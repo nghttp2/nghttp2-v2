@@ -58,6 +58,10 @@ static int conn_call_begin_headers(nghttp2_conn *conn,
     return NGHTTP2_ERR_CALLBACK_FAILURE;
   }
 
+  if (conn->rx.frrd.state == NGHTTP2_FRAME_READ_STATE_CLOSING) {
+    return NGHTTP2_ERR_STOP_READING;
+  }
+
   return 0;
 }
 
@@ -73,6 +77,10 @@ static int conn_call_end_headers(nghttp2_conn *conn,
                                    conn->user_data, stream->user_data);
   if (rv != 0) {
     return NGHTTP2_ERR_CALLBACK_FAILURE;
+  }
+
+  if (conn->rx.frrd.state == NGHTTP2_FRAME_READ_STATE_CLOSING) {
+    return NGHTTP2_ERR_STOP_READING;
   }
 
   return 0;
@@ -92,6 +100,10 @@ static int conn_call_begin_trailers(nghttp2_conn *conn,
     return NGHTTP2_ERR_CALLBACK_FAILURE;
   }
 
+  if (conn->rx.frrd.state == NGHTTP2_FRAME_READ_STATE_CLOSING) {
+    return NGHTTP2_ERR_STOP_READING;
+  }
+
   return 0;
 }
 
@@ -107,6 +119,10 @@ static int conn_call_end_trailers(nghttp2_conn *conn,
                                     conn->user_data, stream->user_data);
   if (rv != 0) {
     return NGHTTP2_ERR_CALLBACK_FAILURE;
+  }
+
+  if (conn->rx.frrd.state == NGHTTP2_FRAME_READ_STATE_CLOSING) {
+    return NGHTTP2_ERR_STOP_READING;
   }
 
   return 0;
@@ -126,6 +142,10 @@ static int conn_call_recv_data(nghttp2_conn *conn, const nghttp2_stream *stream,
     return NGHTTP2_ERR_CALLBACK_FAILURE;
   }
 
+  if (conn->rx.frrd.state == NGHTTP2_FRAME_READ_STATE_CLOSING) {
+    return NGHTTP2_ERR_STOP_READING;
+  }
+
   return 0;
 }
 
@@ -143,6 +163,10 @@ static int conn_call_end_stream(nghttp2_conn *conn,
     return NGHTTP2_ERR_CALLBACK_FAILURE;
   }
 
+  if (conn->rx.frrd.state == NGHTTP2_FRAME_READ_STATE_CLOSING) {
+    return NGHTTP2_ERR_STOP_READING;
+  }
+
   return 0;
 }
 
@@ -157,6 +181,10 @@ static int conn_call_stream_open(nghttp2_conn *conn,
   rv = conn->callbacks.stream_open(conn, stream->stream_id, conn->user_data);
   if (rv != 0) {
     return NGHTTP2_ERR_CALLBACK_FAILURE;
+  }
+
+  if (conn->rx.frrd.state == NGHTTP2_FRAME_READ_STATE_CLOSING) {
+    return NGHTTP2_ERR_STOP_READING;
   }
 
   return 0;
@@ -180,6 +208,71 @@ static int conn_call_stream_close(nghttp2_conn *conn,
                                     stream->user_data);
   if (rv != 0) {
     return NGHTTP2_ERR_CALLBACK_FAILURE;
+  }
+
+  if (conn->rx.frrd.state == NGHTTP2_FRAME_READ_STATE_CLOSING) {
+    return NGHTTP2_ERR_STOP_READING;
+  }
+
+  return 0;
+}
+
+static int conn_call_recv_settings(nghttp2_conn *conn,
+                                   const nghttp2_proto_settings *settings) {
+  int rv;
+
+  if (!conn->callbacks.recv_settings) {
+    return 0;
+  }
+
+  rv = conn->callbacks.recv_settings(conn, settings, conn->user_data);
+  if (rv != 0) {
+    return NGHTTP2_ERR_CALLBACK_FAILURE;
+  }
+
+  if (conn->rx.frrd.state == NGHTTP2_FRAME_READ_STATE_CLOSING) {
+    return NGHTTP2_ERR_STOP_READING;
+  }
+
+  return 0;
+}
+
+static int conn_call_recv_ping_ack(nghttp2_conn *conn,
+                                   const nghttp2_ping_data *data) {
+  int rv;
+
+  if (!conn->callbacks.recv_ping_ack) {
+    return 0;
+  }
+
+  rv = conn->callbacks.recv_ping_ack(conn, data, conn->user_data);
+  if (rv != 0) {
+    return NGHTTP2_ERR_CALLBACK_FAILURE;
+  }
+
+  if (conn->rx.frrd.state == NGHTTP2_FRAME_READ_STATE_CLOSING) {
+    return NGHTTP2_ERR_STOP_READING;
+  }
+
+  return 0;
+}
+
+static int conn_call_shutdown(nghttp2_conn *conn, uint32_t last_stream_id,
+                              uint32_t error_code) {
+  int rv;
+
+  if (!conn->callbacks.shutdown) {
+    return 0;
+  }
+
+  rv =
+    conn->callbacks.shutdown(conn, last_stream_id, error_code, conn->user_data);
+  if (rv != 0) {
+    return NGHTTP2_ERR_CALLBACK_FAILURE;
+  }
+
+  if (conn->rx.frrd.state == NGHTTP2_FRAME_READ_STATE_CLOSING) {
+    return NGHTTP2_ERR_STOP_READING;
   }
 
   return 0;
@@ -1048,6 +1141,10 @@ int nghttp2_conn_decode_field_block(nghttp2_conn *conn, int64_t stream_id,
           if (rv != 0) {
             rv = NGHTTP2_ERR_CALLBACK_FAILURE;
           }
+
+          if (conn->rx.frrd.state == NGHTTP2_FRAME_READ_STATE_CLOSING) {
+            return NGHTTP2_ERR_STOP_READING;
+          }
         }
 
         if (stream->flags & NGHTTP2_STREAM_FLAG_RST_STREAM) {
@@ -1336,11 +1433,9 @@ static int conn_recv_settings(nghttp2_conn *conn,
     nghttp2_min(settings->max_concurrent_streams,
                 conn->settings.max_concurrent_streams_local);
 
-  if (conn->callbacks.recv_settings) {
-    rv = conn->callbacks.recv_settings(conn, settings, conn->user_data);
-    if (rv != 0) {
-      return NGHTTP2_ERR_CALLBACK_FAILURE;
-    }
+  rv = conn_call_recv_settings(conn, settings);
+  if (rv != 0) {
+    return rv;
   }
 
   ++conn->tx.settings.ack_left;
@@ -1376,12 +1471,9 @@ static int conn_recv_ping(nghttp2_conn *conn, const nghttp2_frame_ping *fr) {
       return NGHTTP2_ERR_PROTO;
     }
 
-    if (conn->callbacks.recv_ping_ack) {
-      rv = conn->callbacks.recv_ping_ack(conn, &conn->tx.ping.data,
-                                         conn->user_data);
-      if (rv != 0) {
-        return NGHTTP2_ERR_CALLBACK_FAILURE;
-      }
+    rv = conn_call_recv_ping_ack(conn, &conn->tx.ping.data);
+    if (rv != 0) {
+      return rv;
     }
 
     conn->flags &= ~NGHTTP2_CONN_FLAG_EXPECT_PING_ACK;
@@ -1424,8 +1516,6 @@ static int conn_recv_goaway_hd(nghttp2_conn *conn, nghttp2_frame_goaway *fr,
 
 static int conn_recv_goaway(nghttp2_conn *conn,
                             const nghttp2_frame_goaway *fr) {
-  int rv;
-
   nghttp2_log_rx_goaway(&conn->log, fr);
 
   if (fr->last_stream_id) {
@@ -1445,15 +1535,7 @@ static int conn_recv_goaway(nghttp2_conn *conn,
   conn->rx.goaway.last_stream_id = fr->last_stream_id;
   conn->flags |= NGHTTP2_CONN_FLAG_GOAWAY_RECVED;
 
-  if (conn->callbacks.shutdown) {
-    rv = conn->callbacks.shutdown(conn, fr->last_stream_id, fr->error_code,
-                                  conn->user_data);
-    if (rv != 0) {
-      return NGHTTP2_ERR_CALLBACK_FAILURE;
-    }
-  }
-
-  return 0;
+  return conn_call_shutdown(conn, fr->last_stream_id, fr->error_code);
 }
 
 static int conn_recv_window_update_hd(nghttp2_conn *conn,
@@ -1570,20 +1652,14 @@ static int conn_recv_priority_update(nghttp2_conn *conn,
   return conn_update_stream_priority(conn, stream, &pri);
 }
 
-int nghttp2_conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
-                      nghttp2_tstamp ts) {
+static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
+                     nghttp2_tstamp ts) {
   const uint8_t *p, *end;
   nghttp2_int_reader *ird = &conn->rx.ird;
   nghttp2_frame_reader *frrd = &conn->rx.frrd;
   nghttp2_ssize nread;
   size_t len;
   int rv;
-
-  conn_update_timestamp(conn, ts);
-
-  if (datalen == 0) {
-    return 0;
-  }
 
   p = data;
   end = p + datalen;
@@ -2458,6 +2534,24 @@ int nghttp2_conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
   }
 
   return 0;
+}
+
+int nghttp2_conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
+                      nghttp2_tstamp ts) {
+  int rv;
+
+  conn_update_timestamp(conn, ts);
+
+  if (datalen == 0) {
+    return 0;
+  }
+
+  rv = conn_read(conn, data, datalen, ts);
+  if (rv == NGHTTP2_ERR_STOP_READING) {
+    return 0;
+  }
+
+  return rv;
 }
 
 static int conn_write(nghttp2_conn *conn, nghttp2_buf *dest,

@@ -251,6 +251,11 @@ extern "C" {
  */
 #define NGHTTP2_ERR_STREAM_STATE -221
 /**
+ * @macro :macro:`NGHTTP2_ERR_STOP_READING` indicates that the local
+ * endpoint stops reading any input.
+ */
+#define NGHTTP2_ERR_STOP_READING -222
+/**
  * @macro
  *
  * :macro:`NGHTTP2_ERR_CLOSING` indicates that connection is in closing
