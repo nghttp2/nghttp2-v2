@@ -1141,10 +1141,6 @@ int nghttp2_conn_decode_field_block(nghttp2_conn *conn, int64_t stream_id,
           if (rv != 0) {
             rv = NGHTTP2_ERR_CALLBACK_FAILURE;
           }
-
-          if (conn->rx.frrd.state == NGHTTP2_FRAME_READ_STATE_CLOSING) {
-            return NGHTTP2_ERR_STOP_READING;
-          }
         }
 
         if (stream->flags & NGHTTP2_STREAM_FLAG_RST_STREAM) {
@@ -1156,6 +1152,14 @@ int nghttp2_conn_decode_field_block(nghttp2_conn *conn, int64_t stream_id,
 
       nghttp2_rcbuf_decref(nv.name);
       nghttp2_rcbuf_decref(nv.value);
+
+      if (nghttp2_is_err_fatal(rv)) {
+        return rv;
+      }
+
+      if (conn->rx.frrd.state == NGHTTP2_FRAME_READ_STATE_CLOSING) {
+        return NGHTTP2_ERR_STOP_READING;
+      }
 
       if (rv != 0) {
         return rv;
