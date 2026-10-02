@@ -1153,7 +1153,7 @@ int nghttp2_conn_decode_field_block(nghttp2_conn *conn, int64_t stream_id,
       nghttp2_rcbuf_decref(nv.name);
       nghttp2_rcbuf_decref(nv.value);
 
-      if (nghttp2_is_err_fatal(rv)) {
+      if (nghttp2_err_is_fatal(rv)) {
         return rv;
       }
 
