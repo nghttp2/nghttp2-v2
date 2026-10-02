@@ -1301,8 +1301,6 @@ static int conn_recv_settings(nghttp2_conn *conn,
 
     min_dtable_capacity = conn->rx.frrd.scratch.settings.min_dtable_capacity;
 
-    assert(min_dtable_capacity != UINT32_MAX);
-
     if (min_dtable_capacity != new_settings->hpack_max_dtable_capacity) {
       nghttp2_hpack_encoder_set_max_dtable_capacity(&conn->tx.henc,
                                                     min_dtable_capacity);
