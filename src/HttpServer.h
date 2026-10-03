@@ -63,7 +63,6 @@
 namespace nghttp2 {
 
 struct Config {
-  std::unordered_map<std::string, std::vector<std::string>> push;
   std::unordered_map<std::string, std::string> mime_types;
   Headers trailer;
   std::string trailer_names;
@@ -197,9 +196,6 @@ public:
 
   std::expected<void, Error>
   submit_non_final_response(const std::string &status, int64_t stream_id);
-
-  std::expected<void, Error> submit_push_promise(Stream *stream,
-                                                 std::string_view push_path);
 
   void shutdown_stream(Stream *stream, uint32_t error_code);
 

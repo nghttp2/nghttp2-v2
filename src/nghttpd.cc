@@ -48,32 +48,6 @@
 namespace nghttp2 {
 
 namespace {
-int parse_push_config(Config &config, const char *optarg) {
-  const char *eq = strchr(optarg, '=');
-  if (eq == nullptr) {
-    return -1;
-  }
-  auto &paths = config.push[std::string(optarg, eq)];
-  auto optarg_end = optarg + strlen(optarg);
-  auto i = eq + 1;
-  for (;;) {
-    const char *j = strchr(i, ',');
-    if (j == nullptr) {
-      j = optarg_end;
-    }
-    paths.emplace_back(i, j);
-    if (j == optarg_end) {
-      break;
-    }
-    i = j;
-    ++i;
-  }
-
-  return 0;
-}
-} // namespace
-
-namespace {
 void print_version() { std::println("nghttpd nghttp2/" NGHTTP2_VERSION); }
 } // namespace
 
@@ -124,12 +98,6 @@ Options:
               specifies  the maximum  dynamic table  size it  accepts.
               Then the negotiated dynamic table size is the minimum of
               this option value and the value which client specified.
-  -p, --push=<PATH>=<PUSH_PATH,...>
-              Push  resources <PUSH_PATH>s  when <PATH>  is requested.
-              This option  can be used repeatedly  to specify multiple
-              push  configurations.    <PATH>  and   <PUSH_PATH>s  are
-              relative  to   document  root.   See   --htdocs  option.
-              Example: -p/=/foo.png -p/doc=/bar.css
   -b, --padding=<N>
               Add at  most <N>  bytes to a  frame payload  as padding.
               Specify 0 to disable padding.
@@ -201,7 +169,6 @@ int main(int argc, char **argv) {
       {"verbose", no_argument, nullptr, 'v'},
       {"verify-client", no_argument, nullptr, 'V'},
       {"header-table-size", required_argument, nullptr, 'c'},
-      {"push", required_argument, nullptr, 'p'},
       {"padding", required_argument, nullptr, 'b'},
       {"max-concurrent-streams", required_argument, nullptr, 'm'},
       {"workers", required_argument, nullptr, 'n'},
@@ -223,7 +190,7 @@ int main(int argc, char **argv) {
       {"groups", required_argument, &flag, 14},
       {nullptr, 0, nullptr, 0}};
     int option_index = 0;
-    int c = getopt_long(argc, argv, "DVb:c:d:ehm:n:p:va:w:W:", long_options,
+    int c = getopt_long(argc, argv, "DVb:c:d:ehm:n:va:w:W:", long_options,
                         &option_index);
     if (c == -1) {
       break;
@@ -299,11 +266,6 @@ int main(int argc, char **argv) {
       config.header_table_size = static_cast<int64_t>(*n);
       break;
     }
-    case 'p':
-      if (parse_push_config(config, optarg) != 0) {
-        std::println(stderr, "-p: Bad option value: {}", optarg);
-      }
-      break;
     case 'w':
     case 'W': {
       auto n = util::parse_uint(optarg);
