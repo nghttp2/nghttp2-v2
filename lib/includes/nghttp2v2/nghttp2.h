@@ -921,7 +921,7 @@ typedef struct nghttp2_hpack_nv {
 /**
  * @struct
  *
- * :type:`nghttp2_conn` represents a single QMux connection.
+ * :type:`nghttp2_conn` represents a single HTTP/2 connection.
  */
 typedef struct nghttp2_conn nghttp2_conn;
 
@@ -1614,14 +1614,20 @@ NGHTTP2_EXTERN void nghttp2_conn_del(nghttp2_conn *conn);
  * length |datalen|.  |ts| is the timestamp of this call.  Normally,
  * this function processes all input data.
  *
+ * If this function returns an error code, the error is unrecoverable,
+ * therefore the application should close the underlying connection
+ * without calling any nghttp2 API for |conn|.
+ *
  * This function returns 0 if it succeeds, or one of the following
  * negative error codes:
  *
- * TBD
- *
- * In general, when one of negative error codes is returned, the QMux
- * connection must be closed, and |conn| must be deleted by
- * `nghttp2_conn_del`.
+ * :macro:`NGHTTP2_ERR_NOMEM`
+ *     Out of memory.
+ * :macro:`NGHTTP2_ERR_CALLBACK_FAILURE`
+ *     User callback failed.
+ * :macro:`NGHTTP2_ERR_EXCESSIVE_LOAD`
+ *     The remote endpoint exhibits the behavior that causes the
+ *     excessive load to the local endpoint.
  */
 NGHTTP2_EXTERN int nghttp2_conn_read(nghttp2_conn *conn, const uint8_t *data,
                                      size_t datalen, nghttp2_tstamp ts);
@@ -1706,7 +1712,27 @@ NGHTTP2_EXTERN size_t nghttp2_conn_get_streams_left(const nghttp2_conn *conn);
  *
  * `nghttp2_conn_write` writes HTTP/2 frames into the buffer pointed
  * by |dest| of length |destlen|.  The caller should provide a buffer
- * of 16384 bytes long to just fit into a single TLS record.
+ * of 16384 bytes long to just fit into a single TLS record.  |ts| is
+ * the current timestamp.
+ *
+ * If this function returns an error code, the error is unrecoverable,
+ * therefore the application should close the underlying connection
+ * without calling any nghttp2 API for |conn|.
+ *
+ * This function returns the number of bytes written into the buffer
+ * pointed by |dest| if it succeeds, or one of the following negative
+ * error codes:
+ *
+ * :macro:`NGHTTP2_ERR_NOMEM`
+ *     Out of memory.
+ * :macro:`NGHTTP2_ERR_CALLBACK_FAILURE`
+ *     User callback failed.
+ * :macro:`NGHTTP2_ERR_EXCESSIVE_LOAD`
+ *     The remote endpoint exhibits the behavior that causes the
+ *     excessive load to the local endpoint.
+ * :macro:`NGHTTP2_ERR_CLOSING`
+ *     The connection should be closed because it is terminated by
+ *     GOAWAY; or the graceful shutdown has completed.
  */
 NGHTTP2_EXTERN nghttp2_ssize nghttp2_conn_write(nghttp2_conn *conn,
                                                 uint8_t *dest, size_t destlen,
