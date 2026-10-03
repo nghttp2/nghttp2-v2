@@ -109,8 +109,9 @@ void stream_timeout_cb(struct ev_loop *loop, ev_timer *w, int revents) {
   ev_timer_stop(hd->get_loop(), &stream->rtimer);
   ev_timer_stop(hd->get_loop(), &stream->wtimer);
 
-  if (!hd->submit_rst_stream(stream, NGHTTP2_INTERNAL_ERROR) ||
-      !hd->on_write()) {
+  hd->shutdown_stream(stream, NGHTTP2_INTERNAL_ERROR);
+
+  if (!hd->on_write()) {
     delete_handler(hd);
   }
 }
@@ -406,10 +407,7 @@ int recv_header(nghttp2_conn *conn, int64_t stream_id, int32_t token,
   }
 
   if (stream->header_buffer_size + namebuf.len + valuebuf.len > 64_k) {
-    if (!hd->submit_rst_stream(stream, NGHTTP2_INTERNAL_ERROR)) {
-      return NGHTTP2_ERR_CALLBACK_FAILURE;
-    }
-
+    hd->shutdown_stream(stream, NGHTTP2_INTERNAL_ERROR);
     return 0;
   }
 
@@ -490,10 +488,7 @@ int end_headers(nghttp2_conn *conn, int64_t stream_id, int fin, void *user_data,
   if (hd->get_config()->echo_upload &&
       (method == "POST"sv || method == "PUT"sv)) {
     if (!prepare_upload_temp_store(stream, hd)) {
-      if (!hd->submit_rst_stream(stream, NGHTTP2_INTERNAL_ERROR)) {
-        return NGHTTP2_ERR_CALLBACK_FAILURE;
-      }
-
+      hd->shutdown_stream(stream, NGHTTP2_INTERNAL_ERROR);
       return 0;
     }
   } else if (hd->get_config()->early_response &&
@@ -533,10 +528,7 @@ int recv_data(nghttp2_conn *conn, int64_t stream_id, const uint8_t *data,
              errno == EINTR)
         ;
       if (n == -1) {
-        if (!hd->submit_rst_stream(stream, NGHTTP2_INTERNAL_ERROR)) {
-          return NGHTTP2_ERR_CALLBACK_FAILURE;
-        }
-
+        hd->shutdown_stream(stream, NGHTTP2_INTERNAL_ERROR);
         return 0;
       }
       datalen -= as_unsigned(n);
@@ -1206,14 +1198,11 @@ Http2Handler::submit_non_final_response(const std::string &status,
   return {};
 }
 
-std::expected<void, Error>
-Http2Handler::submit_rst_stream(Stream *stream, uint32_t error_code) {
+void Http2Handler::shutdown_stream(Stream *stream, uint32_t error_code) {
   remove_stream_read_timeout(stream);
   remove_stream_write_timeout(stream);
 
   nghttp2_conn_shutdown_stream(conn_, 0x00, stream->stream_id, error_code);
-
-  return {};
 }
 
 void Http2Handler::add_stream(int64_t stream_id,
@@ -1309,11 +1298,13 @@ std::expected<void, Error> prepare_echo_response(Stream *stream,
                                                  Http2Handler *hd) {
   auto length = lseek(stream->file_ent->fd, 0, SEEK_END);
   if (length == -1) {
-    return hd->submit_rst_stream(stream, NGHTTP2_INTERNAL_ERROR);
+    hd->shutdown_stream(stream, NGHTTP2_INTERNAL_ERROR);
+    return {};
   }
   stream->body_length = length;
   if (lseek(stream->file_ent->fd, 0, SEEK_SET) == -1) {
-    return hd->submit_rst_stream(stream, NGHTTP2_INTERNAL_ERROR);
+    hd->shutdown_stream(stream, NGHTTP2_INTERNAL_ERROR);
+    return {};
   }
 
   static constexpr nghttp2_data_reader dr{

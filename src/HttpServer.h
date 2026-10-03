@@ -202,8 +202,7 @@ public:
   std::expected<void, Error> submit_push_promise(Stream *stream,
                                                  std::string_view push_path);
 
-  std::expected<void, Error> submit_rst_stream(Stream *stream,
-                                               uint32_t error_code);
+  void shutdown_stream(Stream *stream, uint32_t error_code);
 
   void add_stream(int64_t stream_id, std::unique_ptr<Stream> stream);
   void remove_stream(int64_t stream_id);
