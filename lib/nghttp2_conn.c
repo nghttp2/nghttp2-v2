@@ -1127,42 +1127,52 @@ int nghttp2_conn_decode_field_block(nghttp2_conn *conn, int64_t stream_id,
     }
 
     if (flags & NGHTTP2_HPACK_DECODE_FLAG_EMIT) {
-      if (stream) {
-        rv = nghttp2_http_on_header(&stream->rx.http, &nv, request, trailers,
-                                    conn->server &&
-                                      conn->settings.enable_connect_protocol);
-        if (rv != 0) {
-          if (rv == NGHTTP2_ERR_REMOVE_HTTP_HEADER) {
-            rv = 0;
-          }
-        } else if (recv_header) {
-          rv = recv_header(conn, stream->stream_id, nv.token, nv.name, nv.value,
-                           nv.flags, conn->user_data, stream->user_data);
-          if (rv != 0) {
-            rv = NGHTTP2_ERR_CALLBACK_FAILURE;
-          }
+      if (!stream) {
+        nghttp2_rcbuf_decref(nv.name);
+        nghttp2_rcbuf_decref(nv.value);
+
+        continue;
+      }
+
+      rv = nghttp2_http_on_header(&stream->rx.http, &nv, request, trailers,
+                                  conn->server &&
+                                    conn->settings.enable_connect_protocol);
+      if (rv != 0) {
+        nghttp2_rcbuf_decref(nv.name);
+        nghttp2_rcbuf_decref(nv.value);
+
+        if (rv == NGHTTP2_ERR_REMOVE_HTTP_HEADER) {
+          continue;
         }
 
-        if (stream->flags & NGHTTP2_STREAM_FLAG_RST_STREAM) {
-          stream = NULL;
-        }
-      } else {
-        rv = 0;
+        return rv;
+      }
+
+      if (!recv_header) {
+        nghttp2_rcbuf_decref(nv.name);
+        nghttp2_rcbuf_decref(nv.value);
+
+        continue;
+      }
+
+      rv = recv_header(conn, stream->stream_id, nv.token, nv.name, nv.value,
+                       nv.flags, conn->user_data, stream->user_data);
+      if (rv != 0) {
+        nghttp2_rcbuf_decref(nv.name);
+        nghttp2_rcbuf_decref(nv.value);
+
+        return NGHTTP2_ERR_CALLBACK_FAILURE;
+      }
+
+      if (stream->flags & NGHTTP2_STREAM_FLAG_RST_STREAM) {
+        stream = NULL;
       }
 
       nghttp2_rcbuf_decref(nv.name);
       nghttp2_rcbuf_decref(nv.value);
 
-      if (nghttp2_err_is_fatal(rv)) {
-        return rv;
-      }
-
       if (conn->rx.frrd.state == NGHTTP2_FRAME_READ_STATE_CLOSING) {
         return NGHTTP2_ERR_STOP_READING;
-      }
-
-      if (rv != 0) {
-        return rv;
       }
     }
   }
