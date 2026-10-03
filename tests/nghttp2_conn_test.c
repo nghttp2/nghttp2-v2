@@ -81,6 +81,7 @@ static const MunitTest tests[] = {
   munit_void_test(test_nghttp2_conn_is_server),
   munit_void_test(test_nghttp2_conn_get_timestamp),
   munit_void_test(test_nghttp2_conn_get_stream_priority),
+  munit_void_test(test_nghttp2_conn_set_stream_user_data),
   munit_test_end(),
 };
 
@@ -15719,4 +15720,31 @@ void test_nghttp2_conn_get_stream_priority(void) {
   nghttp2_conn_del(conn);
 
   nghttp2_buf_free(&hbuf, mem);
+}
+
+void test_nghttp2_conn_set_stream_user_data(void) {
+  nghttp2_conn *conn;
+  int64_t stream_id;
+  int rv;
+
+  setup_default_client(&conn);
+
+  stream_id = nghttp2_conn_submit_request(
+    conn, reqnva, nghttp2_arraylen(reqnva), NULL, &stream_id);
+
+  assert_int64(0x01, ==, stream_id);
+  assert_ptr_equal(&stream_id,
+                   nghttp2_conn_get_stream_user_data(conn, stream_id));
+  assert_null(nghttp2_conn_get_stream_user_data(conn, 0x03));
+
+  rv = nghttp2_conn_set_stream_user_data(conn, stream_id, &rv);
+
+  assert_int(0, ==, rv);
+  assert_ptr_equal(&rv, nghttp2_conn_get_stream_user_data(conn, stream_id));
+
+  rv = nghttp2_conn_set_stream_user_data(conn, 0x03, &rv);
+
+  assert_int(NGHTTP2_ERR_STREAM_NOT_FOUND, ==, rv);
+
+  nghttp2_conn_del(conn);
 }

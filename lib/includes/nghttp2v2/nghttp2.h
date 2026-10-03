@@ -1934,6 +1934,38 @@ NGHTTP2_EXTERN void nghttp2_conn_terminate(nghttp2_conn *conn,
                                            uint32_t error_code);
 
 /**
+ * @function
+ *
+ * `nghttp2_conn_set_stream_user_data` sets |stream_user_data| to the
+ * stream identified by |stream_id|.
+ *
+ * This function returns 0 if it succeeds, or one of the following
+ * negative error codes:
+ *
+ * :macro:`NGHTTP2_ERR_STREAM_NOT_FOUND`
+ *     Stream not found.
+ */
+NGHTTP2_EXTERN int nghttp2_conn_set_stream_user_data(nghttp2_conn *conn,
+                                                     int64_t stream_id,
+                                                     void *stream_user_data);
+
+/**
+ * @function
+ *
+ * `nghttp2_conn_get_stream_user_data` returns the user data
+ * associated to the stream identified by |stream_id|.  If no data is
+ * associated or the stream is not found, this function returns NULL.
+ *
+ * The user data can be associated to the stream by the following
+ * functions:
+ *
+ * - `nghttp2_conn_set_stream_user_data`
+ * - `nghttp2_conn_submit_request`
+ */
+NGHTTP2_EXTERN void *nghttp2_conn_get_stream_user_data(const nghttp2_conn *conn,
+                                                       int64_t stream_id);
+
+/**
  * @macrosection
  *
  * HTTP stream priority flags

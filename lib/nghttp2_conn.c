@@ -3798,3 +3798,33 @@ int nghttp2_conn_is_server(const nghttp2_conn *conn) { return conn->server; }
 nghttp2_tstamp nghttp2_conn_get_timestamp(const nghttp2_conn *conn) {
   return conn->log.last_ts;
 }
+
+int nghttp2_conn_set_stream_user_data(nghttp2_conn *conn, int64_t stream_id,
+                                      void *stream_user_data) {
+  nghttp2_stream *stream;
+
+  assert(stream_id & 0x1);
+
+  stream = nghttp2_conn_find_stream(conn, stream_id);
+  if (!stream) {
+    return NGHTTP2_ERR_STREAM_NOT_FOUND;
+  }
+
+  stream->user_data = stream_user_data;
+
+  return 0;
+}
+
+void *nghttp2_conn_get_stream_user_data(const nghttp2_conn *conn,
+                                        int64_t stream_id) {
+  nghttp2_stream *stream;
+
+  assert(stream_id & 0x1);
+
+  stream = nghttp2_conn_find_stream(conn, stream_id);
+  if (!stream) {
+    return NULL;
+  }
+
+  return stream->user_data;
+}
