@@ -1969,7 +1969,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
 
             p += nread;
 
-            rv = conn_recv_ping(conn, &frrd->fr.ping);
+            rv = conn_recv_ping(conn, &fr->ping);
             if (rv != 0) {
               return nghttp2_conn_handle_error(conn, rv);
             }
@@ -1984,7 +1984,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
 
           break;
         case NGHTTP2_FRAME_GOAWAY:
-          rv = conn_recv_goaway_hd(conn, &frrd->fr.goaway, ts);
+          rv = conn_recv_goaway_hd(conn, &fr->goaway, ts);
           if (rv != 0) {
             return nghttp2_conn_handle_error(conn, rv);
           }
@@ -2010,7 +2010,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
           }
 
           frrd->state = NGHTTP2_FRAME_READ_STATE_GOAWAY_LAST_STREAM_ID;
-          frrd->left = frrd->fr.goaway.hd.len;
+          frrd->left = fr->goaway.hd.len;
 
           break;
         case NGHTTP2_FRAME_WINDOW_UPDATE:
@@ -2083,11 +2083,11 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
 
           frrd->state =
             NGHTTP2_FRAME_READ_STATE_PRIORITY_UPDATE_PRIORITIZED_STREAM_ID;
-          frrd->left = frrd->fr.priority_update.hd.len;
+          frrd->left = fr->priority_update.hd.len;
 
           break;
         default:
-          nghttp2_log_rx_unknown_frame(&conn->log, &frrd->fr.meta);
+          nghttp2_log_rx_unknown_frame(&conn->log, &fr->meta);
 
           rv = conn_update_glitch_ratelim(conn, 1, ts);
           if (rv != 0) {
@@ -2105,7 +2105,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
           }
 
           frrd->state = NGHTTP2_FRAME_READ_STATE_DISCARD_FRAME;
-          frrd->left = frrd->fr.meta.hd.len;
+          frrd->left = fr->meta.hd.len;
 
           break;
         }
@@ -2117,16 +2117,16 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
 
       break;
     case NGHTTP2_FRAME_READ_STATE_DATA_PADLEN:
-      frrd->fr.data.padlen = *p++;
+      fr->data.padlen = *p++;
 
       --frrd->left;
 
-      if (frrd->fr.data.padlen > frrd->left) {
+      if (fr->data.padlen > frrd->left) {
         return nghttp2_conn_handle_error(conn, NGHTTP2_ERR_PROTO);
       }
 
       if (frrd->left == 0) {
-        rv = conn_recv_data(conn, &frrd->fr.data);
+        rv = conn_recv_data(conn, &fr->data);
         if (rv != 0) {
           return nghttp2_conn_handle_error(conn, rv);
         }
@@ -2134,9 +2134,9 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
         goto frame_done;
       }
 
-      frrd->fr.data.datalen = frrd->left - frrd->fr.data.padlen;
+      fr->data.datalen = frrd->left - fr->data.padlen;
       frrd->state = NGHTTP2_FRAME_READ_STATE_DATA_DATA;
-      frrd->field_left = frrd->fr.data.datalen;
+      frrd->field_left = fr->data.datalen;
 
       if (p == end) {
         return 0;
@@ -2150,7 +2150,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
       frrd->field_left -= len;
       frrd->left -= len;
 
-      rv = conn_on_data(conn, &frrd->fr.data, p, len);
+      rv = conn_on_data(conn, &fr->data, p, len);
       if (rv != 0) {
         return nghttp2_conn_handle_error(conn, rv);
       }
@@ -2160,7 +2160,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
       }
 
       if (frrd->left == 0) {
-        rv = conn_recv_data(conn, &frrd->fr.data);
+        rv = conn_recv_data(conn, &fr->data);
         if (rv != 0) {
           return nghttp2_conn_handle_error(conn, rv);
         }
@@ -2168,7 +2168,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
         goto frame_done;
       }
 
-      assert(frrd->fr.data.padlen);
+      assert(fr->data.padlen);
 
       frrd->state = NGHTTP2_FRAME_READ_STATE_DATA_PADDING;
 
@@ -2187,32 +2187,32 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
         return 0;
       }
 
-      rv = conn_recv_data(conn, &frrd->fr.data);
+      rv = conn_recv_data(conn, &fr->data);
       if (rv != 0) {
         return nghttp2_conn_handle_error(conn, rv);
       }
 
       goto frame_done;
     case NGHTTP2_FRAME_READ_STATE_HEADERS_PADLEN:
-      frrd->fr.headers.padlen = *p++;
+      fr->headers.padlen = *p++;
 
       --frrd->left;
 
-      if (frrd->fr.headers.hd.flags & NGHTTP2_HEADERS_FLAG_PRIORITY) {
+      if (fr->headers.hd.flags & NGHTTP2_HEADERS_FLAG_PRIORITY) {
         frrd->state = NGHTTP2_FRAME_READ_STATE_HEADERS_PRIORITY;
         frrd->field_left = 5;
 
-        if (frrd->fr.headers.padlen + frrd->field_left > frrd->left) {
+        if (fr->headers.padlen + frrd->field_left > frrd->left) {
           return nghttp2_conn_handle_error(conn, NGHTTP2_ERR_PROTO);
         }
       } else {
-        if (frrd->fr.headers.padlen > frrd->left) {
+        if (fr->headers.padlen > frrd->left) {
           return nghttp2_conn_handle_error(conn, NGHTTP2_ERR_PROTO);
         }
 
         if (frrd->left == 0) {
-          if (frrd->fr.headers.hd.flags & NGHTTP2_HEADERS_FLAG_END_HEADERS) {
-            rv = conn_recv_headers(conn, &frrd->fr.headers);
+          if (fr->headers.hd.flags & NGHTTP2_HEADERS_FLAG_END_HEADERS) {
+            rv = conn_recv_headers(conn, &fr->headers);
             if (rv != 0) {
               return nghttp2_conn_handle_error(conn, rv);
             }
@@ -2226,8 +2226,8 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
         }
 
         frrd->state = NGHTTP2_FRAME_READ_STATE_HEADERS_FIELD_BLOCK;
-        frrd->field_left = frrd->left - frrd->fr.headers.padlen;
-        frrd->fr.headers.field_blocklen = frrd->field_left;
+        frrd->field_left = frrd->left - fr->headers.padlen;
+        fr->headers.field_blocklen = frrd->field_left;
 
         break;
       }
@@ -2249,8 +2249,8 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
       }
 
       if (frrd->left == 0) {
-        if (frrd->fr.headers.hd.flags & NGHTTP2_HEADERS_FLAG_END_HEADERS) {
-          rv = conn_recv_headers(conn, &frrd->fr.headers);
+        if (fr->headers.hd.flags & NGHTTP2_HEADERS_FLAG_END_HEADERS) {
+          rv = conn_recv_headers(conn, &fr->headers);
           if (rv != 0) {
             return nghttp2_conn_handle_error(conn, rv);
           }
@@ -2264,8 +2264,8 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
       }
 
       frrd->state = NGHTTP2_FRAME_READ_STATE_HEADERS_FIELD_BLOCK;
-      frrd->field_left = frrd->left - frrd->fr.headers.padlen;
-      frrd->fr.headers.field_blocklen = frrd->field_left;
+      frrd->field_left = frrd->left - fr->headers.padlen;
+      fr->headers.field_blocklen = frrd->field_left;
 
       if (p == end) {
         return 0;
@@ -2276,8 +2276,8 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
       len = nghttp2_min(frrd->field_left, (size_t)(end - p));
 
       rv = nghttp2_conn_decode_field_block(
-        conn, frrd->fr.headers.hd.stream_id, p, len,
-        (frrd->fr.headers.hd.flags & NGHTTP2_HEADERS_FLAG_END_HEADERS) &&
+        conn, fr->headers.hd.stream_id, p, len,
+        (fr->headers.hd.flags & NGHTTP2_HEADERS_FLAG_END_HEADERS) &&
           frrd->field_left == len);
       if (rv != 0) {
         return nghttp2_conn_handle_error(conn, rv);
@@ -2292,10 +2292,10 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
       }
 
       if (frrd->left == 0) {
-        assert(frrd->fr.headers.padlen == 0);
+        assert(fr->headers.padlen == 0);
 
-        if (frrd->fr.headers.hd.flags & NGHTTP2_HEADERS_FLAG_END_HEADERS) {
-          rv = conn_recv_headers(conn, &frrd->fr.headers);
+        if (fr->headers.hd.flags & NGHTTP2_HEADERS_FLAG_END_HEADERS) {
+          rv = conn_recv_headers(conn, &fr->headers);
           if (rv != 0) {
             return nghttp2_conn_handle_error(conn, rv);
           }
@@ -2308,7 +2308,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
         break;
       }
 
-      assert(frrd->fr.headers.padlen);
+      assert(fr->headers.padlen);
 
       frrd->state = NGHTTP2_FRAME_READ_STATE_HEADERS_PADDING;
 
@@ -2327,8 +2327,8 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
         return 0;
       }
 
-      if (frrd->fr.headers.hd.flags & NGHTTP2_HEADERS_FLAG_END_HEADERS) {
-        rv = conn_recv_headers(conn, &frrd->fr.headers);
+      if (fr->headers.hd.flags & NGHTTP2_HEADERS_FLAG_END_HEADERS) {
+        rv = conn_recv_headers(conn, &fr->headers);
         if (rv != 0) {
           return nghttp2_conn_handle_error(conn, rv);
         }
@@ -2366,8 +2366,8 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
       }
 
       /* We treat HEADERS + CONTINUATIONS... as a one big HEADERS. */
-      frrd->fr.headers.hd.len += (uint32_t)frrd->left;
-      frrd->fr.headers.field_blocklen += frrd->left;
+      fr->headers.hd.len += (uint32_t)frrd->left;
+      fr->headers.field_blocklen += frrd->left;
 
       frrd->state = NGHTTP2_FRAME_READ_STATE_CONTINUATION_FRAME_TYPE;
 
@@ -2389,7 +2389,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
 
       /* Fall through */
     case NGHTTP2_FRAME_READ_STATE_CONTINUATION_FRAME_FLAGS:
-      frrd->fr.headers.hd.flags |= *p++ & NGHTTP2_HEADERS_FLAG_END_HEADERS;
+      fr->headers.hd.flags |= *p++ & NGHTTP2_HEADERS_FLAG_END_HEADERS;
       frrd->state = NGHTTP2_FRAME_READ_STATE_CONTINUATION_FRAME_STREAM_ID;
 
       if (p == end) {
@@ -2406,21 +2406,21 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
         return 0;
       }
 
-      if (frrd->fr.headers.hd.stream_id != nghttp2_int_reader_final31(ird)) {
+      if (fr->headers.hd.stream_id != nghttp2_int_reader_final31(ird)) {
         return nghttp2_conn_handle_error(conn, NGHTTP2_ERR_PROTO);
       }
 
       if (frrd->left == 0) {
         /* 0 length CONTINUATION */
-        if (frrd->fr.headers.hd.flags & NGHTTP2_HEADERS_FLAG_END_HEADERS) {
-          rv = nghttp2_conn_decode_field_block(
-            conn, frrd->fr.headers.hd.stream_id, NULL, 0,
-            /* fin = */ 1);
+        if (fr->headers.hd.flags & NGHTTP2_HEADERS_FLAG_END_HEADERS) {
+          rv = nghttp2_conn_decode_field_block(conn, fr->headers.hd.stream_id,
+                                               NULL, 0,
+                                               /* fin = */ 1);
           if (rv != 0) {
             return nghttp2_conn_handle_error(conn, rv);
           }
 
-          rv = conn_recv_headers(conn, &frrd->fr.headers);
+          rv = conn_recv_headers(conn, &fr->headers);
           if (rv != 0) {
             return nghttp2_conn_handle_error(conn, rv);
           }
@@ -2449,9 +2449,9 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
 
       assert(frrd->left == 0);
 
-      frrd->fr.rst_stream.error_code = nghttp2_int_reader_final(ird);
+      fr->rst_stream.error_code = nghttp2_int_reader_final(ird);
 
-      rv = conn_recv_rst_stream(conn, &frrd->fr.rst_stream);
+      rv = conn_recv_rst_stream(conn, &fr->rst_stream);
       if (rv != 0) {
         return nghttp2_conn_handle_error(conn, rv);
       }
@@ -2489,7 +2489,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
 
         frrd->scratch.settings.value = nghttp2_int_reader_final(ird);
 
-        rv = conn_recv_settings_entry(conn, &frrd->fr.settings,
+        rv = conn_recv_settings_entry(conn, &fr->settings,
                                       frrd->scratch.settings.id,
                                       frrd->scratch.settings.value);
         if (rv != 0) {
@@ -2497,7 +2497,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
         }
 
         if (frrd->left == 0) {
-          rv = conn_recv_settings(conn, &frrd->fr.settings, ts);
+          rv = conn_recv_settings(conn, &fr->settings, ts);
           if (rv != 0) {
             return nghttp2_conn_handle_error(conn, rv);
           }
@@ -2521,15 +2521,15 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
 
       frrd->scratch.settings.value = nghttp2_int_reader_final(ird);
 
-      rv = conn_recv_settings_entry(conn, &frrd->fr.settings,
-                                    frrd->scratch.settings.id,
-                                    frrd->scratch.settings.value);
+      rv =
+        conn_recv_settings_entry(conn, &fr->settings, frrd->scratch.settings.id,
+                                 frrd->scratch.settings.value);
       if (rv != 0) {
         return nghttp2_conn_handle_error(conn, rv);
       }
 
       if (frrd->left == 0) {
-        rv = conn_recv_settings(conn, &frrd->fr.settings, ts);
+        rv = conn_recv_settings(conn, &fr->settings, ts);
         if (rv != 0) {
           return nghttp2_conn_handle_error(conn, rv);
         }
@@ -2543,9 +2543,8 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
     case NGHTTP2_FRAME_READ_STATE_PING_DATA:
       len = nghttp2_min(frrd->left, (size_t)(end - p));
 
-      memcpy(frrd->fr.ping.data.data +
-               (sizeof(frrd->fr.ping.data.data) - frrd->left),
-             p, len);
+      memcpy(fr->ping.data.data + (sizeof(fr->ping.data.data) - frrd->left), p,
+             len);
 
       p += len;
       frrd->left -= len;
@@ -2554,7 +2553,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
         return 0;
       }
 
-      rv = conn_recv_ping(conn, &frrd->fr.ping);
+      rv = conn_recv_ping(conn, &fr->ping);
       if (rv != 0) {
         return nghttp2_conn_handle_error(conn, rv);
       }
@@ -2570,7 +2569,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
         return 0;
       }
 
-      frrd->fr.goaway.last_stream_id = nghttp2_int_reader_final31(ird);
+      fr->goaway.last_stream_id = nghttp2_int_reader_final31(ird);
 
       frrd->state = NGHTTP2_FRAME_READ_STATE_GOAWAY_ERROR_CODE;
 
@@ -2589,10 +2588,10 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
         return 0;
       }
 
-      frrd->fr.goaway.error_code = nghttp2_int_reader_final(ird);
+      fr->goaway.error_code = nghttp2_int_reader_final(ird);
 
       if (frrd->left == 0) {
-        rv = conn_recv_goaway(conn, &frrd->fr.goaway);
+        rv = conn_recv_goaway(conn, &fr->goaway);
         if (rv != 0) {
           return nghttp2_conn_handle_error(conn, rv);
         }
@@ -2617,7 +2616,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
         return 0;
       }
 
-      rv = conn_recv_goaway(conn, &frrd->fr.goaway);
+      rv = conn_recv_goaway(conn, &fr->goaway);
       if (rv != 0) {
         return nghttp2_conn_handle_error(conn, rv);
       }
@@ -2635,9 +2634,9 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
 
       assert(frrd->left == 0);
 
-      frrd->fr.window_update.window_size_inc = nghttp2_int_reader_final31(ird);
+      fr->window_update.window_size_inc = nghttp2_int_reader_final31(ird);
 
-      rv = conn_recv_window_update(conn, &frrd->fr.window_update, ts);
+      rv = conn_recv_window_update(conn, &fr->window_update, ts);
       if (rv != 0) {
         return nghttp2_conn_handle_error(conn, rv);
       }
@@ -2653,11 +2652,11 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
         return 0;
       }
 
-      frrd->fr.priority_update.prioritized_stream_id =
+      fr->priority_update.prioritized_stream_id =
         nghttp2_int_reader_final31(ird);
 
       if (frrd->left == 0) {
-        rv = conn_recv_priority_update(conn, &frrd->fr.priority_update, ts);
+        rv = conn_recv_priority_update(conn, &fr->priority_update, ts);
         if (rv != 0) {
           return nghttp2_conn_handle_error(conn, rv);
         }
@@ -2689,8 +2688,8 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
       if (frrd->left == 0 && frrd->scratch.priority_update.prilen == 0) {
         /* The incoming buffer contains the complete priority field
            value */
-        frrd->fr.priority_update.pri = p - len;
-        frrd->fr.priority_update.prilen = len;
+        fr->priority_update.pri = p - len;
+        fr->priority_update.prilen = len;
       } else {
         memcpy(frrd->scratch.priority_update.pri +
                  frrd->scratch.priority_update.prilen,
@@ -2701,11 +2700,11 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
           return 0;
         }
 
-        frrd->fr.priority_update.pri = frrd->scratch.priority_update.pri;
-        frrd->fr.priority_update.prilen = frrd->scratch.priority_update.prilen;
+        fr->priority_update.pri = frrd->scratch.priority_update.pri;
+        fr->priority_update.prilen = frrd->scratch.priority_update.prilen;
       }
 
-      rv = conn_recv_priority_update(conn, &frrd->fr.priority_update, ts);
+      rv = conn_recv_priority_update(conn, &fr->priority_update, ts);
       if (rv != 0) {
         return nghttp2_conn_handle_error(conn, rv);
       }
