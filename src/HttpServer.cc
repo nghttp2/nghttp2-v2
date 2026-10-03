@@ -222,15 +222,6 @@ public:
   }
   const Config *get_config() const { return config_; }
   struct ev_loop *get_loop() const { return loop_; }
-  int64_t get_next_session_id() {
-    auto session_id = next_session_id_;
-    if (next_session_id_ == std::numeric_limits<int64_t>::max()) {
-      next_session_id_ = 1;
-    } else {
-      ++next_session_id_;
-    }
-    return session_id;
-  }
   void accept_connection(int fd) {
     util::make_socket_nodelay(fd);
     SSL *ssl = nullptr;
@@ -241,8 +232,7 @@ public:
         return;
       }
     }
-    auto handler =
-      std::make_unique<Http2Handler>(this, fd, ssl, get_next_session_id());
+    auto handler = std::make_unique<Http2Handler>(this, fd, ssl);
     if (!ssl && !handler->connection_made()) {
       return;
     }
@@ -357,7 +347,6 @@ private:
   const Config *config_;
   SSL_CTX *ssl_ctx_;
   ev_timer release_fd_timer_;
-  int64_t next_session_id_{1};
   ev_tstamp tstamp_cached_;
   std::string cached_date_;
 };
@@ -643,7 +632,7 @@ Stream::~Stream() {
 }
 
 namespace {
-void on_session_closed(Http2Handler *hd, int64_t session_id) {
+void on_session_closed(Http2Handler *hd) {
   if (hd->get_config()->verbose) {
     print_connection_close(hd->get_conn_id());
   }
@@ -680,9 +669,8 @@ void writecb(struct ev_loop *loop, ev_io *w, int revents) {
 }
 } // namespace
 
-Http2Handler::Http2Handler(Sessions *sessions, int fd, SSL *ssl,
-                           int64_t session_id)
-  : session_id_(session_id), sessions_(sessions), ssl_(ssl), fd_(fd) {
+Http2Handler::Http2Handler(Sessions *sessions, int fd, SSL *ssl)
+  : sessions_(sessions), ssl_(ssl), fd_(fd) {
   ev_timer_init(&settings_timerev_, settings_timeout_cb, 0., 0.);
   ev_io_init(&wev_, writecb, fd, EV_WRITE);
   ev_io_init(&rev_, readcb, fd, EV_READ);
@@ -705,7 +693,7 @@ Http2Handler::Http2Handler(Sessions *sessions, int fd, SSL *ssl,
 }
 
 Http2Handler::~Http2Handler() {
-  on_session_closed(this, session_id_);
+  on_session_closed(this);
   nghttp2_conn_del(conn_);
   if (ssl_) {
     SSL_set_shutdown(ssl_, SSL_get_shutdown(ssl_) | SSL_RECEIVED_SHUTDOWN);
@@ -1245,8 +1233,6 @@ Stream *Http2Handler::get_stream(int64_t stream_id) {
     return (*itr).second.get();
   }
 }
-
-int64_t Http2Handler::session_id() const { return session_id_; }
 
 Sessions *Http2Handler::get_sessions() const { return sessions_; }
 

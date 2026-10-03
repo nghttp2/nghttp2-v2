@@ -171,7 +171,7 @@ class Sessions;
 
 class Http2Handler {
 public:
-  Http2Handler(Sessions *sessions, int fd, SSL *ssl, int64_t session_id);
+  Http2Handler(Sessions *sessions, int fd, SSL *ssl);
   ~Http2Handler();
 
   void remove_self();
@@ -208,7 +208,6 @@ public:
   void add_stream(int64_t stream_id, std::unique_ptr<Stream> stream);
   void remove_stream(int64_t stream_id);
   Stream *get_stream(int64_t stream_id);
-  int64_t session_id() const;
   Sessions *get_sessions() const;
   const Config *get_config() const;
   void remove_settings_timer();
@@ -235,7 +234,6 @@ private:
   ev_timer settings_timerev_;
   std::unordered_map<int64_t, std::unique_ptr<Stream>> id2stream_;
   std::function<std::expected<void, Error>(Http2Handler &)> read_, write_;
-  int64_t session_id_;
   nghttp2_conn *conn_{};
   Sessions *sessions_;
   SSL *ssl_;
