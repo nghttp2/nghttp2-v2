@@ -122,7 +122,6 @@ Options:
               specifies  the maximum  dynamic table  size it  accepts.
               Then the negotiated dynamic table size is the minimum of
               this option value and the value which client specified.
-  --color     Force colored log output.
   -p, --push=<PATH>=<PUSH_PATH,...>
               Push  resources <PUSH_PATH>s  when <PATH>  is requested.
               This option  can be used repeatedly  to specify multiple
@@ -189,7 +188,6 @@ Options:
 
 int main(int argc, char **argv) {
   Config config;
-  bool color = false;
   auto mime_types_file_set_manually = false;
 
   while (1) {
@@ -210,7 +208,6 @@ int main(int argc, char **argv) {
       {"window-bits", required_argument, nullptr, 'w'},
       {"connection-window-bits", required_argument, nullptr, 'W'},
       {"no-tls", no_argument, &flag, 1},
-      {"color", no_argument, &flag, 2},
       {"version", no_argument, &flag, 3},
       {"dh-param-file", required_argument, &flag, 4},
       {"early-response", no_argument, &flag, 5},
@@ -332,10 +329,6 @@ int main(int argc, char **argv) {
       case 1:
         // no-tls option
         config.no_tls = true;
-        break;
-      case 2:
-        // color option
-        color = true;
         break;
       case 3:
         // version
@@ -485,13 +478,9 @@ int main(int argc, char **argv) {
     trailer_names.resize(trailer_names.size() - 2);
   }
 
-  set_color_output(color || isatty(fileno(stdout)));
-
   struct sigaction act{};
   act.sa_handler = SIG_IGN;
   sigaction(SIGPIPE, &act, nullptr);
-
-  reset_timer();
 
   HttpServer server(&config);
   if (!server.run()) {
