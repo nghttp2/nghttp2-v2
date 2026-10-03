@@ -97,7 +97,6 @@ struct Config {
   bool no_content_length{};
   bool ktls{};
   Config() noexcept = default;
-  ~Config();
 };
 
 class Http2Handler;
@@ -208,7 +207,6 @@ public:
   void remove_stream(int64_t stream_id);
   Stream *get_stream(int64_t stream_id);
   Sessions *get_sessions() const;
-  const Config *get_config() const;
   void remove_settings_timer();
   void terminate_session(uint32_t error_code);
   void set_timeout();
@@ -251,14 +249,12 @@ struct StatusPage {
 
 class HttpServer {
 public:
-  HttpServer(const Config *config);
+  HttpServer();
   std::expected<void, Error> run();
-  const Config *get_config() const;
   const StatusPage *get_status_page(int status) const;
 
 private:
   std::vector<StatusPage> status_pages_;
-  const Config *config_;
 };
 
 nghttp2_ssize file_read_callback(nghttp2_conn *conn, int64_t stream_id,

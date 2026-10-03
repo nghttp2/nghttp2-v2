@@ -87,14 +87,14 @@ namespace nghttp2 {
 constexpr auto DEFAULT_HTML = "index.html"sv;
 constexpr auto NGHTTPD_SERVER = "nghttpd nghttp2/" NGHTTP2_VERSION ""sv;
 
+Config config;
+
 namespace {
 void delete_handler(Http2Handler *handler) {
   handler->remove_self();
   delete handler;
 }
 } // namespace
-
-Config::~Config() {}
 
 void FileEntry::map_file() {
   map = mmap(NULL, static_cast<size_t>(length), PROT_READ, MAP_PRIVATE, fd, 0);
@@ -181,11 +181,9 @@ bool validate_file_entry(FileEntry *ent,
 
 class Sessions {
 public:
-  Sessions(HttpServer *sv, struct ev_loop *loop, const Config *config,
-           SSL_CTX *ssl_ctx)
+  Sessions(HttpServer *sv, struct ev_loop *loop, SSL_CTX *ssl_ctx)
     : sv_(sv),
       loop_(loop),
-      config_(config),
       ssl_ctx_(ssl_ctx),
       tstamp_cached_(ev_now(loop)),
       cached_date_(
@@ -221,7 +219,6 @@ public:
     }
     return ssl;
   }
-  const Config *get_config() const { return config_; }
   struct ev_loop *get_loop() const { return loop_; }
   void accept_connection(int fd) {
     util::make_socket_nodelay(fd);
@@ -345,7 +342,6 @@ private:
   DList<FileEntry> fd_cache_lru_;
   HttpServer *sv_;
   struct ev_loop *loop_;
-  const Config *config_;
   SSL_CTX *ssl_ctx_;
   ev_timer release_fd_timer_;
   ev_tstamp tstamp_cached_;
@@ -378,7 +374,7 @@ int begin_headers(nghttp2_conn *conn, int64_t stream_id, void *user_data,
   auto hd = static_cast<Http2Handler *>(user_data);
   auto stream = std::make_unique<Stream>(hd, stream_id);
 
-  if (hd->get_config()->verbose) {
+  if (config.verbose) {
     print_http_begin_request_headers(stream_id);
   }
 
@@ -402,7 +398,7 @@ int recv_header(nghttp2_conn *conn, int64_t stream_id, int32_t token,
     return 0;
   }
 
-  if (hd->get_config()->verbose) {
+  if (config.verbose) {
     print_http_header(stream_id, name, value, flags);
   }
 
@@ -473,7 +469,7 @@ int end_headers(nghttp2_conn *conn, int64_t stream_id, int fin, void *user_data,
     return 0;
   }
 
-  if (hd->get_config()->verbose) {
+  if (config.verbose) {
     print_http_end_headers(stream_id);
   }
 
@@ -485,14 +481,12 @@ int end_headers(nghttp2_conn *conn, int64_t stream_id, int fin, void *user_data,
   }
 
   auto method = stream->header.method;
-  if (hd->get_config()->echo_upload &&
-      (method == "POST"sv || method == "PUT"sv)) {
+  if (config.echo_upload && (method == "POST"sv || method == "PUT"sv)) {
     if (!prepare_upload_temp_store(stream, hd)) {
       hd->shutdown_stream(stream, NGHTTP2_INTERNAL_ERROR);
       return 0;
     }
-  } else if (hd->get_config()->early_response &&
-             !prepare_response(stream, hd)) {
+  } else if (config.early_response && !prepare_response(stream, hd)) {
     return NGHTTP2_ERR_CALLBACK_FAILURE;
   }
 
@@ -514,7 +508,7 @@ int recv_data(nghttp2_conn *conn, int64_t stream_id, const uint8_t *data,
     return 0;
   }
 
-  if (hd->get_config()->verbose) {
+  if (config.verbose) {
     print_http_data(stream_id, {data, datalen});
   }
 
@@ -556,7 +550,7 @@ int end_stream(nghttp2_conn *conn, int64_t stream_id, void *user_data,
 
   remove_stream_read_timeout(stream);
 
-  if ((stream->echo_upload || !hd->get_config()->early_response) &&
+  if ((stream->echo_upload || !config.early_response) &&
       !prepare_response(stream, hd)) {
     return NGHTTP2_ERR_CALLBACK_FAILURE;
   }
@@ -570,7 +564,7 @@ int stream_close(nghttp2_conn *conn, uint32_t flags, int64_t stream_id,
                  uint32_t error_code, void *user_data, void *stream_user_data) {
   auto hd = static_cast<Http2Handler *>(user_data);
   hd->remove_stream(stream_id);
-  if (hd->get_config()->verbose) {
+  if (config.verbose) {
     print_stream_close(stream_id,
                        (flags & NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET)
                          ? std::make_optional(error_code)
@@ -596,9 +590,8 @@ void release_fd_cb(struct ev_loop *loop, ev_timer *w, int revents) {
 
 Stream::Stream(Http2Handler *handler, int64_t stream_id)
   : handler(handler), stream_id(stream_id) {
-  auto config = handler->get_config();
-  ev_timer_init(&rtimer, stream_timeout_cb, 0., config->stream_read_timeout);
-  ev_timer_init(&wtimer, stream_timeout_cb, 0., config->stream_write_timeout);
+  ev_timer_init(&rtimer, stream_timeout_cb, 0., config.stream_read_timeout);
+  ev_timer_init(&wtimer, stream_timeout_cb, 0., config.stream_write_timeout);
   rtimer.data = this;
   wtimer.data = this;
 }
@@ -625,7 +618,7 @@ Stream::~Stream() {
 
 namespace {
 void on_session_closed(Http2Handler *hd) {
-  if (hd->get_config()->verbose) {
+  if (config.verbose) {
     print_connection_close(hd->get_conn_id());
   }
 }
@@ -744,7 +737,7 @@ std::expected<void, Error> Http2Handler::read_clear() {
     return std::unexpected{Error::RECV_EOF};
   }
 
-  if (get_config()->hexdump) {
+  if (config.hexdump) {
     (void)util::hexdump(stdout, buf.data(), as_unsigned(nread));
   }
 
@@ -814,7 +807,7 @@ std::expected<void, Error> Http2Handler::tls_handshake() {
     }
   }
 
-  if (sessions_->get_config()->verbose) {
+  if (config.verbose) {
     std::println(stderr, "SSL/TLS handshake completed");
   }
 
@@ -829,7 +822,7 @@ std::expected<void, Error> Http2Handler::tls_handshake() {
     return rv;
   }
 
-  if (sessions_->get_config()->verbose) {
+  if (config.verbose) {
     if (SSL_session_reused(ssl_)) {
       std::println(stderr, "SSL/TLS session reused");
     }
@@ -861,7 +854,7 @@ std::expected<void, Error> Http2Handler::read_tls() {
 
     auto nread = static_cast<size_t>(rv);
 
-    if (get_config()->hexdump) {
+    if (config.hexdump) {
       (void)util::hexdump(stdout, buf.data(), nread);
     }
 
@@ -950,10 +943,9 @@ void Http2Handler::set_timeout() {
   }
 
   auto now = util::timestamp();
-  auto config = sessions_->get_config();
 
   if (expiry <= now) {
-    if (config->verbose) {
+    if (config.verbose) {
       auto t = static_cast<ev_tstamp>(now - expiry) / NGHTTP2_SECONDS;
       std::println(stderr, "Timer has already expired: {:.9f}s", t);
     }
@@ -964,7 +956,7 @@ void Http2Handler::set_timeout() {
   }
 
   auto t = static_cast<ev_tstamp>(expiry - now) / NGHTTP2_SECONDS;
-  if (config->verbose) {
+  if (config.verbose) {
     std::println(stderr, "Set timer={:.9f}s", t);
   }
 
@@ -998,8 +990,6 @@ std::expected<void, Error> Http2Handler::connection_made() {
     .end_stream = nghttp2::end_stream,
   };
 
-  auto config = sessions_->get_config();
-
   nghttp2_settings settings;
 
   nghttp2_settings_default(&settings);
@@ -1008,28 +998,28 @@ std::expected<void, Error> Http2Handler::connection_made() {
   util::secure_random(reinterpret_cast<uint8_t *>(&settings.conn_id),
                       sizeof(settings.conn_id));
 
-  if (config->verbose) {
+  if (config.verbose) {
     settings.log_write = log_write;
   }
 
   settings.max_concurrent_streams_remote =
-    (uint32_t)config->max_concurrent_streams;
+    (uint32_t)config.max_concurrent_streams;
 
-  if (config->header_table_size != -1) {
-    settings.hpack_max_dtable_capacity = (uint32_t)config->header_table_size;
+  if (config.header_table_size != -1) {
+    settings.hpack_max_dtable_capacity = (uint32_t)config.header_table_size;
   }
 
-  if (config->window_bits != -1) {
-    settings.initial_max_stream_data = (1 << config->window_bits) - 1;
+  if (config.window_bits != -1) {
+    settings.initial_max_stream_data = (1 << config.window_bits) - 1;
   }
 
-  if (config->connection_window_bits != -1) {
-    settings.initial_max_data = (1 << config->connection_window_bits) - 1;
+  if (config.connection_window_bits != -1) {
+    settings.initial_max_data = (1 << config.connection_window_bits) - 1;
   }
 
-  if (config->encoder_header_table_size != -1) {
+  if (config.encoder_header_table_size != -1) {
     settings.hpack_encoder_max_dtable_capacity =
-      as_unsigned(config->encoder_header_table_size);
+      as_unsigned(config.encoder_header_table_size);
   }
 
   rv = nghttp2_conn_server_new(&conn_, &callbacks, &settings, NULL, this);
@@ -1052,14 +1042,14 @@ std::expected<void, Error> Http2Handler::verify_alpn_result() {
   SSL_get0_alpn_selected(ssl_, &next_proto, &next_proto_len);
   if (next_proto) {
     auto proto = as_string_view(next_proto, next_proto_len);
-    if (sessions_->get_config()->verbose) {
+    if (config.verbose) {
       std::println("The negotiated protocol: {}", proto);
     }
     if (util::check_h2_is_selected(proto)) {
       return {};
     }
   }
-  if (sessions_->get_config()->verbose) {
+  if (config.verbose) {
     std::println(stderr, "Client did not advertise HTTP/2 protocol. (nghttp2 "
                          "expects h2");
   }
@@ -1083,7 +1073,7 @@ Http2Handler::submit_file_response(std::string_view status, Stream *stream,
     {},
   });
   size_t nvlen = 4;
-  if (!get_config()->no_content_length) {
+  if (!config.no_content_length) {
     nva[nvlen++] = http2::make_field(
       "content-length"sv,
       util::make_string_ref_uint(stream->balloc, as_unsigned(file_length)));
@@ -1096,12 +1086,12 @@ Http2Handler::submit_file_response(std::string_view status, Stream *stream,
   if (content_type) {
     nva[nvlen++] = http2::make_field_v("content-type"sv, *content_type);
   }
-  auto &trailer_names = get_config()->trailer_names;
+  const auto &trailer_names = config.trailer_names;
   if (!trailer_names.empty()) {
     nva[nvlen++] = http2::make_field("trailer"sv, trailer_names);
   }
 
-  if (get_config()->verbose) {
+  if (config.verbose) {
     print_http_response_headers(stream->stream_id, std::span{nva}.first(nvlen));
   }
 
@@ -1128,7 +1118,7 @@ Http2Handler::submit_response(std::string_view status, int64_t stream_id,
   nva.push_back(http2::make_field_v("date"sv, sessions_->get_cached_date()));
 
   if (dr) {
-    auto &trailer_names = get_config()->trailer_names;
+    const auto &trailer_names = config.trailer_names;
     if (!trailer_names.empty()) {
       nva.push_back(http2::make_field("trailer"sv, trailer_names));
     }
@@ -1139,7 +1129,7 @@ Http2Handler::submit_response(std::string_view status, int64_t stream_id,
       http2::make_field(nv.name, nv.value, http2::never_index(nv.never_index)));
   }
 
-  if (get_config()->verbose) {
+  if (config.verbose) {
     print_http_response_headers(stream_id, nva);
   }
 
@@ -1167,13 +1157,13 @@ Http2Handler::submit_response(std::string_view status, int64_t stream_id,
   size_t nvlen = 3;
 
   if (dr) {
-    auto &trailer_names = get_config()->trailer_names;
+    auto &trailer_names = config.trailer_names;
     if (!trailer_names.empty()) {
       nva[nvlen++] = http2::make_field("trailer"sv, trailer_names);
     }
   }
 
-  if (get_config()->verbose) {
+  if (config.verbose) {
     print_http_response_headers(stream_id, std::span{nva}.first(nvlen));
   }
 
@@ -1224,10 +1214,6 @@ Stream *Http2Handler::get_stream(int64_t stream_id) {
 }
 
 Sessions *Http2Handler::get_sessions() const { return sessions_; }
-
-const Config *Http2Handler::get_config() const {
-  return sessions_->get_config();
-}
 
 void Http2Handler::remove_settings_timer() {
   ev_timer_stop(sessions_->get_loop(), &settings_timerev_);
@@ -1313,7 +1299,7 @@ std::expected<void, Error> prepare_echo_response(Stream *stream,
 
   HeaderRefs headers;
   headers.emplace_back("nghttpd-response"sv, "echo"sv);
-  if (!hd->get_config()->no_content_length) {
+  if (!config.no_content_length) {
     headers.emplace_back(
       "content-length"sv,
       util::make_string_ref_uint(stream->balloc, as_unsigned(length)));
@@ -1402,7 +1388,7 @@ std::expected<void, Error> prepare_response(Stream *stream, Http2Handler *hd) {
 
   std::string file_path;
   {
-    auto len = hd->get_config()->htdocs.size() + path.size();
+    auto len = config.htdocs.size() + path.size();
 
     auto trailing_slash = path[path.size() - 1] == '/';
     if (trailing_slash) {
@@ -1410,9 +1396,9 @@ std::expected<void, Error> prepare_response(Stream *stream, Http2Handler *hd) {
     }
 
     file_path.resize_and_overwrite(
-      len, [hd, path, trailing_slash](auto p, auto len) {
+      len, [path, trailing_slash](auto p, auto len) {
         auto first = p;
-        auto &htdocs = hd->get_config()->htdocs;
+        const auto &htdocs = config.htdocs;
         p = std::ranges::copy(htdocs, p).out;
         p = std::ranges::copy(path, p).out;
         if (trailing_slash) {
@@ -1460,7 +1446,7 @@ std::expected<void, Error> prepare_response(Stream *stream, Http2Handler *hd) {
     if (*ext == '.') {
       ++ext;
 
-      const auto &mime_types = hd->get_config()->mime_types;
+      const auto &mime_types = config.mime_types;
       auto content_type_itr = mime_types.find(ext);
       if (content_type_itr != std::ranges::end(mime_types)) {
         content_type = &(*content_type_itr).second;
@@ -1551,19 +1537,19 @@ unsigned int get_ev_loop_flags() {
 
 class AcceptHandler {
 public:
-  AcceptHandler(HttpServer *sv, Sessions *sessions, const Config *config)
-    : sessions_(sessions), config_(config), next_worker_(0) {
-    if (config_->num_worker == 1) {
+  AcceptHandler(HttpServer *sv, Sessions *sessions)
+    : sessions_(sessions), next_worker_(0) {
+    if (config.num_worker == 1) {
       return;
     }
-    for (size_t i = 0; i < config_->num_worker; ++i) {
-      if (config_->verbose) {
+    for (size_t i = 0; i < config.num_worker; ++i) {
+      if (config.verbose) {
         std::println(stderr, "spawning thread #{}", i);
       }
       auto worker = std::make_unique<Worker>();
       auto loop = ev_loop_new(get_ev_loop_flags());
       worker->sessions =
-        std::make_unique<Sessions>(sv, loop, config_, sessions_->get_ssl_ctx());
+        std::make_unique<Sessions>(sv, loop, sessions_->get_ssl_ctx());
       ev_async_init(&worker->w, worker_acceptcb);
       worker->w.data = worker.get();
       ev_async_start(loop, &worker->w);
@@ -1574,7 +1560,7 @@ public:
     }
   }
   void accept_connection(int fd) {
-    if (config_->num_worker == 1) {
+    if (config.num_worker == 1) {
       sessions_->accept_connection(fd);
       return;
     }
@@ -1582,7 +1568,7 @@ public:
     // Dispatch client to the one of the worker threads, in a round
     // robin manner.
     auto &worker = workers_[next_worker_];
-    if (next_worker_ == config_->num_worker - 1) {
+    if (next_worker_ == config.num_worker - 1) {
       next_worker_ = 0;
     } else {
       ++next_worker_;
@@ -1597,7 +1583,6 @@ public:
 private:
   std::vector<std::unique_ptr<Worker>> workers_;
   Sessions *sessions_;
-  const Config *config_;
   // In multi threading mode, this points to the next thread that
   // client will be dispatched.
   size_t next_worker_;
@@ -1709,13 +1694,13 @@ enum {
   IDX_405,
 };
 
-HttpServer::HttpServer(const Config *config) : config_(config) {
+HttpServer::HttpServer() {
   status_pages_ = std::vector<StatusPage>{
-    {"200", make_status_body(200, config_->port)},
-    {"301", make_status_body(301, config_->port)},
-    {"400", make_status_body(400, config_->port)},
-    {"404", make_status_body(404, config_->port)},
-    {"405", make_status_body(405, config_->port)},
+    {"200", make_status_body(200, config.port)},
+    {"301", make_status_body(301, config.port)},
+    {"400", make_status_body(400, config.port)},
+    {"404", make_status_body(404, config.port)},
+    {"405", make_status_body(405, config.port)},
   };
 }
 
@@ -1729,14 +1714,13 @@ int verify_callback(int preverify_ok, X509_STORE_CTX *ctx) {
 
 namespace {
 std::expected<void, Error> start_listen(HttpServer *sv, struct ev_loop *loop,
-                                        Sessions *sessions,
-                                        const Config *config) {
+                                        Sessions *sessions) {
   int r;
   bool ok = false;
   const char *addr = nullptr;
 
   std::shared_ptr<AcceptHandler> acceptor;
-  auto service = util::utos(config->port);
+  auto service = util::utos(config.port);
 
   addrinfo hints{
     .ai_flags = AI_PASSIVE
@@ -1748,8 +1732,8 @@ std::expected<void, Error> start_listen(HttpServer *sv, struct ev_loop *loop,
     .ai_socktype = SOCK_STREAM,
   };
 
-  if (!config->address.empty()) {
-    addr = config->address.c_str();
+  if (!config.address.empty()) {
+    addr = config.address.c_str();
   }
 
   addrinfo *res, *rp;
@@ -1782,15 +1766,15 @@ std::expected<void, Error> start_listen(HttpServer *sv, struct ev_loop *loop,
 #endif // defined(IPV6_V6ONLY)
     if (bind(fd, rp->ai_addr, rp->ai_addrlen) == 0 && listen(fd, 1000) == 0) {
       if (!acceptor) {
-        acceptor = std::make_shared<AcceptHandler>(sv, sessions, config);
+        acceptor = std::make_shared<AcceptHandler>(sv, sessions);
       }
       new ListenEventHandler(sessions, fd, acceptor);
 
-      if (config->verbose) {
+      if (config.verbose) {
         std::string s = util::numeric_name(rp->ai_addr, rp->ai_addrlen);
         std::println("{}: listen {}:{}",
                      rp->ai_family == AF_INET ? "IPv4" : "IPv6", s,
-                     config->port);
+                     config.port);
       }
       ok = true;
       continue;
@@ -1812,8 +1796,7 @@ namespace {
 int alpn_select_proto_cb(SSL *ssl, const unsigned char **out,
                          unsigned char *outlen, const unsigned char *in,
                          unsigned int inlen, void *arg) {
-  auto config = static_cast<HttpServer *>(arg)->get_config();
-  if (config->verbose) {
+  if (config.verbose) {
     std::println("[ALPN] client offers:");
 
     for (unsigned int i = 0; i < inlen; i += in[i] + 1) {
@@ -1830,7 +1813,7 @@ int alpn_select_proto_cb(SSL *ssl, const unsigned char **out,
 std::expected<void, Error> HttpServer::run() {
   SSL_CTX *ssl_ctx = nullptr;
 
-  if (!config_->no_tls) {
+  if (!config.no_tls) {
     ssl_ctx = SSL_CTX_new(TLS_server_method());
     if (!ssl_ctx) {
       std::println(stderr, "{}", ERR_error_string(ERR_get_error(), nullptr));
@@ -1844,7 +1827,7 @@ std::expected<void, Error> HttpServer::run() {
       SSL_OP_NO_TICKET | SSL_OP_CIPHER_SERVER_PREFERENCE);
 
 #ifdef SSL_OP_ENABLE_KTLS
-    if (config_->ktls) {
+    if (config.ktls) {
       ssl_opts |= SSL_OP_ENABLE_KTLS;
     }
 #endif // defined(SSL_OP_ENABLE_KTLS)
@@ -1879,15 +1862,15 @@ std::expected<void, Error> HttpServer::run() {
     SSL_CTX_set_session_id_context(ssl_ctx, sid_ctx, sizeof(sid_ctx) - 1);
     SSL_CTX_set_session_cache_mode(ssl_ctx, SSL_SESS_CACHE_SERVER);
 
-    if (SSL_CTX_set1_groups_list(ssl_ctx, config_->groups.data()) != 1) {
+    if (SSL_CTX_set1_groups_list(ssl_ctx, config.groups.data()) != 1) {
       std::println(stderr, "SSL_CTX_set1_groups_list failed: {}",
                    ERR_error_string(ERR_get_error(), nullptr));
       return std::unexpected{Error::CRYPTO};
     }
 
-    if (!config_->dh_param_file.empty()) {
+    if (!config.dh_param_file.empty()) {
       // Read DH parameters from file
-      auto bio = BIO_new_file(config_->dh_param_file.c_str(), "rb");
+      auto bio = BIO_new_file(config.dh_param_file.c_str(), "rb");
       if (bio == nullptr) {
         std::println(stderr, "BIO_new_file() failed: {}",
                      ERR_error_string(ERR_get_error(), nullptr));
@@ -1926,13 +1909,13 @@ std::expected<void, Error> HttpServer::run() {
       BIO_free(bio);
     }
 
-    if (SSL_CTX_use_PrivateKey_file(ssl_ctx, config_->private_key_file.c_str(),
+    if (SSL_CTX_use_PrivateKey_file(ssl_ctx, config.private_key_file.c_str(),
                                     SSL_FILETYPE_PEM) != 1) {
       std::println(stderr, "SSL_CTX_use_PrivateKey_file failed.");
       return std::unexpected{Error::CRYPTO};
     }
-    if (SSL_CTX_use_certificate_chain_file(ssl_ctx,
-                                           config_->cert_file.c_str()) != 1) {
+    if (SSL_CTX_use_certificate_chain_file(ssl_ctx, config.cert_file.c_str()) !=
+        1) {
       std::println(stderr, "SSL_CTX_use_certificate_file failed.");
       return std::unexpected{Error::CRYPTO};
     }
@@ -1940,7 +1923,7 @@ std::expected<void, Error> HttpServer::run() {
       std::println(stderr, "SSL_CTX_check_private_key failed.");
       return std::unexpected{Error::CRYPTO};
     }
-    if (config_->verify_client) {
+    if (config.verify_client) {
       SSL_CTX_set_verify(ssl_ctx,
                          SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE |
                            SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
@@ -1968,8 +1951,8 @@ std::expected<void, Error> HttpServer::run() {
 
   auto loop = EV_DEFAULT;
 
-  Sessions sessions(this, loop, config_, ssl_ctx);
-  if (auto rv = start_listen(this, loop, &sessions, config_); !rv) {
+  Sessions sessions(this, loop, ssl_ctx);
+  if (auto rv = start_listen(this, loop, &sessions); !rv) {
     std::println(stderr, "Could not listen");
     if (ssl_ctx) {
       SSL_CTX_free(ssl_ctx);
@@ -1983,8 +1966,6 @@ std::expected<void, Error> HttpServer::run() {
 
   return {};
 }
-
-const Config *HttpServer::get_config() const { return config_; }
 
 const StatusPage *HttpServer::get_status_page(int status) const {
   switch (status) {

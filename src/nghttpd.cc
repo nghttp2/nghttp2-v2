@@ -84,6 +84,8 @@ void print_usage(std::ostream &out) {
 }
 } // namespace
 
+extern Config config;
+
 namespace {
 void print_help(std::ostream &out) {
   Config config;
@@ -187,7 +189,6 @@ Options:
 } // namespace
 
 int main(int argc, char **argv) {
-  Config config;
   auto mime_types_file_set_manually = false;
 
   while (1) {
@@ -482,7 +483,7 @@ int main(int argc, char **argv) {
   act.sa_handler = SIG_IGN;
   sigaction(SIGPIPE, &act, nullptr);
 
-  HttpServer server(&config);
+  HttpServer server;
   if (!server.run()) {
     exit(EXIT_FAILURE);
   }
