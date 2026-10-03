@@ -636,4 +636,4 @@ configRevision
 SEE ALSO
 --------
 
-:manpage:`nghttp(1)`, :manpage:`nghttpd(1)`, :manpage:`h2load(1)`
+:doc:`nghttp.1`, :doc:`nghttpd.1`, :doc:`h2load.1`

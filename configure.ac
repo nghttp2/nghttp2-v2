@@ -1213,6 +1213,8 @@ AC_CONFIG_FILES([
   lib/includes/Makefile
   lib/includes/nghttp2v2/version.h
   tests/Makefile
+  doc/Makefile
+  doc/source/conf.py
   third-party/Makefile
   src/Makefile
   src/testdata/Makefile
