@@ -215,6 +215,7 @@ public:
   void terminate_session(uint32_t error_code);
   void set_timeout();
   std::expected<void, Error> on_timeout();
+  uint64_t get_conn_id() const;
 
   std::expected<void, Error> fill_wb(nghttp2_tstamp ts);
 

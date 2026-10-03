@@ -3828,3 +3828,7 @@ void *nghttp2_conn_get_stream_user_data(const nghttp2_conn *conn,
 
   return stream->user_data;
 }
+
+const nghttp2_settings *nghttp2_conn_get_settings(const nghttp2_conn *conn) {
+  return &conn->settings;
+}

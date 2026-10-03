@@ -94,10 +94,6 @@ void delete_handler(Http2Handler *handler) {
 }
 } // namespace
 
-namespace {
-void print_session_id(int64_t id) { std::print("[id={}] ", id); }
-} // namespace
-
 Config::~Config() {}
 
 void FileEntry::map_file() {
@@ -109,16 +105,9 @@ namespace {
 void stream_timeout_cb(struct ev_loop *loop, ev_timer *w, int revents) {
   auto stream = static_cast<Stream *>(w->data);
   auto hd = stream->handler;
-  auto config = hd->get_config();
 
   ev_timer_stop(hd->get_loop(), &stream->rtimer);
   ev_timer_stop(hd->get_loop(), &stream->wtimer);
-
-  if (config->verbose) {
-    print_session_id(hd->session_id());
-    print_timer();
-    std::println(" timeout stream_id={}", stream->stream_id);
-  }
 
   if (!hd->submit_rst_stream(stream, NGHTTP2_INTERNAL_ERROR) ||
       !hd->on_write()) {
@@ -397,8 +386,11 @@ namespace {
 int begin_headers(nghttp2_conn *conn, int64_t stream_id, void *user_data,
                   void *stream_user_data) {
   auto hd = static_cast<Http2Handler *>(user_data);
-
   auto stream = std::make_unique<Stream>(hd, stream_id);
+
+  if (hd->get_config()->verbose) {
+    print_http_begin_request_headers(stream_id);
+  }
 
   add_stream_read_timeout(stream.get());
   hd->add_stream(stream_id, std::move(stream));
@@ -418,6 +410,10 @@ int recv_header(nghttp2_conn *conn, int64_t stream_id, int32_t token,
   auto stream = hd->get_stream(stream_id);
   if (!stream) {
     return 0;
+  }
+
+  if (hd->get_config()->verbose) {
+    print_http_header(stream_id, name, value, flags);
   }
 
   if (stream->header_buffer_size + namebuf.len + valuebuf.len > 64_k) {
@@ -490,6 +486,10 @@ int end_headers(nghttp2_conn *conn, int64_t stream_id, int fin, void *user_data,
     return 0;
   }
 
+  if (hd->get_config()->verbose) {
+    print_http_end_headers(stream_id);
+  }
+
   auto expect100 = stream->header.expect;
 
   if (util::strieq("100-continue"sv, expect100) &&
@@ -528,6 +528,10 @@ int recv_data(nghttp2_conn *conn, int64_t stream_id, const uint8_t *data,
   auto stream = hd->get_stream(stream_id);
   if (!stream) {
     return 0;
+  }
+
+  if (hd->get_config()->verbose) {
+    print_http_data(stream_id, {data, datalen});
   }
 
   if (stream->echo_upload) {
@@ -586,10 +590,10 @@ int stream_close(nghttp2_conn *conn, uint32_t flags, int64_t stream_id,
   auto hd = static_cast<Http2Handler *>(user_data);
   hd->remove_stream(stream_id);
   if (hd->get_config()->verbose) {
-    print_session_id(hd->session_id());
-    print_timer();
-    std::println(" stream_id={} closed", stream_id);
-    fflush(stdout);
+    print_stream_close(stream_id,
+                       (flags & NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET)
+                         ? std::make_optional(error_code)
+                         : std::nullopt);
   }
   return 0;
 }
@@ -641,9 +645,7 @@ Stream::~Stream() {
 namespace {
 void on_session_closed(Http2Handler *hd, int64_t session_id) {
   if (hd->get_config()->verbose) {
-    print_session_id(session_id);
-    print_timer();
-    std::println(" closed");
+    print_connection_close(hd->get_conn_id());
   }
 }
 } // namespace
@@ -1003,15 +1005,6 @@ std::expected<void, Error> Http2Handler::on_timeout() {
   return {};
 }
 
-namespace {
-void log_write(void *user_data, char *msg, size_t len) {
-  msg[len++] = '\n';
-
-  while (write(fileno(stderr), msg, len) == -1 && errno == EINTR)
-    ;
-}
-} // namespace
-
 std::expected<void, Error> Http2Handler::connection_made() {
   int rv;
 
@@ -1128,6 +1121,10 @@ Http2Handler::submit_file_response(std::string_view status, Stream *stream,
     nva[nvlen++] = http2::make_field("trailer"sv, trailer_names);
   }
 
+  if (get_config()->verbose) {
+    print_http_response_headers(stream->stream_id, std::span{nva}.first(nvlen));
+  }
+
   if (auto rv = nghttp2_conn_submit_response(conn_, stream->stream_id,
                                              nva.data(), nvlen, dr);
       rv != 0) {
@@ -1161,6 +1158,11 @@ Http2Handler::submit_response(std::string_view status, int64_t stream_id,
     nva.push_back(
       http2::make_field(nv.name, nv.value, http2::never_index(nv.never_index)));
   }
+
+  if (get_config()->verbose) {
+    print_http_response_headers(stream_id, nva);
+  }
+
   if (auto rv = nghttp2_conn_submit_response(conn_, stream_id, nva.data(),
                                              nva.size(), dr);
       rv != 0) {
@@ -1189,6 +1191,10 @@ Http2Handler::submit_response(std::string_view status, int64_t stream_id,
     if (!trailer_names.empty()) {
       nva[nvlen++] = http2::make_field("trailer"sv, trailer_names);
     }
+  }
+
+  if (get_config()->verbose) {
+    print_http_response_headers(stream_id, std::span{nva}.first(nvlen));
   }
 
   if (nghttp2_conn_submit_response(conn_, stream_id, nva.data(), nvlen, dr) !=
@@ -1254,6 +1260,16 @@ void Http2Handler::remove_settings_timer() {
 
 void Http2Handler::terminate_session(uint32_t error_code) {
   nghttp2_conn_terminate(conn_, error_code);
+}
+
+uint64_t Http2Handler::get_conn_id() const {
+  if (!conn_) {
+    return 0;
+  }
+
+  auto settings = nghttp2_conn_get_settings(conn_);
+
+  return settings->conn_id;
 }
 
 nghttp2_ssize file_read_callback(nghttp2_conn *conn, int64_t stream_id,

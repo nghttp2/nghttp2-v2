@@ -35,6 +35,8 @@
 #include <poll.h>
 
 #include <chrono>
+#include <span>
+#include <optional>
 
 #include <nghttp2v2/nghttp2.h>
 
@@ -93,6 +95,35 @@ void set_color_output(bool f);
 // Set output file when printing HTTP2 frames. By default, stdout is
 // used.
 void set_output(FILE *file);
+
+void log_write(void *user_data, char *msg, size_t len);
+
+void print_http_begin_request_headers(int64_t stream_id);
+
+void print_http_begin_response_headers(int64_t stream_id);
+
+void print_http_header(int64_t stream_id, const nghttp2_rcbuf *name,
+                       const nghttp2_rcbuf *value, uint8_t flags);
+
+void print_http_end_headers(int64_t stream_id);
+
+void print_http_data(int64_t stream_id, std::span<const uint8_t> data);
+
+void print_http_begin_trailers(int64_t stream_id);
+
+void print_http_end_trailers(int64_t stream_id);
+
+void print_http_request_headers(int64_t stream_id,
+                                std::span<const nghttp2_nv> nva);
+
+void print_http_response_headers(int64_t stream_id,
+                                 std::span<const nghttp2_nv> nva);
+
+void print_http_settings(const nghttp2_proto_settings *settings);
+
+void print_stream_close(int64_t stream_id, std::optional<uint32_t> error_code);
+
+void print_connection_close(uint64_t conn_id);
 
 } // namespace nghttp2
 

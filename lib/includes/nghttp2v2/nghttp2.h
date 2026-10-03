@@ -1990,6 +1990,14 @@ NGHTTP2_EXTERN int nghttp2_conn_set_stream_user_data(nghttp2_conn *conn,
  */
 NGHTTP2_EXTERN void *nghttp2_conn_get_stream_user_data(const nghttp2_conn *conn,
                                                        int64_t stream_id);
+/**
+ * @function
+ *
+ * `nghttp2_conn_get_settings` returns the connection settings of
+ * |conn|.
+ */
+NGHTTP2_EXTERN const nghttp2_settings *
+nghttp2_conn_get_settings(const nghttp2_conn *conn);
 
 /**
  * @macrosection
@@ -2151,6 +2159,14 @@ NGHTTP2_EXTERN int nghttp2_check_header_name(const uint8_t *name, size_t len);
  * :rfc:`7230#section-3.2`.
  */
 NGHTTP2_EXTERN int nghttp2_check_header_value(const uint8_t *value, size_t len);
+
+/**
+ * @function
+ *
+ * `nghttp2_http2_strerror` returns the textual representation of
+ * HTTP/2 error code |error_code|.
+ */
+NGHTTP2_EXTERN const char *nghttp2_http2_strerror(uint32_t error_code);
 
 /* TODO: Add HPACK public API here */
 
