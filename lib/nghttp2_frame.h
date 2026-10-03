@@ -337,6 +337,22 @@ nghttp2_ssize nghttp2_frame_decode_data(nghttp2_frame_data *dest,
                                         const uint8_t *src, size_t srclen);
 
 /*
+ * nghttp2_frame_decode_data_payload decodes the payload of DATA frame
+ * from |src| of length |srclen|.  |dest|->hd should have all fields
+ * assigned before calling this function.  The result is stored in the
+ * object pointed by |dest|.  DATA frame payload must start at src[0].
+ * This function finishes when it decodes one DATA frame, and returns
+ * the exact number of bytes read to decode a frame payload if it
+ * succeeds, or one of the following negative error codes:
+ *
+ * NGHTTP2_ERR_FRAME_ENCODING
+ *     |src| is too short to include DATA frame.
+ */
+nghttp2_ssize nghttp2_frame_decode_data_payload(nghttp2_frame_data *dest,
+                                                const uint8_t *src,
+                                                size_t srclen);
+
+/*
  * nghttp2_frame_decode_headers decodes HEADERS frame from |src| of
  * length |srclen|.  The result is stored in the object pointed by
  * |dest|.  HEADERS frame must start at src[0].  This function
@@ -349,6 +365,23 @@ nghttp2_ssize nghttp2_frame_decode_data(nghttp2_frame_data *dest,
  */
 nghttp2_ssize nghttp2_frame_decode_headers(nghttp2_frame_headers *dest,
                                            const uint8_t *src, size_t srclen);
+
+/*
+ * nghttp2_frame_decode_headers_payload decodes the payload of HEADERS
+ * frame from |src| of length |srclen|.  |dest|->hd should have all
+ * fields assigned before calling this function.  The result is stored
+ * in the object pointed by |dest|.  HEADERS frame payload must start
+ * at src[0].  This function finishes when it decodes one HEADERS
+ * frame, and returns the exact number of bytes read to decode a frame
+ * payload if it succeeds, or one of the following negative error
+ * codes:
+ *
+ * NGHTTP2_ERR_FRAME_ENCODING
+ *     |src| is too short to include HEADERS frame.
+ */
+nghttp2_ssize nghttp2_frame_decode_headers_payload(nghttp2_frame_headers *dest,
+                                                   const uint8_t *src,
+                                                   size_t srclen);
 
 /*
  * nghttp2_frame_decode_rst_stream decodes RST_STREAM frame from |src|
@@ -364,6 +397,23 @@ nghttp2_ssize nghttp2_frame_decode_headers(nghttp2_frame_headers *dest,
 nghttp2_ssize nghttp2_frame_decode_rst_stream(nghttp2_frame_rst_stream *dest,
                                               const uint8_t *src,
                                               size_t srclen);
+
+/*
+ * nghttp2_frame_decode_rst_stream_payload decodes the payload of
+ * RST_STREAM frame from |src| of length |srclen|.  |dest|->hd should
+ * have all fields assigned before calling this function.  The result
+ * is stored in the object pointed by |dest|.  RST_STREAM frame
+ * payload must start at src[0].  This function finishes when it
+ * decodes one RST_STREAM frame, and returns the exact number of bytes
+ * read to decode a frame payload if it succeeds, or one of the
+ * following negative error codes:
+ *
+ * NGHTTP2_ERR_FRAME_ENCODING
+ *     |src| is too short to include RST_STREAM frame.
+ */
+nghttp2_ssize
+nghttp2_frame_decode_rst_stream_payload(nghttp2_frame_rst_stream *dest,
+                                        const uint8_t *src, size_t srclen);
 
 /*
  * nghttp2_frame_decode_settings decodes SETTINGS frame from |src| of
@@ -394,6 +444,22 @@ nghttp2_ssize nghttp2_frame_decode_ping(nghttp2_frame_ping *dest,
                                         const uint8_t *src, size_t srclen);
 
 /*
+ * nghttp2_frame_decode_ping_payload decodes the payload of PING frame
+ * from |src| of length |srclen|.  |dest|->hd should have all fields
+ * assigned before calling this function.  The result is stored in the
+ * object pointed by |dest|.  PING frame payload must start at src[0].
+ * This function finishes when it decodes one PING frame, and returns
+ * the exact number of bytes read to decode a frame payload if it
+ * succeeds, or one of the following negative error codes:
+ *
+ * NGHTTP2_ERR_FRAME_ENCODING
+ *     |src| is too short to include PING frame.
+ */
+nghttp2_ssize nghttp2_frame_decode_ping_payload(nghttp2_frame_ping *dest,
+                                                const uint8_t *src,
+                                                size_t srclen);
+
+/*
  * nghttp2_frame_decode_goaway decodes GOAWAY frame from |src| of
  * length |srclen|.  The result is stored in the object pointed by
  * |dest|.  GOAWAY frame must start at src[0].  This function finishes
@@ -406,6 +472,23 @@ nghttp2_ssize nghttp2_frame_decode_ping(nghttp2_frame_ping *dest,
  */
 nghttp2_ssize nghttp2_frame_decode_goaway(nghttp2_frame_goaway *dest,
                                           const uint8_t *src, size_t srclen);
+
+/*
+ * nghttp2_frame_decode_goaway_payload decodes the payload of GOAWAY
+ * frame from |src| of length |srclen|.  |dest|->hd should have all
+ * fields assigned before calling this function.  The result is stored
+ * in the object pointed by |dest|.  GOAWAY frame payload must start
+ * at src[0].  This function finishes when it decodes one GOAWAY
+ * frame, and returns the exact number of bytes read to decode a frame
+ * payload if it succeeds, or one of the following negative error
+ * codes:
+ *
+ * NGHTTP2_ERR_FRAME_ENCODING
+ *     |src| is too short to include GOAWAY frame.
+ */
+nghttp2_ssize nghttp2_frame_decode_goaway_payload(nghttp2_frame_goaway *dest,
+                                                  const uint8_t *src,
+                                                  size_t srclen);
 
 /*
  * nghttp2_frame_decode_window_update decodes WINDOW_UPDATE frame from
@@ -421,6 +504,23 @@ nghttp2_ssize nghttp2_frame_decode_goaway(nghttp2_frame_goaway *dest,
 nghttp2_ssize
 nghttp2_frame_decode_window_update(nghttp2_frame_window_update *dest,
                                    const uint8_t *src, size_t srclen);
+
+/*
+ * nghttp2_frame_decode_window_update_payload decodes the payload of
+ * WINDOW_UPDATE frame from |src| of length |srclen|.  |dest|->hd
+ * should have all fields assigned before calling this function.  The
+ * result is stored in the object pointed by |dest|.  WINDOW_UPDATE
+ * frame payload must start at src[0].  This function finishes when it
+ * decodes one WINDOW_UPDATE frame, and returns the exact number of
+ * bytes read to decode a frame payload if it succeeds, or one of the
+ * following negative error codes:
+ *
+ * NGHTTP2_ERR_FRAME_ENCODING
+ *     |src| is too short to include WINDOW_UPDATE frame.
+ */
+nghttp2_ssize
+nghttp2_frame_decode_window_update_payload(nghttp2_frame_window_update *dest,
+                                           const uint8_t *src, size_t srclen);
 
 /*
  * nghttp2_frame_decode_continuation decodes CONTINUATION frame from
@@ -451,6 +551,22 @@ nghttp2_ssize nghttp2_frame_decode_continuation(nghttp2_frame_headers *dest,
 nghttp2_ssize
 nghttp2_frame_decode_priority_update(nghttp2_frame_priority_update *dest,
                                      const uint8_t *src, size_t srclen);
+
+/*
+ * nghttp2_frame_decode_priority_update_payload decodes the payload of
+ * PRIORITY_UPDATE frame from |src| of length |srclen|.  |dest|->hd
+ * should have all fields assigned before calling this function.  The
+ * result is stored in the object pointed by |dest|.  PRIORITY_UPDATE
+ * frame payload must start at src[0].  This function finishes when it
+ * decodes one PRIORITY_UPDATE frame, and returns the exact number of
+ * bytes read to decode a frame payload if it succeeds, or one of the
+ * following negative error codes:
+ *
+ * NGHTTP2_ERR_FRAME_ENCODING
+ *     |src| is too short to include PRIORITY_UPDATE frame.
+ */
+nghttp2_ssize nghttp2_frame_decode_priority_update_payload(
+  nghttp2_frame_priority_update *dest, const uint8_t *src, size_t srclen);
 
 /*
  * nghttp2_nva_copy copies name/value pairs from |nva|, which contains

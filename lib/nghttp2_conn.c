@@ -33,6 +33,7 @@
 #include "nghttp2_unreachable.h"
 #include "nghttp2_http.h"
 #include "nghttp2_str.h"
+#include "nghttp2_conv.h"
 
 static int conn_idle_stream(const nghttp2_conn *conn, int64_t stream_id) {
   if (conn->server) {
@@ -1254,6 +1255,7 @@ static int conn_recv_settings_hd(nghttp2_conn *conn, nghttp2_frame_settings *fr,
 
   fr->settings = &conn->rx.frrd.scratch.settings.data;
   *fr->settings = conn->remote.settings;
+  conn->rx.frrd.scratch.settings.min_dtable_capacity = UINT32_MAX;
 
   return 0;
 }
@@ -1671,6 +1673,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
   const uint8_t *p, *end;
   nghttp2_int_reader *ird = &conn->rx.ird;
   nghttp2_frame_reader *frrd = &conn->rx.frrd;
+  nghttp2_frame *fr = &frrd->fr;
   nghttp2_ssize nread;
   size_t len;
   int rv;
@@ -1701,231 +1704,415 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
 
       /* Fall through */
     case NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH:
-      len = nghttp2_int_reader_read(ird, p, (size_t)(end - p), 3);
+      for (;;) {
+        if (frrd->scratch.hd.buflen) {
+          len =
+            nghttp2_min(sizeof(frrd->scratch.hd.buf) - frrd->scratch.hd.buflen,
+                        (size_t)(end - p));
+          memcpy(frrd->scratch.hd.buf + frrd->scratch.hd.buflen, p, len);
 
-      p += len;
+          p += len;
+          frrd->scratch.hd.buflen += len;
 
-      if (!nghttp2_int_reader_done(ird)) {
-        return 0;
-      }
+          if (frrd->scratch.hd.buflen < sizeof(frrd->scratch.hd.buf)) {
+            return 0;
+          }
 
-      frrd->fr.meta.hd.len = nghttp2_int_reader_final(ird);
+          nghttp2_frame_decode_hd(&fr->meta.hd, frrd->scratch.hd.buf);
+        } else if ((size_t)(end - p) < NGHTTP2_FRAME_HDLEN) {
+          memcpy(frrd->scratch.hd.buf, p, (size_t)(end - p));
+          frrd->scratch.hd.buflen += (size_t)(end - p);
+          return 0;
+        } else {
+          p = nghttp2_frame_decode_hd(&fr->meta.hd, p);
+        }
 
-      if (frrd->fr.meta.hd.len > NGHTTP2_DEFAULT_MAX_FRAME_SIZE) {
-        if (!(conn->flags & NGHTTP2_CONN_FLAG_SETTINGS_SEEN)) {
+        if (fr->meta.hd.len > NGHTTP2_DEFAULT_MAX_FRAME_SIZE) {
+          if (!(conn->flags & NGHTTP2_CONN_FLAG_SETTINGS_SEEN)) {
+            /* connection preface error */
+            return NGHTTP2_ERR_PROTO;
+          }
+
+          return nghttp2_conn_handle_error(conn, NGHTTP2_ERR_FRAME_SIZE);
+        }
+
+        if (!(conn->flags & NGHTTP2_CONN_FLAG_SETTINGS_SEEN) &&
+            fr->meta.hd.type != NGHTTP2_FRAME_SETTINGS) {
           /* connection preface error */
           return NGHTTP2_ERR_PROTO;
         }
 
-        return nghttp2_conn_handle_error(conn, NGHTTP2_ERR_FRAME_SIZE);
-      }
-
-      frrd->state = NGHTTP2_FRAME_READ_STATE_FRAME_TYPE;
-
-      if (p == end) {
-        return 0;
-      }
-
-      /* Fall through */
-    case NGHTTP2_FRAME_READ_STATE_FRAME_TYPE:
-      frrd->fr.meta.hd.type = *p++;
-
-      if (!(conn->flags & NGHTTP2_CONN_FLAG_SETTINGS_SEEN) &&
-          frrd->fr.meta.hd.type != NGHTTP2_FRAME_SETTINGS) {
-        /* connection preface error */
-        return NGHTTP2_ERR_PROTO;
-      }
-
-      frrd->state = NGHTTP2_FRAME_READ_STATE_FRAME_FLAGS;
-
-      if (p == end) {
-        return 0;
-      }
-
-      /* Fall through */
-    case NGHTTP2_FRAME_READ_STATE_FRAME_FLAGS:
-      frrd->fr.meta.hd.flags = *p++;
-
-      frrd->state = NGHTTP2_FRAME_READ_STATE_FRAME_STREAM_ID;
-
-      if (p == end) {
-        return 0;
-      }
-
-      /* Fall through */
-    case NGHTTP2_FRAME_READ_STATE_FRAME_STREAM_ID:
-      len = nghttp2_int_reader_read(ird, p, (size_t)(end - p), 4);
-
-      p += len;
-
-      if (!nghttp2_int_reader_done(ird)) {
-        return 0;
-      }
-
-      frrd->fr.meta.hd.stream_id = nghttp2_int_reader_final31(ird);
-
-      switch (frrd->fr.meta.hd.type) {
-      case NGHTTP2_FRAME_DATA:
-        rv = conn_recv_data_hd(conn, &frrd->fr.data, ts);
-        if (rv != 0) {
-          return nghttp2_conn_handle_error(conn, rv);
-        }
-
-        if (frrd->fr.data.hd.len == 0) {
-          goto frame_done;
-        }
-
-        frrd->left = frrd->fr.data.hd.len;
-
-        if (frrd->fr.data.hd.flags & NGHTTP2_DATA_FLAG_PADDED) {
-          frrd->state = NGHTTP2_FRAME_READ_STATE_DATA_PADLEN;
-        } else {
-          frrd->state = NGHTTP2_FRAME_READ_STATE_DATA_DATA;
-          frrd->field_left = frrd->left;
-          frrd->fr.data.datalen = frrd->field_left;
-        }
-
-        break;
-      case NGHTTP2_FRAME_HEADERS:
-        rv = conn_recv_headers_hd(conn, &frrd->fr.headers, ts);
-        if (rv != 0) {
-          return nghttp2_conn_handle_error(conn, rv);
-        }
-
-        if (frrd->fr.headers.hd.len == 0) {
-          if (frrd->fr.headers.hd.flags & NGHTTP2_HEADERS_FLAG_END_HEADERS) {
-            goto frame_done;
+        switch (fr->meta.hd.type) {
+        case NGHTTP2_FRAME_DATA:
+          rv = conn_recv_data_hd(conn, &fr->data, ts);
+          if (rv != 0) {
+            return nghttp2_conn_handle_error(conn, rv);
           }
 
-          frrd->state = NGHTTP2_FRAME_READ_STATE_CONTINUATION_FRAME_LENGTH;
+          if (fr->data.hd.len == 0) {
+            nghttp2_frame_reader_reset(frrd);
+            continue;
+          }
+
+          len = (size_t)(end - p);
+          if (len >= fr->data.hd.len) {
+            nread = nghttp2_frame_decode_data_payload(&fr->data, p, len);
+            if (nread < 0) {
+              return nghttp2_conn_handle_error(conn, (int)nread);
+            }
+
+            p += nread;
+
+            rv = conn_on_data(conn, &fr->data, fr->data.data, fr->data.datalen);
+            if (rv != 0) {
+              return nghttp2_conn_handle_error(conn, rv);
+            }
+
+            rv = conn_recv_data(conn, &fr->data);
+            if (rv != 0) {
+              return nghttp2_conn_handle_error(conn, rv);
+            }
+
+            nghttp2_frame_reader_reset(frrd);
+
+            continue;
+          }
+
+          frrd->left = fr->data.hd.len;
+
+          if (fr->data.hd.flags & NGHTTP2_DATA_FLAG_PADDED) {
+            frrd->state = NGHTTP2_FRAME_READ_STATE_DATA_PADLEN;
+          } else {
+            frrd->state = NGHTTP2_FRAME_READ_STATE_DATA_DATA;
+            frrd->field_left = frrd->left;
+            fr->data.datalen = frrd->field_left;
+          }
+
+          break;
+        case NGHTTP2_FRAME_HEADERS:
+          rv = conn_recv_headers_hd(conn, &fr->headers, ts);
+          if (rv != 0) {
+            return nghttp2_conn_handle_error(conn, rv);
+          }
+
+          if (fr->headers.hd.len == 0) {
+            if (fr->headers.hd.flags & NGHTTP2_HEADERS_FLAG_END_HEADERS) {
+              nghttp2_frame_reader_reset(frrd);
+              continue;
+            }
+
+            frrd->state = NGHTTP2_FRAME_READ_STATE_CONTINUATION_FRAME_LENGTH;
+
+            break;
+          }
+
+          len = (size_t)(end - p);
+
+          if (len >= fr->headers.hd.len) {
+            nread = nghttp2_frame_decode_headers_payload(&fr->headers, p, len);
+            if (nread < 0) {
+              return nghttp2_conn_handle_error(conn, (int)nread);
+            }
+
+            p += nread;
+
+            rv = nghttp2_conn_decode_field_block(
+              conn, fr->headers.hd.stream_id, fr->headers.field_block,
+              fr->headers.field_blocklen,
+              (fr->headers.hd.flags & NGHTTP2_HEADERS_FLAG_END_HEADERS));
+            if (rv != 0) {
+              return nghttp2_conn_handle_error(conn, rv);
+            }
+
+            if (fr->headers.hd.flags & NGHTTP2_HEADERS_FLAG_END_HEADERS) {
+              rv = conn_recv_headers(conn, &fr->headers);
+              if (rv != 0) {
+                return nghttp2_conn_handle_error(conn, rv);
+              }
+
+              nghttp2_frame_reader_reset(frrd);
+
+              continue;
+            }
+
+            frrd->state = NGHTTP2_FRAME_READ_STATE_CONTINUATION_FRAME_LENGTH;
+
+            break;
+          }
+
+          frrd->left = fr->headers.hd.len;
+
+          if (fr->headers.hd.flags & NGHTTP2_HEADERS_FLAG_PADDED) {
+            frrd->state = NGHTTP2_FRAME_READ_STATE_HEADERS_PADLEN;
+          } else {
+            if (fr->headers.hd.flags & NGHTTP2_HEADERS_FLAG_PRIORITY) {
+              frrd->state = NGHTTP2_FRAME_READ_STATE_HEADERS_PRIORITY;
+              frrd->field_left = 5;
+            } else {
+              frrd->state = NGHTTP2_FRAME_READ_STATE_HEADERS_FIELD_BLOCK;
+              frrd->field_left = frrd->left;
+              fr->headers.field_blocklen = frrd->field_left;
+            }
+          }
+
+          break;
+        case NGHTTP2_FRAME_RST_STREAM:
+          rv = conn_recv_rst_stream_hd(conn, &fr->rst_stream, ts);
+          if (rv != 0) {
+            return nghttp2_conn_handle_error(conn, rv);
+          }
+
+          len = (size_t)(end - p);
+
+          if (len >= fr->rst_stream.hd.len) {
+            nread =
+              nghttp2_frame_decode_rst_stream_payload(&fr->rst_stream, p, len);
+            if (nread < 0) {
+              return nghttp2_conn_handle_error(conn, (int)nread);
+            }
+
+            p += nread;
+
+            rv = conn_recv_rst_stream(conn, &fr->rst_stream);
+            if (rv != 0) {
+              return nghttp2_conn_handle_error(conn, rv);
+            }
+
+            nghttp2_frame_reader_reset(frrd);
+
+            continue;
+          }
+
+          frrd->state = NGHTTP2_FRAME_READ_STATE_RST_STREAM_ERROR_CODE;
+          frrd->left = fr->rst_stream.hd.len;
+
+          break;
+        case NGHTTP2_FRAME_SETTINGS:
+          conn->flags |= NGHTTP2_CONN_FLAG_SETTINGS_SEEN;
+
+          rv = conn_recv_settings_hd(conn, &fr->settings, ts);
+          if (rv != 0) {
+            return nghttp2_conn_handle_error(conn, rv);
+          }
+
+          if (fr->settings.hd.flags & NGHTTP2_SETTINGS_FLAG_ACK) {
+            rv = conn_recv_settings_ack(conn, &fr->settings);
+            if (rv != 0) {
+              return nghttp2_conn_handle_error(conn, rv);
+            }
+
+            nghttp2_frame_reader_reset(frrd);
+
+            continue;
+          }
+
+          if (fr->settings.hd.len == 0) {
+            rv = conn_recv_settings(conn, &fr->settings, ts);
+            if (rv != 0) {
+              return nghttp2_conn_handle_error(conn, rv);
+            }
+
+            nghttp2_frame_reader_reset(frrd);
+
+            continue;
+          }
+
+          len = (size_t)(end - p);
+
+          if (len >= fr->settings.hd.len) {
+            len = fr->settings.hd.len;
+
+            for (; len; len -= 6) {
+              p = nghttp2_get_uint16be(&frrd->scratch.settings.id, p);
+              p = nghttp2_get_uint32be(&frrd->scratch.settings.value, p);
+
+              rv = conn_recv_settings_entry(conn, &fr->settings,
+                                            frrd->scratch.settings.id,
+                                            frrd->scratch.settings.value);
+              if (rv != 0) {
+                return nghttp2_conn_handle_error(conn, rv);
+              }
+            }
+
+            rv = conn_recv_settings(conn, &fr->settings, ts);
+            if (rv != 0) {
+              return nghttp2_conn_handle_error(conn, rv);
+            }
+
+            nghttp2_frame_reader_reset(frrd);
+
+            continue;
+          }
+
+          frrd->state = NGHTTP2_FRAME_READ_STATE_SETTINGS_SETTINGS;
+          frrd->left = fr->settings.hd.len;
+          frrd->scratch.settings.min_dtable_capacity = UINT32_MAX;
+
+          break;
+        case NGHTTP2_FRAME_PUSH_PROMISE:
+          /* We do not expect receiving PUSH_PROMISE because we do not
+             support server push. */
+          return nghttp2_conn_handle_error(conn, NGHTTP2_ERR_PROTO);
+        case NGHTTP2_FRAME_PING:
+          rv = conn_recv_ping_hd(conn, &fr->ping, ts);
+          if (rv != 0) {
+            return nghttp2_conn_handle_error(conn, rv);
+          }
+
+          len = (size_t)(end - p);
+
+          if (len >= fr->ping.hd.len) {
+            nread = nghttp2_frame_decode_ping_payload(&fr->ping, p, len);
+            if (nread < 0) {
+              return (int)nread;
+            }
+
+            p += nread;
+
+            rv = conn_recv_ping(conn, &frrd->fr.ping);
+            if (rv != 0) {
+              return nghttp2_conn_handle_error(conn, rv);
+            }
+
+            nghttp2_frame_reader_reset(frrd);
+
+            continue;
+          }
+
+          frrd->state = NGHTTP2_FRAME_READ_STATE_PING_DATA;
+          frrd->left = fr->ping.hd.len;
+
+          break;
+        case NGHTTP2_FRAME_GOAWAY:
+          rv = conn_recv_goaway_hd(conn, &frrd->fr.goaway, ts);
+          if (rv != 0) {
+            return nghttp2_conn_handle_error(conn, rv);
+          }
+
+          len = (size_t)(end - p);
+
+          if (len >= fr->goaway.hd.len) {
+            nread = nghttp2_frame_decode_goaway_payload(&fr->goaway, p, len);
+            if (nread < 0) {
+              return (int)nread;
+            }
+
+            p += nread;
+
+            rv = conn_recv_goaway(conn, &fr->goaway);
+            if (rv != 0) {
+              return nghttp2_conn_handle_error(conn, rv);
+            }
+
+            nghttp2_frame_reader_reset(frrd);
+
+            continue;
+          }
+
+          frrd->state = NGHTTP2_FRAME_READ_STATE_GOAWAY_LAST_STREAM_ID;
+          frrd->left = frrd->fr.goaway.hd.len;
+
+          break;
+        case NGHTTP2_FRAME_WINDOW_UPDATE:
+          rv = conn_recv_window_update_hd(conn, &fr->window_update);
+          if (rv != 0) {
+            return nghttp2_conn_handle_error(conn, rv);
+          }
+
+          len = (size_t)(end - p);
+
+          if (len >= fr->window_update.hd.len) {
+            nread = nghttp2_frame_decode_window_update_payload(
+              &fr->window_update, p, len);
+            if (nread < 0) {
+              return (int)nread;
+            }
+
+            p += nread;
+
+            rv = conn_recv_window_update(conn, &fr->window_update, ts);
+            if (rv != 0) {
+              return nghttp2_conn_handle_error(conn, rv);
+            }
+
+            nghttp2_frame_reader_reset(frrd);
+
+            continue;
+          }
+
+          frrd->state = NGHTTP2_FRAME_READ_STATE_WINDOW_UPDATE_WINDOW_SIZE_INC;
+          frrd->left = fr->window_update.hd.len;
+
+          break;
+        case NGHTTP2_FRAME_CONTINUATION:
+          return nghttp2_conn_handle_error(conn, NGHTTP2_ERR_PROTO);
+        case NGHTTP2_FRAME_PRIORITY_UPDATE:
+          rv = conn_recv_priority_update_hd(conn, &fr->priority_update);
+          if (rv != 0) {
+            return nghttp2_conn_handle_error(conn, rv);
+          }
+
+          len = (size_t)(end - p);
+
+          if (len >= fr->priority_update.hd.len) {
+            nread = nghttp2_frame_decode_priority_update_payload(
+              &fr->priority_update, p, len);
+            if (nread < 0) {
+              return (int)nread;
+            }
+
+            p += nread;
+
+            /* Apply the same buffer limit */
+            if (fr->priority_update.hd.len >
+                sizeof(frrd->scratch.priority_update.pri) + 4) {
+              nghttp2_frame_reader_reset(frrd);
+
+              continue;
+            }
+
+            rv = conn_recv_priority_update(conn, &fr->priority_update, ts);
+            if (rv != 0) {
+              return nghttp2_conn_handle_error(conn, rv);
+            }
+
+            nghttp2_frame_reader_reset(frrd);
+
+            continue;
+          }
+
+          frrd->state =
+            NGHTTP2_FRAME_READ_STATE_PRIORITY_UPDATE_PRIORITIZED_STREAM_ID;
+          frrd->left = frrd->fr.priority_update.hd.len;
+
+          break;
+        default:
+          nghttp2_log_rx_unknown_frame(&conn->log, &frrd->fr.meta);
+
+          rv = conn_update_glitch_ratelim(conn, 1, ts);
+          if (rv != 0) {
+            return rv;
+          }
+
+          len = (size_t)(end - p);
+
+          if (len >= fr->meta.hd.len) {
+            p += fr->meta.hd.len;
+
+            nghttp2_frame_reader_reset(frrd);
+
+            continue;
+          }
+
+          frrd->state = NGHTTP2_FRAME_READ_STATE_DISCARD_FRAME;
+          frrd->left = frrd->fr.meta.hd.len;
 
           break;
         }
 
-        frrd->left = frrd->fr.headers.hd.len;
-
-        /* The absence of nghttp2_stream object means that it should
-           be ignored; no callback should called.  But the received
-           data should be counted toward connection-level flow
-           control. */
-        if (frrd->fr.headers.hd.flags & NGHTTP2_HEADERS_FLAG_PADDED) {
-          frrd->state = NGHTTP2_FRAME_READ_STATE_HEADERS_PADLEN;
-        } else {
-          if (frrd->fr.headers.hd.flags & NGHTTP2_HEADERS_FLAG_PRIORITY) {
-            frrd->state = NGHTTP2_FRAME_READ_STATE_HEADERS_PRIORITY;
-            frrd->field_left = 5;
-          } else {
-            frrd->state = NGHTTP2_FRAME_READ_STATE_HEADERS_FIELD_BLOCK;
-            frrd->field_left = frrd->left;
-            frrd->fr.headers.field_blocklen = frrd->field_left;
-          }
+        if (frrd->state != NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH) {
+          break;
         }
-
-        break;
-      case NGHTTP2_FRAME_RST_STREAM:
-        rv = conn_recv_rst_stream_hd(conn, &frrd->fr.rst_stream, ts);
-        if (rv != 0) {
-          return nghttp2_conn_handle_error(conn, rv);
-        }
-
-        frrd->state = NGHTTP2_FRAME_READ_STATE_RST_STREAM_ERROR_CODE;
-        frrd->left = frrd->fr.rst_stream.hd.len;
-
-        break;
-      case NGHTTP2_FRAME_SETTINGS:
-        conn->flags |= NGHTTP2_CONN_FLAG_SETTINGS_SEEN;
-
-        rv = conn_recv_settings_hd(conn, &frrd->fr.settings, ts);
-        if (rv != 0) {
-          return nghttp2_conn_handle_error(conn, rv);
-        }
-
-        if (frrd->fr.settings.hd.flags & NGHTTP2_SETTINGS_FLAG_ACK) {
-          rv = conn_recv_settings_ack(conn, &frrd->fr.settings);
-          if (rv != 0) {
-            return nghttp2_conn_handle_error(conn, rv);
-          }
-
-          goto frame_done;
-        }
-
-        if (frrd->fr.settings.hd.len == 0) {
-          rv = conn_recv_settings(conn, &frrd->fr.settings, ts);
-          if (rv != 0) {
-            return nghttp2_conn_handle_error(conn, rv);
-          }
-
-          goto frame_done;
-        }
-
-        frrd->state = NGHTTP2_FRAME_READ_STATE_SETTINGS_SETTINGS;
-        frrd->left = frrd->fr.settings.hd.len;
-        frrd->scratch.settings.min_dtable_capacity = UINT32_MAX;
-
-        break;
-      case NGHTTP2_FRAME_PUSH_PROMISE:
-        /* We do not expect receiving PUSH_PROMISE because we do not
-           support server push. */
-        return nghttp2_conn_handle_error(conn, NGHTTP2_ERR_PROTO);
-      case NGHTTP2_FRAME_PING:
-        rv = conn_recv_ping_hd(conn, &frrd->fr.ping, ts);
-        if (rv != 0) {
-          return nghttp2_conn_handle_error(conn, rv);
-        }
-
-        frrd->state = NGHTTP2_FRAME_READ_STATE_PING_DATA;
-        frrd->left = frrd->fr.ping.hd.len;
-
-        break;
-      case NGHTTP2_FRAME_GOAWAY:
-        rv = conn_recv_goaway_hd(conn, &frrd->fr.goaway, ts);
-        if (rv != 0) {
-          return nghttp2_conn_handle_error(conn, rv);
-        }
-
-        frrd->state = NGHTTP2_FRAME_READ_STATE_GOAWAY_LAST_STREAM_ID;
-        frrd->left = frrd->fr.goaway.hd.len;
-
-        break;
-      case NGHTTP2_FRAME_WINDOW_UPDATE:
-        rv = conn_recv_window_update_hd(conn, &frrd->fr.window_update);
-        if (rv != 0) {
-          return nghttp2_conn_handle_error(conn, rv);
-        }
-
-        frrd->state = NGHTTP2_FRAME_READ_STATE_WINDOW_UPDATE_WINDOW_SIZE_INC;
-        frrd->left = frrd->fr.window_update.hd.len;
-
-        break;
-      case NGHTTP2_FRAME_CONTINUATION:
-        return nghttp2_conn_handle_error(conn, NGHTTP2_ERR_PROTO);
-      case NGHTTP2_FRAME_PRIORITY_UPDATE:
-        rv = conn_recv_priority_update_hd(conn, &frrd->fr.priority_update);
-        if (rv != 0) {
-          return nghttp2_conn_handle_error(conn, rv);
-        }
-
-        frrd->state =
-          NGHTTP2_FRAME_READ_STATE_PRIORITY_UPDATE_PRIORITIZED_STREAM_ID;
-        frrd->left = frrd->fr.priority_update.hd.len;
-
-        break;
-      default:
-        nghttp2_log_rx_unknown_frame(&conn->log, &frrd->fr.meta);
-
-        rv = conn_update_glitch_ratelim(conn, 1, ts);
-        if (rv != 0) {
-          return rv;
-        }
-
-        frrd->state = NGHTTP2_FRAME_READ_STATE_DISCARD_FRAME;
-        frrd->left = frrd->fr.meta.hd.len;
-
-        if (frrd->left == 0) {
-          goto frame_done;
-        }
-
-        break;
       }
 
       break;

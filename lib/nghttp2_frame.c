@@ -350,7 +350,7 @@ const uint8_t *nghttp2_frame_decode_hd(nghttp2_frame_hd *hd,
 nghttp2_ssize nghttp2_frame_decode_data(nghttp2_frame_data *dest,
                                         const uint8_t *src, size_t srclen) {
   const uint8_t *p = src;
-  size_t len;
+  nghttp2_ssize nread;
 
   if (srclen < NGHTTP2_FRAME_HDLEN) {
     return NGHTTP2_ERR_FRAME_ENCODING;
@@ -358,7 +358,22 @@ nghttp2_ssize nghttp2_frame_decode_data(nghttp2_frame_data *dest,
 
   p = nghttp2_frame_decode_hd(&dest->hd, p);
 
-  if (srclen < NGHTTP2_FRAME_HDLEN + dest->hd.len) {
+  nread =
+    nghttp2_frame_decode_data_payload(dest, p, srclen - NGHTTP2_FRAME_HDLEN);
+  if (nread < 0) {
+    return nread;
+  }
+
+  return (nghttp2_ssize)NGHTTP2_FRAME_HDLEN + nread;
+}
+
+nghttp2_ssize nghttp2_frame_decode_data_payload(nghttp2_frame_data *dest,
+                                                const uint8_t *src,
+                                                size_t srclen) {
+  const uint8_t *p = src;
+  size_t len;
+
+  if (srclen < dest->hd.len) {
     return NGHTTP2_ERR_FRAME_ENCODING;
   }
 
@@ -389,13 +404,13 @@ nghttp2_ssize nghttp2_frame_decode_data(nghttp2_frame_data *dest,
     dest->data = NULL;
   }
 
-  return (nghttp2_ssize)(NGHTTP2_FRAME_HDLEN + dest->hd.len);
+  return (nghttp2_ssize)dest->hd.len;
 }
 
 nghttp2_ssize nghttp2_frame_decode_headers(nghttp2_frame_headers *dest,
                                            const uint8_t *src, size_t srclen) {
   const uint8_t *p = src;
-  size_t len;
+  nghttp2_ssize nread;
 
   if (srclen < NGHTTP2_FRAME_HDLEN) {
     return NGHTTP2_ERR_FRAME_ENCODING;
@@ -403,7 +418,22 @@ nghttp2_ssize nghttp2_frame_decode_headers(nghttp2_frame_headers *dest,
 
   p = nghttp2_frame_decode_hd(&dest->hd, p);
 
-  if (srclen < NGHTTP2_FRAME_HDLEN + dest->hd.len) {
+  nread =
+    nghttp2_frame_decode_headers_payload(dest, p, srclen - NGHTTP2_FRAME_HDLEN);
+  if (nread < 0) {
+    return nread;
+  }
+
+  return (nghttp2_ssize)NGHTTP2_FRAME_HDLEN + nread;
+}
+
+nghttp2_ssize nghttp2_frame_decode_headers_payload(nghttp2_frame_headers *dest,
+                                                   const uint8_t *src,
+                                                   size_t srclen) {
+  const uint8_t *p = src;
+  size_t len;
+
+  if (srclen < dest->hd.len) {
     return NGHTTP2_ERR_FRAME_ENCODING;
   }
 
@@ -444,13 +474,14 @@ nghttp2_ssize nghttp2_frame_decode_headers(nghttp2_frame_headers *dest,
     dest->field_block = NULL;
   }
 
-  return (nghttp2_ssize)(NGHTTP2_FRAME_HDLEN + dest->hd.len);
+  return (nghttp2_ssize)dest->hd.len;
 }
 
 nghttp2_ssize nghttp2_frame_decode_rst_stream(nghttp2_frame_rst_stream *dest,
                                               const uint8_t *src,
                                               size_t srclen) {
   const uint8_t *p = src;
+  nghttp2_ssize nread;
 
   if (srclen < NGHTTP2_FRAME_HDLEN + 4) {
     return NGHTTP2_ERR_FRAME_ENCODING;
@@ -458,13 +489,27 @@ nghttp2_ssize nghttp2_frame_decode_rst_stream(nghttp2_frame_rst_stream *dest,
 
   p = nghttp2_frame_decode_hd(&dest->hd, p);
 
-  if (dest->hd.len != 4) {
+  nread = nghttp2_frame_decode_rst_stream_payload(dest, p,
+                                                  srclen - NGHTTP2_FRAME_HDLEN);
+  if (nread < 0) {
+    return nread;
+  }
+
+  return (nghttp2_ssize)NGHTTP2_FRAME_HDLEN + 4;
+}
+
+nghttp2_ssize
+nghttp2_frame_decode_rst_stream_payload(nghttp2_frame_rst_stream *dest,
+                                        const uint8_t *src, size_t srclen) {
+  const uint8_t *p = src;
+
+  if (dest->hd.len != 4 || srclen < dest->hd.len) {
     return NGHTTP2_ERR_FRAME_ENCODING;
   }
 
   nghttp2_get_uint32be(&dest->error_code, p);
 
-  return (nghttp2_ssize)(NGHTTP2_FRAME_HDLEN + 4);
+  return 4;
 }
 
 nghttp2_ssize nghttp2_frame_decode_settings(nghttp2_frame_settings *dest,
@@ -495,6 +540,7 @@ nghttp2_ssize nghttp2_frame_decode_settings(nghttp2_frame_settings *dest,
 nghttp2_ssize nghttp2_frame_decode_ping(nghttp2_frame_ping *dest,
                                         const uint8_t *src, size_t srclen) {
   const uint8_t *p = src;
+  nghttp2_ssize nread;
 
   if (srclen < NGHTTP2_FRAME_HDLEN + 8) {
     return NGHTTP2_ERR_FRAME_ENCODING;
@@ -502,18 +548,33 @@ nghttp2_ssize nghttp2_frame_decode_ping(nghttp2_frame_ping *dest,
 
   p = nghttp2_frame_decode_hd(&dest->hd, p);
 
-  if (dest->hd.len != 8) {
+  nread =
+    nghttp2_frame_decode_ping_payload(dest, p, srclen - NGHTTP2_FRAME_HDLEN);
+  if (nread < 0) {
+    return nread;
+  }
+
+  return (nghttp2_ssize)NGHTTP2_FRAME_HDLEN + 8;
+}
+
+nghttp2_ssize nghttp2_frame_decode_ping_payload(nghttp2_frame_ping *dest,
+                                                const uint8_t *src,
+                                                size_t srclen) {
+  const uint8_t *p = src;
+
+  if (dest->hd.len != 8 || srclen < dest->hd.len) {
     return NGHTTP2_ERR_FRAME_ENCODING;
   }
 
   memcpy(dest->data.data, p, sizeof(dest->data.data));
 
-  return (nghttp2_ssize)(NGHTTP2_FRAME_HDLEN + 8);
+  return 8;
 }
 
 nghttp2_ssize nghttp2_frame_decode_goaway(nghttp2_frame_goaway *dest,
                                           const uint8_t *src, size_t srclen) {
   const uint8_t *p = src;
+  nghttp2_ssize nread;
 
   if (srclen < NGHTTP2_FRAME_HDLEN + 8) {
     return NGHTTP2_ERR_FRAME_ENCODING;
@@ -521,7 +582,21 @@ nghttp2_ssize nghttp2_frame_decode_goaway(nghttp2_frame_goaway *dest,
 
   p = nghttp2_frame_decode_hd(&dest->hd, p);
 
-  if (srclen < NGHTTP2_FRAME_HDLEN + dest->hd.len || dest->hd.len < 8) {
+  nread =
+    nghttp2_frame_decode_goaway_payload(dest, p, srclen - NGHTTP2_FRAME_HDLEN);
+  if (nread < 0) {
+    return nread;
+  }
+
+  return (nghttp2_ssize)NGHTTP2_FRAME_HDLEN + nread;
+}
+
+nghttp2_ssize nghttp2_frame_decode_goaway_payload(nghttp2_frame_goaway *dest,
+                                                  const uint8_t *src,
+                                                  size_t srclen) {
+  const uint8_t *p = src;
+
+  if (dest->hd.len < 8 || srclen < dest->hd.len) {
     return NGHTTP2_ERR_FRAME_ENCODING;
   }
 
@@ -535,13 +610,14 @@ nghttp2_ssize nghttp2_frame_decode_goaway(nghttp2_frame_goaway *dest,
     dest->debug_data = NULL;
   }
 
-  return (nghttp2_ssize)(NGHTTP2_FRAME_HDLEN + dest->hd.len);
+  return (nghttp2_ssize)dest->hd.len;
 }
 
 nghttp2_ssize
 nghttp2_frame_decode_window_update(nghttp2_frame_window_update *dest,
                                    const uint8_t *src, size_t srclen) {
   const uint8_t *p = src;
+  nghttp2_ssize nread;
 
   if (srclen < NGHTTP2_FRAME_HDLEN + 4) {
     return NGHTTP2_ERR_FRAME_ENCODING;
@@ -549,13 +625,27 @@ nghttp2_frame_decode_window_update(nghttp2_frame_window_update *dest,
 
   p = nghttp2_frame_decode_hd(&dest->hd, p);
 
-  if (dest->hd.len != 4) {
+  nread = nghttp2_frame_decode_window_update_payload(
+    dest, p, srclen - NGHTTP2_FRAME_HDLEN);
+  if (nread < 0) {
+    return nread;
+  }
+
+  return (nghttp2_ssize)NGHTTP2_FRAME_HDLEN + 4;
+}
+
+nghttp2_ssize
+nghttp2_frame_decode_window_update_payload(nghttp2_frame_window_update *dest,
+                                           const uint8_t *src, size_t srclen) {
+  const uint8_t *p = src;
+
+  if (dest->hd.len != 4 || srclen < dest->hd.len) {
     return NGHTTP2_ERR_FRAME_ENCODING;
   }
 
   nghttp2_get_uint31be(&dest->window_size_inc, p);
 
-  return (nghttp2_ssize)(NGHTTP2_FRAME_HDLEN + 4);
+  return (nghttp2_ssize)4;
 }
 
 nghttp2_ssize nghttp2_frame_decode_continuation(nghttp2_frame_headers *dest,
@@ -589,6 +679,7 @@ nghttp2_ssize
 nghttp2_frame_decode_priority_update(nghttp2_frame_priority_update *dest,
                                      const uint8_t *src, size_t srclen) {
   const uint8_t *p = src;
+  nghttp2_ssize nread;
 
   if (srclen < NGHTTP2_FRAME_HDLEN + 4) {
     return NGHTTP2_ERR_FRAME_ENCODING;
@@ -596,7 +687,20 @@ nghttp2_frame_decode_priority_update(nghttp2_frame_priority_update *dest,
 
   p = nghttp2_frame_decode_hd(&dest->hd, p);
 
-  if (srclen < NGHTTP2_FRAME_HDLEN + dest->hd.len || dest->hd.len < 4) {
+  nread = nghttp2_frame_decode_priority_update_payload(
+    dest, p, srclen - NGHTTP2_FRAME_HDLEN);
+  if (nread < 0) {
+    return nread;
+  }
+
+  return (nghttp2_ssize)NGHTTP2_FRAME_HDLEN + nread;
+}
+
+nghttp2_ssize nghttp2_frame_decode_priority_update_payload(
+  nghttp2_frame_priority_update *dest, const uint8_t *src, size_t srclen) {
+  const uint8_t *p = src;
+
+  if (dest->hd.len < 4 || srclen < dest->hd.len) {
     return NGHTTP2_ERR_FRAME_ENCODING;
   }
 
@@ -610,7 +714,7 @@ nghttp2_frame_decode_priority_update(nghttp2_frame_priority_update *dest,
     dest->pri = NULL;
   }
 
-  return (nghttp2_ssize)(NGHTTP2_FRAME_HDLEN + dest->hd.len);
+  return (nghttp2_ssize)dest->hd.len;
 }
 
 int nghttp2_nva_copy(nghttp2_nv **pnva, const nghttp2_nv *nva, size_t nvlen,

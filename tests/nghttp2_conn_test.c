@@ -1643,7 +1643,8 @@ void test_nghttp2_conn_recv_frame_hd(void) {
 
   read_client_preface(conn, NULL, 0, ts);
 
-  rv = nghttp2_conn_read(conn, (const uint8_t *)"\x00\x40\x01", 3, ++ts);
+  rv = nghttp2_conn_read(
+    conn, (const uint8_t *)"\x00\x40\x01\x00\x00\x00\x00\x00\x00", 9, ++ts);
 
   assert_int(0, ==, rv);
   assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_CLOSING, ==,
@@ -1657,7 +1658,8 @@ void test_nghttp2_conn_recv_frame_hd(void) {
 
   read_client_preface(conn, NULL, 0, ts);
 
-  rv = nghttp2_conn_read(conn, (const uint8_t *)"\xFF\xFF\xFF", 3, ++ts);
+  rv = nghttp2_conn_read(
+    conn, (const uint8_t *)"\xFF\xFF\xFF\x00\x00\x00\x00\x00\x00", 9, ++ts);
 
   assert_int(0, ==, rv);
   assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_CLOSING, ==,
@@ -1796,6 +1798,63 @@ void test_nghttp2_conn_recv_headers(void) {
   nghttp2_hpack_encoder_free(&enc);
   nghttp2_conn_del(conn);
 
+  /* Receive HEADERS with END_STREAM, and PADDED flags set */
+  setup_default_server(&conn);
+  read_client_preface(conn, NULL, 0, ts);
+  nghttp2_hpack_encoder_init(&enc, NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY, mem);
+
+  nghttp2_buf_reset(&hbuf);
+  rv =
+    nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
+
+  assert_int(0, ==, rv);
+
+  fr.headers = (nghttp2_frame_headers){
+    .hd =
+      {
+        .type = NGHTTP2_FRAME_HEADERS,
+        .flags = NGHTTP2_HEADERS_FLAG_END_STREAM | NGHTTP2_HEADERS_FLAG_PADDED,
+        .stream_id = 0x01,
+      },
+    .padlen = 11,
+    .field_block = hbuf.pos,
+    .field_blocklen = nghttp2_buf_len(&hbuf),
+  };
+
+  fr.headers.hd.len =
+    (uint32_t)nghttp2_frame_encode_headers_payloadlen(&fr.headers);
+
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+  assert_enum(nghttp2_frame_read_state,
+              NGHTTP2_FRAME_READ_STATE_CONTINUATION_FRAME_LENGTH, ==,
+              conn->rx.frrd.state);
+
+  nghttp2_hpack_encoder_free(&enc);
+  nghttp2_conn_del(conn);
+
+  /* Read 1 byte at a time */
+  setup_default_server(&conn);
+  read_client_preface(conn, NULL, 0, ts);
+
+  for (i = 0; i < nghttp2_buf_len(&buf); ++i) {
+    rv = nghttp2_conn_read(conn, buf.pos + i, 1, ++ts);
+
+    assert_int(0, ==, rv);
+  }
+
+  assert_enum(nghttp2_frame_read_state,
+              NGHTTP2_FRAME_READ_STATE_CONTINUATION_FRAME_LENGTH, ==,
+              conn->rx.frrd.state);
+
+  nghttp2_conn_del(conn);
+
   /* Receive HEADERS with END_HEADERS, END_STREAM, and PRIORITY flags
      set */
   setup_default_server(&conn);
@@ -1836,6 +1895,21 @@ void test_nghttp2_conn_recv_headers(void) {
               ==, conn->rx.frrd.state);
 
   nghttp2_hpack_encoder_free(&enc);
+  nghttp2_conn_del(conn);
+
+  /* Read 1 byte at a time */
+  setup_default_server(&conn);
+  read_client_preface(conn, NULL, 0, ts);
+
+  for (i = 0; i < nghttp2_buf_len(&buf); ++i) {
+    rv = nghttp2_conn_read(conn, buf.pos + i, 1, ++ts);
+
+    assert_int(0, ==, rv);
+  }
+
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
+              ==, conn->rx.frrd.state);
+
   nghttp2_conn_del(conn);
 
   /* Receive HEADERS with END_HEADERS and END_STREAM flags set */
@@ -2252,6 +2326,52 @@ void test_nghttp2_conn_recv_headers(void) {
 
   nghttp2_conn_del(conn);
 
+  /* Receive HEADERS with PADDED and PRIORITY flags set and the length
+     is too short */
+  setup_default_server(&conn);
+  read_client_preface(conn, NULL, 0, ts);
+
+  fr.headers = (nghttp2_frame_headers){
+    .hd =
+      {
+        .len = 6,
+        .type = NGHTTP2_FRAME_HEADERS,
+        .flags = NGHTTP2_HEADERS_FLAG_PADDED | NGHTTP2_HEADERS_FLAG_PRIORITY,
+        .stream_id = 0x01,
+      },
+    .padlen = 1,
+  };
+
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_CLOSING, ==,
+              conn->rx.frrd.state);
+  assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, conn->tx.goaway.error_code);
+
+  nghttp2_conn_del(conn);
+
+  /* Read 1 byte at a time */
+  setup_default_server(&conn);
+  read_client_preface(conn, NULL, 0, ts);
+
+  for (i = 0; i < nghttp2_buf_len(&buf); ++i) {
+    rv = nghttp2_conn_read(conn, buf.pos + i, 1, ++ts);
+
+    assert_int(0, ==, rv);
+  }
+
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_CLOSING, ==,
+              conn->rx.frrd.state);
+  assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, conn->tx.goaway.error_code);
+
+  nghttp2_conn_del(conn);
+
   /* Receive HEADERS with PADDED flag set and the length is too
      short */
   setup_default_server(&conn);
@@ -2278,6 +2398,55 @@ void test_nghttp2_conn_recv_headers(void) {
   rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
 
   assert_int(0, ==, rv);
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_CLOSING, ==,
+              conn->rx.frrd.state);
+  assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, conn->tx.goaway.error_code);
+
+  nghttp2_conn_del(conn);
+
+  /* Receive HEADERS with PADDED flag set and the length is too
+     short */
+  setup_default_server(&conn);
+  read_client_preface(conn, NULL, 0, ts);
+
+  fr.headers = (nghttp2_frame_headers){
+    .hd =
+      {
+        .len = 1,
+        .type = NGHTTP2_FRAME_HEADERS,
+        .flags = NGHTTP2_HEADERS_FLAG_PADDED,
+        .stream_id = 0x01,
+      },
+    .padlen = 10,
+  };
+
+  fr.headers.hd.len =
+    (uint32_t)nghttp2_frame_encode_headers_payloadlen(&fr.headers) - 1;
+
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_CLOSING, ==,
+              conn->rx.frrd.state);
+  assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, conn->tx.goaway.error_code);
+
+  nghttp2_conn_del(conn);
+
+  /* Read 1 byte at a time */
+  setup_default_server(&conn);
+  read_client_preface(conn, NULL, 0, ts);
+
+  for (i = 0; i < nghttp2_buf_len(&buf); ++i) {
+    rv = nghttp2_conn_read(conn, buf.pos + i, 1, ++ts);
+
+    assert_int(0, ==, rv);
+  }
+
   assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_CLOSING, ==,
               conn->rx.frrd.state);
   assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, conn->tx.goaway.error_code);
@@ -2618,12 +2787,6 @@ void test_nghttp2_conn_recv_headers(void) {
 
   assert_int(0, ==, rv);
 
-  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
-
-  assert_int(0, ==, rv);
-  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
-              ==, conn->rx.frrd.state);
-
   fr.headers = (nghttp2_frame_headers){
     .hd =
       {
@@ -2636,8 +2799,6 @@ void test_nghttp2_conn_recv_headers(void) {
 
   fr.headers.hd.len =
     (uint32_t)nghttp2_frame_encode_headers_payloadlen(&fr.headers);
-
-  nghttp2_buf_reset(&buf);
   rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
 
   assert_int(0, ==, rv);
@@ -2649,6 +2810,171 @@ void test_nghttp2_conn_recv_headers(void) {
               ==, conn->rx.frrd.state);
 
   nghttp2_hpack_encoder_free(&enc);
+  nghttp2_conn_del(conn);
+
+  /* Read 1 byte at a time */
+  setup_default_server(&conn);
+  read_client_preface(conn, NULL, 0, ts);
+
+  for (i = 0; i < nghttp2_buf_len(&buf); ++i) {
+    rv = nghttp2_conn_read(conn, buf.pos + i, 1, ++ts);
+
+    assert_int(0, ==, rv);
+  }
+
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
+              ==, conn->rx.frrd.state);
+
+  nghttp2_conn_del(conn);
+
+  /* Receive trailer HEADERS with PADDED, and 1 padded byte and 0
+     length field block */
+  setup_default_server(&conn);
+  read_client_preface(conn, NULL, 0, ts);
+  nghttp2_hpack_encoder_init(&enc, NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY, mem);
+
+  nghttp2_buf_reset(&hbuf);
+  rv =
+    nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
+
+  assert_int(0, ==, rv);
+
+  fr.headers = (nghttp2_frame_headers){
+    .hd =
+      {
+        .type = NGHTTP2_FRAME_HEADERS,
+        .flags = NGHTTP2_HEADERS_FLAG_END_HEADERS,
+        .stream_id = 0x01,
+      },
+    .field_block = hbuf.pos,
+    .field_blocklen = nghttp2_buf_len(&hbuf),
+  };
+
+  fr.headers.hd.len =
+    (uint32_t)nghttp2_frame_encode_headers_payloadlen(&fr.headers);
+
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
+
+  assert_int(0, ==, rv);
+
+  fr.headers = (nghttp2_frame_headers){
+    .hd =
+      {
+        .type = NGHTTP2_FRAME_HEADERS,
+        .flags = NGHTTP2_HEADERS_FLAG_END_STREAM | NGHTTP2_HEADERS_FLAG_PADDED,
+        .stream_id = 0x01,
+      },
+  };
+
+  fr.headers.hd.len =
+    (uint32_t)nghttp2_frame_encode_headers_payloadlen(&fr.headers);
+  rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+  assert_enum(nghttp2_frame_read_state,
+              NGHTTP2_FRAME_READ_STATE_CONTINUATION_FRAME_LENGTH, ==,
+              conn->rx.frrd.state);
+
+  nghttp2_hpack_encoder_free(&enc);
+  nghttp2_conn_del(conn);
+
+  /* Read 1 byte at a time */
+  setup_default_server(&conn);
+  read_client_preface(conn, NULL, 0, ts);
+
+  for (i = 0; i < nghttp2_buf_len(&buf); ++i) {
+    rv = nghttp2_conn_read(conn, buf.pos + i, 1, ++ts);
+
+    assert_int(0, ==, rv);
+  }
+
+  assert_enum(nghttp2_frame_read_state,
+              NGHTTP2_FRAME_READ_STATE_CONTINUATION_FRAME_LENGTH, ==,
+              conn->rx.frrd.state);
+
+  nghttp2_conn_del(conn);
+
+  /* Receive trailer HEADERS with END_HEADERS and PADDED, and 1 padded
+     byte and nonzero length field block */
+  setup_default_server(&conn);
+  read_client_preface(conn, NULL, 0, ts);
+  nghttp2_hpack_encoder_init(&enc, NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY, mem);
+
+  nghttp2_buf_reset(&hbuf);
+  rv =
+    nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
+
+  assert_int(0, ==, rv);
+
+  fr.headers = (nghttp2_frame_headers){
+    .hd =
+      {
+        .type = NGHTTP2_FRAME_HEADERS,
+        .flags = NGHTTP2_HEADERS_FLAG_END_HEADERS,
+        .stream_id = 0x01,
+      },
+    .field_block = hbuf.pos,
+    .field_blocklen = nghttp2_buf_len(&hbuf),
+  };
+
+  fr.headers.hd.len =
+    (uint32_t)nghttp2_frame_encode_headers_payloadlen(&fr.headers);
+
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
+
+  assert_int(0, ==, rv);
+
+  nghttp2_buf_reset(&hbuf);
+  rv = nghttp2_hpack_encoder_write(&enc, &hbuf, trnva, nghttp2_arraylen(trnva));
+
+  assert_int(0, ==, rv);
+
+  fr.headers = (nghttp2_frame_headers){
+    .hd =
+      {
+        .type = NGHTTP2_FRAME_HEADERS,
+        .flags = NGHTTP2_HEADERS_FLAG_END_HEADERS |
+                 NGHTTP2_HEADERS_FLAG_END_STREAM | NGHTTP2_HEADERS_FLAG_PADDED,
+        .stream_id = 0x01,
+      },
+    .field_block = hbuf.pos,
+    .field_blocklen = nghttp2_buf_len(&hbuf),
+  };
+
+  fr.headers.hd.len =
+    (uint32_t)nghttp2_frame_encode_headers_payloadlen(&fr.headers);
+  rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
+              ==, conn->rx.frrd.state);
+
+  nghttp2_hpack_encoder_free(&enc);
+  nghttp2_conn_del(conn);
+
+  /* Read 1 byte at a time */
+  setup_default_server(&conn);
+  read_client_preface(conn, NULL, 0, ts);
+
+  for (i = 0; i < nghttp2_buf_len(&buf); ++i) {
+    rv = nghttp2_conn_read(conn, buf.pos + i, 1, ++ts);
+
+    assert_int(0, ==, rv);
+  }
+
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
+              ==, conn->rx.frrd.state);
+
   nghttp2_conn_del(conn);
 
   /* Receive trailer HEADERS with END_HEADERS and PRIORITY, and 0
@@ -2682,12 +3008,6 @@ void test_nghttp2_conn_recv_headers(void) {
 
   assert_int(0, ==, rv);
 
-  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
-
-  assert_int(0, ==, rv);
-  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
-              ==, conn->rx.frrd.state);
-
   fr.headers = (nghttp2_frame_headers){
     .hd =
       {
@@ -2702,7 +3022,6 @@ void test_nghttp2_conn_recv_headers(void) {
   fr.headers.hd.len =
     (uint32_t)nghttp2_frame_encode_headers_payloadlen(&fr.headers);
 
-  nghttp2_buf_reset(&buf);
   rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
 
   assert_int(0, ==, rv);
@@ -2714,6 +3033,95 @@ void test_nghttp2_conn_recv_headers(void) {
               ==, conn->rx.frrd.state);
 
   nghttp2_hpack_encoder_free(&enc);
+  nghttp2_conn_del(conn);
+
+  /* Read 1 byte at a time */
+  setup_default_server(&conn);
+  read_client_preface(conn, NULL, 0, ts);
+
+  for (i = 0; i < nghttp2_buf_len(&buf); ++i) {
+    rv = nghttp2_conn_read(conn, buf.pos + i, 1, ++ts);
+
+    assert_int(0, ==, rv);
+  }
+
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
+              ==, conn->rx.frrd.state);
+
+  nghttp2_conn_del(conn);
+
+  /* Receive trailer HEADERS with PRIORITY, and 0 length field
+     block */
+  setup_default_server(&conn);
+  read_client_preface(conn, NULL, 0, ts);
+  nghttp2_hpack_encoder_init(&enc, NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY, mem);
+
+  nghttp2_buf_reset(&hbuf);
+  rv =
+    nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
+
+  assert_int(0, ==, rv);
+
+  fr.headers = (nghttp2_frame_headers){
+    .hd =
+      {
+        .type = NGHTTP2_FRAME_HEADERS,
+        .flags = NGHTTP2_HEADERS_FLAG_END_HEADERS,
+        .stream_id = 0x01,
+      },
+    .field_block = hbuf.pos,
+    .field_blocklen = nghttp2_buf_len(&hbuf),
+  };
+
+  fr.headers.hd.len =
+    (uint32_t)nghttp2_frame_encode_headers_payloadlen(&fr.headers);
+
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
+
+  assert_int(0, ==, rv);
+
+  fr.headers = (nghttp2_frame_headers){
+    .hd =
+      {
+        .type = NGHTTP2_FRAME_HEADERS,
+        .flags =
+          NGHTTP2_HEADERS_FLAG_END_STREAM | NGHTTP2_HEADERS_FLAG_PRIORITY,
+        .stream_id = 0x01,
+      },
+  };
+
+  fr.headers.hd.len =
+    (uint32_t)nghttp2_frame_encode_headers_payloadlen(&fr.headers);
+
+  rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+  assert_enum(nghttp2_frame_read_state,
+              NGHTTP2_FRAME_READ_STATE_CONTINUATION_FRAME_LENGTH, ==,
+              conn->rx.frrd.state);
+
+  nghttp2_hpack_encoder_free(&enc);
+  nghttp2_conn_del(conn);
+
+  /* Read 1 byte at a time */
+  setup_default_server(&conn);
+  read_client_preface(conn, NULL, 0, ts);
+
+  for (i = 0; i < nghttp2_buf_len(&buf); ++i) {
+    rv = nghttp2_conn_read(conn, buf.pos + i, 1, ++ts);
+
+    assert_int(0, ==, rv);
+  }
+
+  assert_enum(nghttp2_frame_read_state,
+              NGHTTP2_FRAME_READ_STATE_CONTINUATION_FRAME_LENGTH, ==,
+              conn->rx.frrd.state);
+
   nghttp2_conn_del(conn);
 
   /* Receive HEADERS for the closed stream */
@@ -3562,7 +3970,7 @@ void test_nghttp2_conn_recv_data(void) {
   nghttp2_hpack_encoder_free(&enc);
   nghttp2_conn_del(conn);
 
-  /* Receive 1 byte at a time */
+  /* Read 1 byte at a time */
   server_default_callbacks(&callbacks);
   callbacks.recv_data = recv_data;
 
@@ -3752,6 +4160,39 @@ void test_nghttp2_conn_recv_data(void) {
   nghttp2_hpack_encoder_free(&enc);
   nghttp2_conn_del(conn);
 
+  /* Read 1 byte at a time */
+  server_default_callbacks(&callbacks);
+  callbacks.recv_data = recv_data;
+
+  opts = (conn_options){
+    .callbacks = &callbacks,
+    .user_data = &ud,
+  };
+
+  setup_default_server_with_options(&conn, opts);
+  read_client_preface(conn, NULL, 0, ts);
+
+  ud = (userdata){0};
+
+  for (i = 0; i < nghttp2_buf_len(&buf); ++i) {
+    rv = nghttp2_conn_read(conn, buf.pos + i, 1, ++ts);
+
+    assert_int(0, ==, rv);
+  }
+
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
+              ==, conn->rx.frrd.state);
+  assert_size(111, ==, ud.recv_data.ncalled);
+  assert_int64(0x01, ==, ud.recv_data.stream_id);
+  assert_size(111, ==, ud.recv_data.datalen);
+
+  stream = nghttp2_conn_find_stream(conn, 0x01);
+
+  assert_not_null(stream);
+  assert_true(stream->flags & NGHTTP2_STREAM_FLAG_SHUT_RD);
+
+  nghttp2_conn_del(conn);
+
   /* Receive DATA with PADDED flag set and the length is too short */
   setup_default_server(&conn);
   read_client_preface(conn, NULL, 0, ts);
@@ -3858,6 +4299,22 @@ void test_nghttp2_conn_recv_data(void) {
   assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, conn->tx.goaway.error_code);
 
   nghttp2_hpack_encoder_free(&enc);
+  nghttp2_conn_del(conn);
+
+  /* Read 1 byte at a time */
+  setup_default_server(&conn);
+  read_client_preface(conn, NULL, 0, ts);
+
+  for (i = 0; i < nghttp2_buf_len(&buf); ++i) {
+    rv = nghttp2_conn_read(conn, buf.pos + i, 1, ++ts);
+
+    assert_int(0, ==, rv);
+  }
+
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_CLOSING, ==,
+              conn->rx.frrd.state);
+  assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, conn->tx.goaway.error_code);
+
   nghttp2_conn_del(conn);
 
   /* Receive 0 length DATA */
@@ -3981,6 +4438,26 @@ void test_nghttp2_conn_recv_data(void) {
   assert_true(stream->flags & NGHTTP2_STREAM_FLAG_SHUT_RD);
 
   nghttp2_hpack_encoder_free(&enc);
+  nghttp2_conn_del(conn);
+
+  /* Read 1 byte at a time */
+  setup_default_server(&conn);
+  read_client_preface(conn, NULL, 0, ts);
+
+  for (i = 0; i < nghttp2_buf_len(&buf); ++i) {
+    rv = nghttp2_conn_read(conn, buf.pos + i, 1, ++ts);
+
+    assert_int(0, ==, rv);
+  }
+
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
+              ==, conn->rx.frrd.state);
+
+  stream = nghttp2_conn_find_stream(conn, 0x01);
+
+  assert_not_null(stream);
+  assert_true(stream->flags & NGHTTP2_STREAM_FLAG_SHUT_RD);
+
   nghttp2_conn_del(conn);
 
   /* Receive DATA on the closed stream  */
@@ -4225,7 +4702,7 @@ void test_nghttp2_conn_recv_rst_stream(void) {
   nghttp2_hpack_encoder_free(&enc);
   nghttp2_conn_del(conn);
 
-  /* Receive 1 byte at a time */
+  /* Read 1 byte at a time */
   setup_default_server(&conn);
   read_client_preface(conn, NULL, 0, ts);
 
@@ -4621,6 +5098,40 @@ void test_nghttp2_conn_recv_settings(void) {
 
     assert_int(0, ==, rv);
   }
+
+  assert_size(1, ==, ud.recv_settings.ncalled);
+  assert_size(2048, ==, ud.recv_settings.settings.hpack_max_dtable_capacity);
+  assert_uint32(0, ==, ud.recv_settings.settings.max_concurrent_streams);
+  assert_uint32(INT32_MAX, ==,
+                ud.recv_settings.settings.initial_max_stream_data);
+  assert_uint32(UINT32_MAX, ==,
+                ud.recv_settings.settings.max_field_section_size);
+  assert_uint32(1, ==, ud.recv_settings.settings.enable_connect_protocol);
+
+  nghttp2_conn_del(conn);
+
+  /* SETTINGS split into 2 reads */
+  server_default_callbacks(&callbacks);
+  callbacks.recv_settings = recv_settings;
+
+  opts = (conn_options){
+    .callbacks = &callbacks,
+    .user_data = &ud,
+  };
+
+  setup_default_server_with_options(&conn, opts);
+  read_client_preface(conn, NULL, 0, ts);
+
+  ud = (userdata){0};
+
+  rv = nghttp2_conn_read(conn, buf.pos, NGHTTP2_FRAME_HDLEN + 3, ++ts);
+
+  assert_int(0, ==, rv);
+
+  buf.pos += NGHTTP2_FRAME_HDLEN + 3;
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
 
   assert_size(1, ==, ud.recv_settings.ncalled);
   assert_size(2048, ==, ud.recv_settings.settings.hpack_max_dtable_capacity);
@@ -5544,7 +6055,7 @@ void test_nghttp2_conn_recv_goaway(void) {
 
   nghttp2_conn_del(conn);
 
-  /* Receive 1 byte at a time */
+  /* Read 1 byte at a time */
   setup_default_client(&conn);
   read_server_preface(conn, NULL, 0, ts);
 
@@ -5582,6 +6093,20 @@ void test_nghttp2_conn_recv_goaway(void) {
   assert_int(0, ==, rv);
   assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
               ==, conn->rx.frrd.state);
+  assert_true(conn->flags & NGHTTP2_CONN_FLAG_GOAWAY_RECVED);
+
+  nghttp2_conn_del(conn);
+
+  /* Read 1 byte at a time */
+  setup_default_client(&conn);
+  read_server_preface(conn, NULL, 0, ts);
+
+  for (i = 0; i < nghttp2_buf_len(&buf); ++i) {
+    rv = nghttp2_conn_read(conn, buf.pos + i, 1, ++ts);
+
+    assert_int(0, ==, rv);
+  }
+
   assert_true(conn->flags & NGHTTP2_CONN_FLAG_GOAWAY_RECVED);
 
   nghttp2_conn_del(conn);
@@ -5879,7 +6404,7 @@ void test_nghttp2_conn_recv_window_update(void) {
   nghttp2_hpack_encoder_free(&enc);
   nghttp2_conn_del(conn);
 
-  /* Receive 1 byte at a time */
+  /* Read 1 byte at a time */
   setup_default_server(&conn);
   read_client_preface(conn, NULL, 0, ts);
 
@@ -6262,7 +6787,7 @@ void test_nghttp2_conn_recv_priority_update(void) {
   nghttp2_hpack_encoder_free(&enc);
   nghttp2_conn_del(conn);
 
-  /* Receive 1 byte at a time */
+  /* Read 1 byte at a time */
   setup_default_server(&conn);
   read_client_preface(conn, NULL, 0, ts);
 
@@ -6271,6 +6796,32 @@ void test_nghttp2_conn_recv_priority_update(void) {
 
     assert_int(0, ==, rv);
   }
+
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
+              ==, conn->rx.frrd.state);
+
+  stream = nghttp2_conn_find_stream(conn, 0x01);
+
+  assert_not_null(stream);
+  assert_uint32(2, ==, stream->sched.pri.urgency);
+  assert_true(stream->sched.pri.inc);
+
+  nghttp2_conn_del(conn);
+
+  /* PRIORITY_UPDATE frame is split into 2 reads */
+  setup_default_server(&conn);
+  read_client_preface(conn, NULL, 0, ts);
+
+  rv = nghttp2_conn_read(
+    conn, buf.pos, nghttp2_buf_len(&buf) - nghttp2_strlen_lit(prival), ++ts);
+
+  assert_int(0, ==, rv);
+
+  buf.pos += nghttp2_buf_len(&buf) - nghttp2_strlen_lit(prival);
+
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
 
   assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
               ==, conn->rx.frrd.state);
@@ -6646,6 +7197,27 @@ void test_nghttp2_conn_recv_priority_update(void) {
   nghttp2_hpack_encoder_free(&enc);
   nghttp2_conn_del(conn);
 
+  /* Read 1 byte at a time */
+  setup_default_server(&conn);
+  read_client_preface(conn, NULL, 0, ts);
+
+  for (i = 0; i < nghttp2_buf_len(&buf); ++i) {
+    rv = nghttp2_conn_read(conn, buf.pos + i, 1, ++ts);
+
+    assert_int(0, ==, rv);
+  }
+
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
+              ==, conn->rx.frrd.state);
+
+  stream = nghttp2_conn_find_stream(conn, 0x01);
+
+  assert_not_null(stream);
+  assert_uint32(NGHTTP2_DEFAULT_URGENCY, ==, stream->sched.pri.urgency);
+  assert_false(stream->sched.pri.inc);
+
+  nghttp2_conn_del(conn);
+
   /* Receive PRIORITY_UPDATE with too long priority field value */
   setup_default_server(&conn);
   read_client_preface(conn, NULL, 0, ts);
@@ -6703,6 +7275,27 @@ void test_nghttp2_conn_recv_priority_update(void) {
   assert_false(stream->sched.pri.inc);
 
   nghttp2_hpack_encoder_free(&enc);
+  nghttp2_conn_del(conn);
+
+  /* Read 1 byte at a time */
+  setup_default_server(&conn);
+  read_client_preface(conn, NULL, 0, ts);
+
+  for (i = 0; i < nghttp2_buf_len(&buf); ++i) {
+    rv = nghttp2_conn_read(conn, buf.pos + i, 1, ++ts);
+
+    assert_int(0, ==, rv);
+  }
+
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
+              ==, conn->rx.frrd.state);
+
+  stream = nghttp2_conn_find_stream(conn, 0x01);
+
+  assert_not_null(stream);
+  assert_uint32(NGHTTP2_DEFAULT_URGENCY, ==, stream->sched.pri.urgency);
+  assert_false(stream->sched.pri.inc);
+
   nghttp2_conn_del(conn);
 
   nghttp2_buf_free(&hbuf, mem);

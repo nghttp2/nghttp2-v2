@@ -36,9 +36,6 @@
 typedef enum nghttp2_frame_read_state {
   NGHTTP2_FRAME_READ_STATE_PREFACE,
   NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
-  NGHTTP2_FRAME_READ_STATE_FRAME_TYPE,
-  NGHTTP2_FRAME_READ_STATE_FRAME_FLAGS,
-  NGHTTP2_FRAME_READ_STATE_FRAME_STREAM_ID,
   NGHTTP2_FRAME_READ_STATE_DATA_PADLEN,
   NGHTTP2_FRAME_READ_STATE_DATA_DATA,
   NGHTTP2_FRAME_READ_STATE_DATA_PADDING,
@@ -81,6 +78,10 @@ typedef struct nghttp2_frame_reader {
       size_t prilen;
       uint8_t pri[8];
     } priority_update;
+    struct {
+      size_t buflen;
+      uint8_t buf[9];
+    } hd;
   } scratch;
   size_t left;
   size_t field_left;

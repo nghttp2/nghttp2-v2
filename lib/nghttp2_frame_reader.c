@@ -32,6 +32,7 @@ void nghttp2_frame_reader_server_init(nghttp2_frame_reader *frrd) {
 
 void nghttp2_frame_reader_reset(nghttp2_frame_reader *frrd) {
   frrd->state = NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH;
+  frrd->scratch.hd.buflen = 0;
 }
 
 void nghttp2_int_reader_reset(nghttp2_int_reader *ird) {
