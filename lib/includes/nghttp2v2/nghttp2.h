@@ -1643,7 +1643,7 @@ NGHTTP2_EXTERN int nghttp2_conn_read(nghttp2_conn *conn, const uint8_t *data,
  */
 NGHTTP2_EXTERN int nghttp2_conn_extend_max_stream_offset(nghttp2_conn *conn,
                                                          int64_t stream_id,
-                                                         uint32_t datalen);
+                                                         size_t datalen);
 
 /**
  * @function
@@ -1653,7 +1653,7 @@ NGHTTP2_EXTERN int nghttp2_conn_extend_max_stream_offset(nghttp2_conn *conn,
  * control window.
  */
 NGHTTP2_EXTERN int nghttp2_conn_extend_max_offset(nghttp2_conn *conn,
-                                                  uint32_t datalen);
+                                                  size_t datalen);
 
 /**
  * @function

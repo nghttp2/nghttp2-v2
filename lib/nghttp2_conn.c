@@ -3566,7 +3566,7 @@ int nghttp2_conn_submit_trailers(nghttp2_conn *conn, int64_t stream_id,
 }
 
 int nghttp2_conn_extend_max_stream_offset(nghttp2_conn *conn, int64_t stream_id,
-                                          uint32_t datalen) {
+                                          size_t datalen) {
   nghttp2_stream *stream;
   uint64_t max_offset;
 
@@ -3606,7 +3606,7 @@ int nghttp2_conn_extend_max_stream_offset(nghttp2_conn *conn, int64_t stream_id,
   return 0;
 }
 
-int nghttp2_conn_extend_max_offset(nghttp2_conn *conn, uint32_t datalen) {
+int nghttp2_conn_extend_max_offset(nghttp2_conn *conn, size_t datalen) {
   uint64_t max_offset;
 
   max_offset = conn->rx.unsent_max_offset + datalen;
