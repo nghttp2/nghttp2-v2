@@ -1182,24 +1182,6 @@ typedef int (*nghttp2_stream_close)(nghttp2_conn *conn, uint32_t flags,
 /**
  * @functypedef
  *
- * :type:`nghttp2_extend_max_stream_data` is a callback function which
- * is invoked when max stream data is extended.  |stream_id|
- * identifies the stream.  |max_data| is a cumulative number of bytes
- * an endpoint can send on this stream.
- *
- * The callback function must return 0 if it succeeds.  Returning
- * :macro:`NGHTTP2_ERR_CALLBACK_FAILURE` makes the library call return
- * immediately.
- */
-typedef int (*nghttp2_extend_max_stream_data)(nghttp2_conn *conn,
-                                              int64_t stream_id,
-                                              uint64_t max_data,
-                                              void *user_data,
-                                              void *stream_user_data);
-
-/**
- * @functypedef
- *
  * :type:`nghttp2_rand` is a callback function which is invoked when
  * unpredictable data of |destlen| bytes are needed.  The
  * implementation must write unpredictable data of |destlen| bytes
@@ -1393,13 +1375,6 @@ typedef struct nghttp2_callbacks {
    * when a stream is closed.  This callback function is optional.
    */
   nghttp2_stream_close stream_close;
-  /**
-   * :member:`extend_max_stream_data` is callback function which is
-   * invoked when the maximum offset of stream data that a local
-   * endpoint can send is increased.  This callback function is
-   * optional.
-   */
-  nghttp2_extend_max_stream_data extend_max_stream_data;
   /**
    * :member:`write_stream_data_offset` is a callback function which
    * is invoked when the stream data is written.  This callback

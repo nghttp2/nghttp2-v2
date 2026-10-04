@@ -87,11 +87,6 @@ std::tuple<nghttp2_conn *, bool> setup_conn(FuzzedDataProvider &fdp,
          uint32_t error_code, void *user_data, void *stream_user_data) {
         return simple_stream_callback(conn, stream_id, user_data);
       },
-    .extend_max_stream_data =
-      [](nghttp2_conn *conn, int64_t stream_id, uint64_t max_data,
-         void *user_data, void *stream_user_data) {
-        return simple_stream_callback(conn, stream_id, user_data);
-      },
     .write_stream_data_offset =
       [](nghttp2_conn *conn, int64_t stream_id, uint64_t offset, size_t len,
          void *user_data, void *stream_user_data) {
