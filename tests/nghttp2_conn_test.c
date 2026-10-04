@@ -428,9 +428,10 @@ static int shutdown(nghttp2_conn *conn, int64_t last_stream_id,
 }
 
 static int recv_ping_ack(nghttp2_conn *conn, const nghttp2_ping_data *data,
-                         void *conn_user_data) {
+                         nghttp2_duration rtt, void *conn_user_data) {
   userdata *ud = conn_user_data;
   (void)conn;
+  (void)rtt;
 
   ++ud->recv_ping_ack.ncalled;
   ud->recv_ping_ack.data = *data;

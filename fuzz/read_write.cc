@@ -144,9 +144,9 @@ std::tuple<nghttp2_conn *, bool> setup_conn(FuzzedDataProvider &fdp,
         return simple_stream_callback(conn, stream_id, user_data);
       },
     .recv_ping_ack =
-      [](nghttp2_conn *conn, const nghttp2_ping_data *data, void *user_data) {
-        return simple_callback(conn, user_data);
-      },
+      [](nghttp2_conn *conn, const nghttp2_ping_data *data,
+         nghttp2_duration rtt,
+         void *user_data) { return simple_callback(conn, user_data); },
     .shutdown =
       [](nghttp2_conn *conn, int64_t last_stream_id, uint32_t error_code,
          void *user_data) { return simple_callback(conn, user_data); },

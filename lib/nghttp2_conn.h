@@ -143,6 +143,8 @@ struct nghttp2_conn {
     struct {
       /* data contains the PING data to send or sent. */
       nghttp2_ping_data data;
+      /* sent_ts is the timestamp when PING frame is sent. */
+      nghttp2_tstamp sent_ts;
     } ping;
 
     struct {

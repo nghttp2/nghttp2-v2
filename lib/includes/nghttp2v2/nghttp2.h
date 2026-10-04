@@ -1343,6 +1343,8 @@ typedef int (*nghttp2_end_stream)(nghttp2_conn *conn, int64_t stream_id,
  * invoked when PING with ACK flag set is received.  |data| contains
  * the data received with PING frame.  This is the data that the local
  * endpoint sent to the remote endpoint.  The data is 8 bytes long.
+ * |rtt| is the round trip time between the transmission of PING frame
+ * and the reception of its acknowledgement.
  *
  * The implementation of this callback must return 0 if it succeeds.
  * Returning :macro:`NGHTTP2_ERR_CALLBACK_FAILURE` will return to the
@@ -1351,6 +1353,7 @@ typedef int (*nghttp2_end_stream)(nghttp2_conn *conn, int64_t stream_id,
  */
 typedef int (*nghttp2_recv_ping_ack)(nghttp2_conn *conn,
                                      const nghttp2_ping_data *data,
+                                     nghttp2_duration rtt,
                                      void *conn_user_data);
 
 /**

@@ -258,14 +258,15 @@ static int conn_call_recv_settings_ack(nghttp2_conn *conn) {
 }
 
 static int conn_call_recv_ping_ack(nghttp2_conn *conn,
-                                   const nghttp2_ping_data *data) {
+                                   const nghttp2_ping_data *data,
+                                   nghttp2_duration rtt) {
   int rv;
 
   if (!conn->callbacks.recv_ping_ack) {
     return 0;
   }
 
-  rv = conn->callbacks.recv_ping_ack(conn, data, conn->user_data);
+  rv = conn->callbacks.recv_ping_ack(conn, data, rtt, conn->user_data);
   if (rv != 0) {
     return NGHTTP2_ERR_CALLBACK_FAILURE;
   }
@@ -1507,7 +1508,8 @@ static int conn_recv_ping_hd(nghttp2_conn *conn, nghttp2_frame_ping *fr,
   return conn_update_glitch_ratelim(conn, 1, ts);
 }
 
-static int conn_recv_ping(nghttp2_conn *conn, const nghttp2_frame_ping *fr) {
+static int conn_recv_ping(nghttp2_conn *conn, const nghttp2_frame_ping *fr,
+                          nghttp2_tstamp ts) {
   nghttp2_ping_data *data;
   int rv;
 
@@ -1522,7 +1524,8 @@ static int conn_recv_ping(nghttp2_conn *conn, const nghttp2_frame_ping *fr) {
       return NGHTTP2_ERR_PROTO;
     }
 
-    rv = conn_call_recv_ping_ack(conn, &conn->tx.ping.data);
+    rv = conn_call_recv_ping_ack(conn, &conn->tx.ping.data,
+                                 ts - conn->tx.ping.sent_ts);
     if (rv != 0) {
       return rv;
     }
@@ -2004,7 +2007,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
 
             p += nread;
 
-            rv = conn_recv_ping(conn, &fr->ping);
+            rv = conn_recv_ping(conn, &fr->ping, ts);
             if (rv != 0) {
               return nghttp2_conn_handle_error(conn, rv);
             }
@@ -2588,7 +2591,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
         return 0;
       }
 
-      rv = conn_recv_ping(conn, &fr->ping);
+      rv = conn_recv_ping(conn, &fr->ping, ts);
       if (rv != 0) {
         return nghttp2_conn_handle_error(conn, rv);
       }
@@ -3275,6 +3278,7 @@ int nghttp2_conn_write_connection_wide_frames(nghttp2_conn *conn,
 
     nghttp2_log_tx_ping(&conn->log, &fr.ping);
 
+    conn->tx.ping.sent_ts = ts;
     conn->flags &= ~NGHTTP2_CONN_FLAG_SEND_PING;
     conn->flags |= NGHTTP2_CONN_FLAG_EXPECT_PING_ACK;
   }
