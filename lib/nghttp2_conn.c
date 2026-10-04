@@ -238,6 +238,25 @@ static int conn_call_recv_settings(nghttp2_conn *conn,
   return 0;
 }
 
+static int conn_call_recv_settings_ack(nghttp2_conn *conn) {
+  int rv;
+
+  if (!conn->callbacks.recv_settings_ack) {
+    return 0;
+  }
+
+  rv = conn->callbacks.recv_settings_ack(conn, conn->user_data);
+  if (rv != 0) {
+    return NGHTTP2_ERR_CALLBACK_FAILURE;
+  }
+
+  if (conn->rx.frrd.state == NGHTTP2_FRAME_READ_STATE_CLOSING) {
+    return NGHTTP2_ERR_STOP_READING;
+  }
+
+  return 0;
+}
+
 static int conn_call_recv_ping_ack(nghttp2_conn *conn,
                                    const nghttp2_ping_data *data) {
   int rv;
@@ -1248,7 +1267,7 @@ static int conn_recv_settings_hd(nghttp2_conn *conn, nghttp2_frame_settings *fr,
       return NGHTTP2_ERR_FRAME_ENCODING;
     }
 
-    return 0;
+    return conn_call_recv_settings_ack(conn);
   }
 
   if (fr->hd.len % 6) {

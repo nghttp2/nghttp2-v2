@@ -78,6 +78,10 @@ std::tuple<nghttp2_conn *, bool> setup_conn(FuzzedDataProvider &fdp,
     .recv_settings =
       [](nghttp2_conn *conn, const nghttp2_proto_settings *settings,
          void *user_data) { return simple_callback(conn, user_data); },
+    .recv_settings_ack =
+      [](nghttp2_conn *conn, void *user_data) {
+        return simple_callback(conn, user_data);
+      },
     .stream_open =
       [](nghttp2_conn *conn, int64_t stream_id, void *user_data) {
         return simple_stream_callback(conn, stream_id, user_data);

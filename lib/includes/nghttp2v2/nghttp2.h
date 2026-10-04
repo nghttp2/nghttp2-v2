@@ -1144,6 +1144,20 @@ typedef int (*nghttp2_recv_settings)(nghttp2_conn *conn,
 /**
  * @functypedef
  *
+ * :type:`nghttp2_recv_settings_ack` is a callback function which is
+ * invoked when SETTINGS frame with ACK flag set is received.
+ *
+ * The implementation of this callback must return 0 if it succeeds.
+ * Returning :macro:`NGHTTP2_ERR_CALLBACK_FAILURE` will return to the
+ * caller immediately.  Any values other than 0 is treated as
+ * :macro:`NGHTTP2_ERR_CALLBACK_FAILURE`.
+ */
+typedef int (*nghttp2_recv_settings_ack)(nghttp2_conn *conn,
+                                         void *conn_user_data);
+
+/**
+ * @functypedef
+ *
  * :type:`nghttp2_stream_open` is a callback function which is called
  * when remote stream is opened by a remote endpoint.  This function
  * is not called if stream is opened by implicitly (we might
@@ -1380,6 +1394,12 @@ typedef struct nghttp2_callbacks {
    * when SETTINGS frame is received from the remote endpoint.
    */
   nghttp2_recv_settings recv_settings;
+  /**
+   * :member:`recv_settings_ack` is a callback function which is
+   * invoked when SETTINGS frame with ACK flag set is received from
+   * the remote endpoint.
+   */
+  nghttp2_recv_settings_ack recv_settings_ack;
   /**
    * :member:`stream_open` is a callback function which is invoked
    * when new remote stream is opened by a remote endpoint.  This
