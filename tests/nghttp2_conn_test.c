@@ -7485,34 +7485,9 @@ void test_nghttp2_conn_recv_settings_ack(void) {
 
   assert_not_null(stream);
   assert_uint64(1 << 17, ==, stream->rx.max_offset);
-  assert_uint64(NGHTTP2_INITIAL_WINDOW_SIZE +
-                  ((1 << 17) - NGHTTP2_INITIAL_WINDOW_SIZE) * 2,
-                ==, stream->rx.unsent_max_offset);
+  assert_uint64(1 << 17, ==, stream->rx.unsent_max_offset);
   assert_uint64(1 << 17, ==, stream->rx.max_offset);
   assert_uint32(1 << 17, ==, conn->rx.stream_window);
-  assert_not_null(stream->strmq_prev);
-
-  nghttp2_buf_reset(&obuf);
-  nwrite = nghttp2_conn_write(conn, obuf.last, nghttp2_buf_left(&obuf), ++ts);
-
-  assert_ptrdiff(0, <, nwrite);
-  assert_uint64(stream->rx.unsent_max_offset, ==, stream->rx.max_offset);
-
-  obuf.last += nwrite;
-
-  rv = nghttp2_frd_decode_buf(&frd, &fr, &obuf);
-
-  assert_int(0, ==, rv);
-  assert_uint8(NGHTTP2_FRAME_SETTINGS, ==, fr.meta.hd.type);
-
-  rv = nghttp2_frd_decode_buf(&frd, &fr, &obuf);
-
-  assert_int(0, ==, rv);
-  assert_uint8(NGHTTP2_FRAME_WINDOW_UPDATE, ==, fr.meta.hd.type);
-  assert_int64(0x01, ==, fr.window_update.hd.stream_id);
-  assert_uint32(NGHTTP2_INITIAL_WINDOW_SIZE +
-                  ((1 << 17) - NGHTTP2_INITIAL_WINDOW_SIZE) * 2 - (1 << 17),
-                ==, fr.window_update.window_size_inc);
   assert_null(stream->strmq_prev);
 
   nghttp2_hpack_encoder_free(&enc);

@@ -1287,8 +1287,13 @@ static int stream_apply_rx_initial_max_stream_data(void *data, void *ptr) {
     return NGHTTP2_ERR_FLOW_CONTROL;
   }
 
+  stream->rx.unsent_max_offset += arg->delta;
+
+  if (stream->rx.max_offset > max_offset) {
+    stream->rx.unsent_max_offset += arg->delta;
+  }
+
   stream->rx.max_offset = max_offset;
-  stream->rx.unsent_max_offset += arg->delta * 2;
 
   if (!(stream->flags & NGHTTP2_STREAM_FLAG_SHUT_RD) &&
       conn_should_send_stream_window_update(arg->conn, stream)) {
