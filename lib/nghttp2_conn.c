@@ -648,7 +648,12 @@ static int conn_on_end_data(nghttp2_conn *conn, nghttp2_stream *stream,
 
   stream->flags |= NGHTTP2_STREAM_FLAG_SHUT_RD;
 
-  return conn_call_end_stream(conn, stream);
+  rv = conn_call_end_stream(conn, stream);
+  if (rv != 0) {
+    return rv;
+  }
+
+  return nghttp2_conn_close_stream_if_shut_rdwr(conn, stream);
 }
 
 static int conn_on_data(nghttp2_conn *conn, const nghttp2_frame_data *fr,
@@ -890,7 +895,12 @@ static int conn_on_end_headers(nghttp2_conn *conn, nghttp2_stream *stream,
 
   stream->flags |= NGHTTP2_STREAM_FLAG_SHUT_RD;
 
-  return conn_call_end_stream(conn, stream);
+  rv = conn_call_end_stream(conn, stream);
+  if (rv != 0) {
+    return rv;
+  }
+
+  return nghttp2_conn_close_stream_if_shut_rdwr(conn, stream);
 }
 
 static int conn_recv_headers(nghttp2_conn *conn,
