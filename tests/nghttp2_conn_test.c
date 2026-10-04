@@ -83,6 +83,7 @@ static const MunitTest tests[] = {
   munit_void_test(test_nghttp2_conn_get_stream_priority),
   munit_void_test(test_nghttp2_conn_set_stream_user_data),
   munit_void_test(test_nghttp2_conn_get_settings),
+  munit_void_test(test_nghttp2_conn_get_headers_field_blocklen),
   munit_test_end(),
 };
 
@@ -15737,4 +15738,108 @@ void test_nghttp2_conn_get_settings(void) {
   assert_ptr_equal(log_write, settings->log_write);
 
   nghttp2_conn_del(conn);
+}
+
+static int get_headers_fields_blocklen_end_headers(nghttp2_conn *conn,
+                                                   int64_t stream_id, int fin,
+                                                   void *conn_user_data,
+                                                   void *stream_user_data) {
+  size_t len;
+  (void)stream_id;
+  (void)fin;
+  (void)conn_user_data;
+  (void)stream_user_data;
+
+  len = nghttp2_conn_get_headers_field_blocklen(conn);
+
+  assert_size(27, ==, len);
+
+  return 0;
+}
+
+void test_nghttp2_conn_get_headers_field_blocklen(void) {
+  const nghttp2_mem *mem = nghttp2_mem_default();
+  nghttp2_conn *conn;
+  nghttp2_hpack_encoder enc;
+  nghttp2_callbacks callbacks;
+  nghttp2_tstamp ts = 0;
+  uint8_t rawbuf[16384];
+  nghttp2_buf buf, hbuf;
+  nghttp2_frame fr;
+  conn_options opts;
+  int rv;
+
+  nghttp2_buf_wrap_init(&buf, rawbuf, sizeof(rawbuf));
+  nghttp2_buf_init(&hbuf);
+
+  /* field_blocklen should be the sum of HEADERS and all CONTINUATION
+     frames that follows. */
+  server_default_callbacks(&callbacks);
+  callbacks.end_headers = get_headers_fields_blocklen_end_headers;
+
+  opts = (conn_options){
+    .callbacks = &callbacks,
+  };
+
+  setup_default_server_with_options(&conn, opts);
+  write_preface(conn, ts);
+  read_client_preface(conn, NULL, 0, ts);
+  write_settings_ack(conn, ts);
+
+  nghttp2_buf_init(&hbuf);
+  nghttp2_hpack_encoder_init(&enc, NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY, mem);
+  nghttp2_buf_reset(&hbuf);
+  rv =
+    nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
+
+  assert_int(0, ==, rv);
+
+  fr.headers = (nghttp2_frame_headers){
+    .hd =
+      {
+        .type = NGHTTP2_FRAME_HEADERS,
+        .flags = NGHTTP2_HEADERS_FLAG_END_STREAM | NGHTTP2_HEADERS_FLAG_PADDED |
+                 NGHTTP2_HEADERS_FLAG_PRIORITY,
+        .stream_id = 0x01,
+      },
+    .field_block = hbuf.pos,
+    .field_blocklen = nghttp2_buf_len(&hbuf) - 1,
+  };
+
+  hbuf.pos += fr.headers.field_blocklen;
+
+  fr.headers.hd.len =
+    (uint32_t)nghttp2_frame_encode_headers_payloadlen(&fr.headers);
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
+
+  assert_int(0, ==, rv);
+
+  fr.headers = (nghttp2_frame_headers){
+    .hd =
+      {
+        .type = NGHTTP2_FRAME_CONTINUATION,
+        .flags = NGHTTP2_HEADERS_FLAG_END_HEADERS,
+        .stream_id = 0x01,
+      },
+    .field_block = hbuf.pos,
+    .field_blocklen = nghttp2_buf_len(&hbuf),
+  };
+
+  fr.headers.hd.len =
+    (uint32_t)nghttp2_frame_encode_headers_payloadlen(&fr.headers);
+  rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
+              ==, conn->rx.frrd.state);
+
+  nghttp2_hpack_encoder_free(&enc);
+  nghttp2_conn_del(conn);
+
+  nghttp2_buf_free(&hbuf, mem);
 }

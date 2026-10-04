@@ -1975,6 +1975,21 @@ NGHTTP2_EXTERN const nghttp2_settings *
 nghttp2_conn_get_settings(const nghttp2_conn *conn);
 
 /**
+ * @function
+ *
+ * `nghttp2_conn_get_headers_field_blocklen` returns the compressed
+ * HPACK field block length of HEADERS frame that |conn| is currently
+ * processing.  If CONTINUATION frames are involved, this value is the
+ * sum of all HEADERS and CONTINUATION frames up to the frame that
+ * bares END_HEADERS flag.  This function should only be called within
+ * :member:`nghttp2_callbacks.end_headers` or
+ * :member:`nghttp2_callbacks.end_trailers` callback.  Otherwise, the
+ * behavior is undefined.
+ */
+NGHTTP2_EXTERN size_t
+nghttp2_conn_get_headers_field_blocklen(const nghttp2_conn *conn);
+
+/**
  * @macrosection
  *
  * HTTP stream priority flags

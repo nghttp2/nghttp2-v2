@@ -3847,3 +3847,9 @@ void *nghttp2_conn_get_stream_user_data(const nghttp2_conn *conn,
 const nghttp2_settings *nghttp2_conn_get_settings(const nghttp2_conn *conn) {
   return &conn->settings;
 }
+
+size_t nghttp2_conn_get_headers_field_blocklen(const nghttp2_conn *conn) {
+  assert(conn->rx.frrd.fr.meta.hd.type == NGHTTP2_FRAME_HEADERS);
+
+  return conn->rx.frrd.fr.headers.field_blocklen;
+}
