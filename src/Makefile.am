@@ -105,7 +105,23 @@ nghttpd_SOURCES = ${HELPER_OBJECTS} ${HELPER_HFILES} nghttpd.cc \
 	tls.cc tls.h ssl_compat.h \
 	HttpServer.cc HttpServer.h
 
+bin_PROGRAMS += h2load
+
+h2load_SOURCES = util.cc util.h \
+	http2.cc http2.h h2load.cc h2load.h \
+	timegm.c timegm.h \
+	tls.cc tls.h ssl_compat.h \
+	h2load_session.h \
+	h2load_http2_session.cc h2load_http2_session.h \
+	h2load_http1_session.cc h2load_http1_session.h \
+	app_helper.cc app_helper.h \
+	network.cc network.h \
+	errors.h
+
 if ENABLE_HTTP3
+h2load_SOURCES += \
+	h2load_http3_session.cc h2load_http3_session.h \
+	h2load_quic.cc h2load_quic.h
 endif # ENABLE_HTTP3
 
 if HAVE_MRUBY

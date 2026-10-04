@@ -97,6 +97,8 @@ using namespace nghttp2;
 
 namespace h2load {
 
+constexpr auto NGHTTP2_CLEARTEXT_PROTO_VERSION_ID = "h2c"sv;
+
 namespace {
 bool recorded(std::chrono::steady_clock::time_point t) {
   return std::chrono::steady_clock::duration::zero() != t.time_since_epoch();
@@ -1472,7 +1474,7 @@ std::expected<void, Error> Client::tls_handshake() {
 }
 
 std::expected<void, Error> Client::read_tls() {
-  std::array<uint8_t, 8_k> rawbuf;
+  std::array<uint8_t, 16_k> rawbuf;
 
   ERR_clear_error();
 
@@ -3048,7 +3050,7 @@ int main(int argc, char **argv) {
       break;
     case 'p': {
       auto proto = std::string_view{optarg};
-      if (util::strieq(NGHTTP2_CLEARTEXT_PROTO_VERSION_ID ""sv, proto)) {
+      if (util::strieq(NGHTTP2_CLEARTEXT_PROTO_VERSION_ID, proto)) {
         config.no_tls_proto = Config::PROTO_HTTP2;
       } else if (util::strieq(NGHTTP2_H1_1, proto)) {
         config.no_tls_proto = Config::PROTO_HTTP1_1;

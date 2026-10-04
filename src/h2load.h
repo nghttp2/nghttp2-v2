@@ -45,8 +45,7 @@
 #include <span>
 #include <expected>
 
-#define NGHTTP2_NO_SSIZE_T
-#include <nghttp2/nghttp2.h>
+#include <nghttp2v2/nghttp2.h>
 
 #ifdef ENABLE_HTTP3
 #  include <ngtcp2/ngtcp2.h>

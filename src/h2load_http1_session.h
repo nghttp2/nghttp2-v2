@@ -27,7 +27,7 @@
 
 #include "h2load_session.h"
 
-#include <nghttp2/nghttp2.h>
+#include <nghttp2v2/nghttp2.h>
 
 #include "llhttp.h"
 

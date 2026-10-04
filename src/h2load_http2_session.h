@@ -27,7 +27,7 @@
 
 #include "h2load_session.h"
 
-#include <nghttp2/nghttp2.h>
+#include <nghttp2v2/nghttp2.h>
 
 namespace h2load {
 
@@ -45,8 +45,10 @@ public:
   size_t max_concurrent_streams() override;
 
 private:
+  std::expected<size_t, Error> write_frames(std::span<uint8_t> dest);
+
   Client *client_;
-  nghttp2_session *session_{};
+  nghttp2_conn *conn_{};
 };
 
 } // namespace h2load
