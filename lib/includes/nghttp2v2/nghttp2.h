@@ -1214,9 +1214,9 @@ typedef int (*nghttp2_write_stream_data_offset)(nghttp2_conn *conn,
  * :type:`nghttp2_begin_fields` is a callback function which is
  * invoked when an incoming HTTP field section is started on a stream
  * denoted by |stream_id|.  Each HTTP field is passed to application
- * by :type:`nghttp2_recv_header` callback.  And then
- * :type:`nghttp2_end_headers` is called when a whole HTTP field
- * section is processed.
+ * by :type:`nghttp2_recv_field` callback.  And then
+ * :type:`nghttp2_end_field` is called when a whole HTTP field section
+ * is processed.
  *
  * The implementation of this callback must return 0 if it succeeds.
  * Returning :macro:`NGHTTP2_ERR_CALLBACK_FAILURE` will return to the
