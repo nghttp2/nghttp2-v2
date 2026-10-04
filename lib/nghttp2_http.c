@@ -202,7 +202,7 @@ static const int8_t VALID_AUTHORITY_CHARS[256] = {
   ['x'] = 1, ['y'] = 1, ['z'] = 1, ['~'] = 1,
 };
 
-static int check_authority(const uint8_t *value, size_t len) {
+int nghttp2_check_authority(const uint8_t *value, size_t len) {
   const uint8_t *last;
   for (last = value + len; value != last; ++value) {
     if (!VALID_AUTHORITY_CHARS[*value]) {
@@ -320,7 +320,7 @@ static int http_request_on_header(nghttp2_http_state *http,
 
   switch (nv->token) {
   case NGHTTP2_HPACK_TOKEN__AUTHORITY:
-    if (!check_authority(nv->value->base, nv->value->len) ||
+    if (!nghttp2_check_authority(nv->value->base, nv->value->len) ||
         !check_pseudo_header(http, nv, NGHTTP2_HTTP_FLAG__AUTHORITY)) {
       return NGHTTP2_ERR_MALFORMED_HTTP_HEADER;
     }
@@ -383,7 +383,7 @@ static int http_request_on_header(nghttp2_http_state *http,
     }
     break;
   case NGHTTP2_HPACK_TOKEN_HOST:
-    if (!check_authority(nv->value->base, nv->value->len)) {
+    if (!nghttp2_check_authority(nv->value->base, nv->value->len)) {
       return NGHTTP2_ERR_REMOVE_HTTP_HEADER;
     }
     if (!check_pseudo_header(http, nv, NGHTTP2_HTTP_FLAG_HOST)) {

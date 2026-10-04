@@ -2170,6 +2170,19 @@ NGHTTP2_EXTERN int nghttp2_check_header_value(const uint8_t *value, size_t len);
 /**
  * @function
  *
+ * `nghttp2_check_authority` returns nonzero if the |value| which is
+ * supposed to be the value of the :authority or host header field is
+ * valid according to https://tools.ietf.org/html/rfc3986#section-3.2
+ *
+ * |value| is valid if it merely consists of the allowed characters.
+ * In particular, it does not check whether |value| follows the syntax
+ * of authority.
+ */
+NGHTTP2_EXTERN int nghttp2_check_authority(const uint8_t *value, size_t len);
+
+/**
+ * @function
+ *
  * `nghttp2_http2_strerror` returns the textual representation of
  * HTTP/2 error code |error_code|.
  */
