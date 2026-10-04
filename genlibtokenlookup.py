@@ -117,7 +117,7 @@ def gen_enum():
 
 def gen_index_header():
     print('''\
-static int32_t lookup_token(const uint8_t *name, size_t namelen) {
+int32_t nghttp2_hpack_lookup_token(const uint8_t *name, size_t namelen) {
   switch (namelen) {''')
     b = build_header(HEADERS)
     for size in sorted(b.keys()):

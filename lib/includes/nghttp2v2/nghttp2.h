@@ -927,6 +927,16 @@ typedef struct nghttp2_hpack_nv {
 } nghttp2_hpack_nv;
 
 /**
+ * @function
+ *
+ * `nghttp2_hpack_lookup_token` returns :type:`nghttp2_hpack_token`
+ * value for |name| of length |namelen|.  It returns -1 if the look up
+ * fails.
+ */
+NGHTTP2_EXTERN int32_t nghttp2_hpack_lookup_token(const uint8_t *name,
+                                                  size_t namelen);
+
+/**
  * @struct
  *
  * :type:`nghttp2_conn` represents a single HTTP/2 connection.
