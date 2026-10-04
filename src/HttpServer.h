@@ -51,7 +51,6 @@
 
 #include <ev.h>
 
-#define NGHTTP2_NO_SSIZE_T
 #include <nghttp2v2/nghttp2.h>
 
 #include "http2.h"
