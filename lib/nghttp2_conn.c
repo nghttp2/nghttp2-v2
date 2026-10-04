@@ -598,11 +598,16 @@ int nghttp2_conn_close_stream_if_shut_rdwr(nghttp2_conn *conn,
 int nghttp2_conn_close_stream(nghttp2_conn *conn, nghttp2_stream *stream) {
   int rv;
 
+  /* First remove stream from conn->streams so that an application can
+     issue nghttp2_conn_submit_request in stream_close callback. */
+  rv =
+    nghttp2_map_remove(&conn->streams, (nghttp2_map_key_type)stream->stream_id);
+
+  assert(0 == rv);
+
   if (!(stream->flags & NGHTTP2_STREAM_FLAG_REFUSED)) {
     rv = conn_call_stream_close(conn, stream);
-    if (rv != 0) {
-      return rv;
-    }
+    /* Continue to free stream */
   }
 
   assert(conn->sched.stream_inprogress != stream);
@@ -610,15 +615,10 @@ int nghttp2_conn_close_stream(nghttp2_conn *conn, nghttp2_stream *stream) {
   nghttp2_conn_strmq_remove(conn, stream);
   nghttp2_conn_unschedule_stream(conn, stream);
 
-  rv =
-    nghttp2_map_remove(&conn->streams, (nghttp2_map_key_type)stream->stream_id);
-
-  assert(0 == rv);
-
   nghttp2_stream_free(stream);
   nghttp2_mem_free(conn->mem, stream);
 
-  return 0;
+  return rv;
 }
 
 static int conn_max_data_violated(nghttp2_conn *conn, size_t datalen) {
