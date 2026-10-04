@@ -1121,7 +1121,7 @@ typedef struct nghttp2_ping_data {
  */
 typedef int (*nghttp2_recv_settings)(nghttp2_conn *conn,
                                      const nghttp2_proto_settings *settings,
-                                     void *user_data);
+                                     void *conn_user_data);
 
 /**
  * @functypedef
@@ -1136,7 +1136,7 @@ typedef int (*nghttp2_recv_settings)(nghttp2_conn *conn,
  * call return immediately.
  */
 typedef int (*nghttp2_stream_open)(nghttp2_conn *conn, int64_t stream_id,
-                                   void *user_data);
+                                   void *conn_user_data);
 
 /**
  * @macrosection
@@ -1177,7 +1177,8 @@ typedef int (*nghttp2_stream_open)(nghttp2_conn *conn, int64_t stream_id,
  */
 typedef int (*nghttp2_stream_close)(nghttp2_conn *conn, uint32_t flags,
                                     int64_t stream_id, uint32_t error_code,
-                                    void *user_data, void *stream_user_data);
+                                    void *conn_user_data,
+                                    void *stream_user_data);
 
 /**
  * @functypedef
@@ -1204,7 +1205,7 @@ typedef void (*nghttp2_rand)(uint8_t *dest, size_t destlen);
 typedef int (*nghttp2_write_stream_data_offset)(nghttp2_conn *conn,
                                                 int64_t stream_id,
                                                 uint64_t offset, size_t len,
-                                                void *user_data,
+                                                void *conn_user_data,
                                                 void *stream_user_data);
 
 /**
