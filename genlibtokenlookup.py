@@ -69,10 +69,18 @@ HEADERS = [
     ('upgrade', None),
     (':protocol', None),
     ('priority', None),
+    ('alt-svc', None),
+    ('early-data', None),
+    ('forwarded', None),
+    ('sec-websocket-accept', None),
+    ('sec-websocket-key', None),
+    ('trailer', None),
+    ('x-forwarded-for', None),
+    ('x-forwarded-proto', None),
 ]
 
 def to_enum_hd(k):
-    res = 'NGHTTP2_TOKEN_'
+    res = 'NGHTTP2_HPACK_TOKEN_'
     for c in k.upper():
         if c == ':' or c == '-':
             res += '_'
@@ -97,7 +105,7 @@ def build_header(headers):
 
 def gen_enum():
     name = ''
-    print('typedef enum {')
+    print('typedef enum nghttp2_hpack_token {')
     for k, token in HEADERS:
         if token is None:
             print('  {},'.format(to_enum_hd(k)))
@@ -105,7 +113,7 @@ def gen_enum():
             if name != k:
                 name = k
                 print('  {} = {},'.format(to_enum_hd(k), token))
-    print('} nghttp2_token;')
+    print('} nghttp2_hpack_token;')
 
 def gen_index_header():
     print('''\

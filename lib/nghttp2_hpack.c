@@ -234,6 +234,11 @@ static int32_t lookup_token(const uint8_t *name, size_t namelen) {
     break;
   case 7:
     switch (name[6]) {
+    case 'c':
+      if (memeq("alt-sv", name, 6)) {
+        return NGHTTP2_HPACK_TOKEN_ALT_SVC;
+      }
+      break;
     case 'd':
       if (memeq(":metho", name, 6)) {
         return NGHTTP2_HPACK_TOKEN__METHOD;
@@ -255,6 +260,9 @@ static int32_t lookup_token(const uint8_t *name, size_t namelen) {
     case 'r':
       if (memeq("refere", name, 6)) {
         return NGHTTP2_HPACK_TOKEN_REFERER;
+      }
+      if (memeq("traile", name, 6)) {
+        return NGHTTP2_HPACK_TOKEN_TRAILER;
       }
       break;
     case 's':
@@ -293,6 +301,11 @@ static int32_t lookup_token(const uint8_t *name, size_t namelen) {
     break;
   case 9:
     switch (name[8]) {
+    case 'd':
+      if (memeq("forwarde", name, 8)) {
+        return NGHTTP2_HPACK_TOKEN_FORWARDED;
+      }
+      break;
     case 'l':
       if (memeq(":protoco", name, 8)) {
         return NGHTTP2_HPACK_TOKEN__PROTOCOL;
@@ -302,6 +315,11 @@ static int32_t lookup_token(const uint8_t *name, size_t namelen) {
     break;
   case 10:
     switch (name[9]) {
+    case 'a':
+      if (memeq("early-dat", name, 9)) {
+        return NGHTTP2_HPACK_TOKEN_EARLY_DATA;
+      }
+      break;
     case 'e':
       if (memeq("keep-aliv", name, 9)) {
         return NGHTTP2_HPACK_TOKEN_KEEP_ALIVE;
@@ -410,6 +428,11 @@ static int32_t lookup_token(const uint8_t *name, size_t namelen) {
         return NGHTTP2_HPACK_TOKEN_ACCEPT_ENCODING;
       }
       break;
+    case 'r':
+      if (memeq("x-forwarded-fo", name, 14)) {
+        return NGHTTP2_HPACK_TOKEN_X_FORWARDED_FOR;
+      }
+      break;
     }
     break;
   case 16:
@@ -449,6 +472,16 @@ static int32_t lookup_token(const uint8_t *name, size_t namelen) {
         return NGHTTP2_HPACK_TOKEN_TRANSFER_ENCODING;
       }
       break;
+    case 'o':
+      if (memeq("x-forwarded-prot", name, 16)) {
+        return NGHTTP2_HPACK_TOKEN_X_FORWARDED_PROTO;
+      }
+      break;
+    case 'y':
+      if (memeq("sec-websocket-ke", name, 16)) {
+        return NGHTTP2_HPACK_TOKEN_SEC_WEBSOCKET_KEY;
+      }
+      break;
     }
     break;
   case 18:
@@ -473,6 +506,15 @@ static int32_t lookup_token(const uint8_t *name, size_t namelen) {
       }
       if (memeq("proxy-authorizatio", name, 18)) {
         return NGHTTP2_HPACK_TOKEN_PROXY_AUTHORIZATION;
+      }
+      break;
+    }
+    break;
+  case 20:
+    switch (name[19]) {
+    case 't':
+      if (memeq("sec-websocket-accep", name, 19)) {
+        return NGHTTP2_HPACK_TOKEN_SEC_WEBSOCKET_ACCEPT;
       }
       break;
     }
