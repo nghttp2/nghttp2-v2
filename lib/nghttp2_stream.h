@@ -123,6 +123,7 @@ typedef struct nghttp2_http_state {
 } nghttp2_http_state;
 
 typedef struct nghttp2_stream_callbacks {
+  nghttp2_end_stream local_end_stream;
   nghttp2_write_stream_data_offset write_stream_data_offset;
 } nghttp2_stream_callbacks;
 

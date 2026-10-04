@@ -33,12 +33,13 @@
 #include "nghttp2_vec.h"
 
 void nghttp2_http_writer_init(
-  nghttp2_http_writer *hw,
+  nghttp2_http_writer *hw, nghttp2_end_stream local_end_stream,
   nghttp2_write_stream_data_offset write_stream_data_offset,
   const nghttp2_mem *mem) {
   hw->mem = mem;
   /* This does not allocate memory, and it always succeeds. */
   nghttp2_ringbuf_init(&hw->outq, 0, sizeof(nghttp2_frame), mem);
+  hw->local_end_stream = local_end_stream;
   hw->write_stream_data_offset = write_stream_data_offset;
   nghttp2_buf_init(&hw->header_buf);
   hw->datacnt = 0;
@@ -100,7 +101,7 @@ int nghttp2_http_writer_write(nghttp2_http_writer *hw, nghttp2_buf *dest,
   fr = nghttp2_ringbuf_get(&hw->outq, 0);
   if (fr->meta.hd.type == NGHTTP2_FRAME_HEADERS) {
     rv = nghttp2_http_writer_write_headers(hw, dest, &fr->headers, henc, stream,
-                                           log);
+                                           conn, log);
     if (rv != 0) {
       return rv;
     }
@@ -118,18 +119,48 @@ int nghttp2_http_writer_write(nghttp2_http_writer *hw, nghttp2_buf *dest,
   return 0;
 }
 
-static void http_writer_on_end_headers(nghttp2_http_writer *hw,
-                                       const nghttp2_frame_headers *fr) {
+static int conn_call_local_end_stream(nghttp2_conn *conn,
+                                      const nghttp2_stream *stream) {
+  int rv;
+
+  if (!conn->callbacks.local_end_stream) {
+    return 0;
+  }
+
+  rv = conn->callbacks.local_end_stream(conn, stream->stream_id,
+                                        conn->user_data, stream->user_data);
+  if (rv != 0) {
+    return NGHTTP2_ERR_CALLBACK_FAILURE;
+  }
+
+  return 0;
+}
+
+static int http_writer_on_end_headers(nghttp2_http_writer *hw,
+                                      const nghttp2_frame_headers *fr,
+                                      nghttp2_stream *stream,
+                                      nghttp2_conn *conn) {
+  int rv = 0;
+
   hw->flags &= ~NGHTTP2_HTTP_WRITER_FLAG_INPROGRESS;
+
+  if (fr->hd.flags & NGHTTP2_HEADERS_FLAG_END_STREAM) {
+    rv = conn_call_local_end_stream(conn, stream);
+  }
 
   nghttp2_buf_reset(&hw->header_buf);
   nghttp2_mem_free(hw->mem, (nghttp2_nv *)fr->nva);
   nghttp2_ringbuf_pop_front(&hw->outq);
+
+  return rv;
 }
 
-int nghttp2_http_writer_write_headers(
-  nghttp2_http_writer *hw, nghttp2_buf *dest, const nghttp2_frame_headers *fr,
-  nghttp2_hpack_encoder *henc, nghttp2_stream *stream, nghttp2_log *log) {
+int nghttp2_http_writer_write_headers(nghttp2_http_writer *hw,
+                                      nghttp2_buf *dest,
+                                      const nghttp2_frame_headers *fr,
+                                      nghttp2_hpack_encoder *henc,
+                                      nghttp2_stream *stream,
+                                      nghttp2_conn *conn, nghttp2_log *log) {
   nghttp2_frame_headers lfr;
   size_t nwrite;
   int rv;
@@ -184,8 +215,7 @@ int nghttp2_http_writer_write_headers(
     stream->flags |= NGHTTP2_STREAM_FLAG_OPENED;
 
     if (hw->field_left == 0) {
-      http_writer_on_end_headers(hw, fr);
-      return 0;
+      return http_writer_on_end_headers(hw, fr, stream, conn);
     }
 
     if (nghttp2_buf_left(dest) == 0) {
@@ -204,7 +234,7 @@ int nghttp2_http_writer_write_headers(
   hw->field_left -= nwrite;
 
   if (nghttp2_buf_len(&hw->header_buf) == 0) {
-    http_writer_on_end_headers(hw, fr);
+    return http_writer_on_end_headers(hw, fr, stream, conn);
   }
 
   return 0;
@@ -224,6 +254,19 @@ static size_t stream_flow_control_limit(const nghttp2_stream *stream) {
   }
 
   return (size_t)(stream->tx.max_offset - stream->tx.offset);
+}
+
+static int http_writer_on_end_data(nghttp2_http_writer *hw,
+                                   nghttp2_stream *stream, nghttp2_conn *conn) {
+  int rv = 0;
+
+  if (hw->flags & NGHTTP2_HTTP_WRITER_FLAG_DATA_END_STREAM) {
+    rv = conn_call_local_end_stream(conn, stream);
+  }
+
+  nghttp2_ringbuf_pop_front(&hw->outq);
+
+  return rv;
 }
 
 int nghttp2_http_writer_write_data(nghttp2_http_writer *hw, nghttp2_buf *dest,
@@ -286,9 +329,7 @@ int nghttp2_http_writer_write_data(nghttp2_http_writer *hw, nghttp2_buf *dest,
       }
 
       if (!(hw->flags & NGHTTP2_HTTP_WRITER_FLAG_DATA_END_STREAM)) {
-        nghttp2_ringbuf_pop_front(&hw->outq);
-
-        return 0;
+        return http_writer_on_end_data(hw, stream, conn);
       }
     }
 
@@ -331,9 +372,7 @@ int nghttp2_http_writer_write_data(nghttp2_http_writer *hw, nghttp2_buf *dest,
 
     if (lfr.hd.len == 0) {
       hw->datacnt = 0;
-      nghttp2_ringbuf_pop_front(&hw->outq);
-
-      return 0;
+      return http_writer_on_end_data(hw, stream, conn);
     }
 
     hw->flags |= NGHTTP2_HTTP_WRITER_FLAG_INPROGRESS;
@@ -384,7 +423,7 @@ int nghttp2_http_writer_write_data(nghttp2_http_writer *hw, nghttp2_buf *dest,
     hw->datacnt = 0;
 
     if (hw->flags & NGHTTP2_HTTP_WRITER_FLAG_DATA_EOF) {
-      nghttp2_ringbuf_pop_front(&hw->outq);
+      return http_writer_on_end_data(hw, stream, conn);
     }
   }
 

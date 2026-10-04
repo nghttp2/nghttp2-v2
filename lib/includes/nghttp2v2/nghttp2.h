@@ -1294,10 +1294,7 @@ typedef int (*nghttp2_recv_data)(nghttp2_conn *conn, int64_t stream_id,
  * @functypedef
  *
  * :type:`nghttp2_end_stream` is a callback function which is invoked
- * when the receiving side of stream is closed.  For server, this
- * callback function is invoked when HTTP request is received
- * completely.  For client, this callback function is invoked when
- * HTTP response is received completely.
+ * when the one side of stream is closed.
  *
  * The implementation of this callback must return 0 if it succeeds.
  * Returning :macro:`NGHTTP2_ERR_CALLBACK_FAILURE` will return to the
@@ -1424,10 +1421,21 @@ typedef struct nghttp2_callbacks {
    */
   nghttp2_recv_data recv_data;
   /**
-   * :member:`end_stream` is a callback function which is invoked when
-   * a receiving side of stream has been closed.
+   * :member:`local_end_stream` is a callback function which is
+   * invoked when a sending side of stream has been closed.  For
+   * server, this callback function is invoked when HTTP response is
+   * sent completely.  For client, this callback function is invoked
+   * when HTTP request is sent completely.
    */
-  nghttp2_end_stream end_stream;
+  nghttp2_end_stream local_end_stream;
+  /**
+   * :member:`remote_end_stream` is a callback function which is
+   * invoked when a receiving side of stream has been closed.  For
+   * server, this callback function is invoked when HTTP request is
+   * received completely.  For client, this callback function is
+   * invoked when HTTP response is received completely.
+   */
+  nghttp2_end_stream remote_end_stream;
   /**
    * :member:`recv_ping_ack` is a callback function which is invoked
    * when PING frame with ACK flag set is received.

@@ -150,16 +150,16 @@ static int conn_call_recv_data(nghttp2_conn *conn, const nghttp2_stream *stream,
   return 0;
 }
 
-static int conn_call_end_stream(nghttp2_conn *conn,
-                                const nghttp2_stream *stream) {
+static int conn_call_remote_end_stream(nghttp2_conn *conn,
+                                       const nghttp2_stream *stream) {
   int rv;
 
-  if (!conn->callbacks.end_stream) {
+  if (!conn->callbacks.remote_end_stream) {
     return 0;
   }
 
-  rv = conn->callbacks.end_stream(conn, stream->stream_id, conn->user_data,
-                                  stream->user_data);
+  rv = conn->callbacks.remote_end_stream(conn, stream->stream_id,
+                                         conn->user_data, stream->user_data);
   if (rv != 0) {
     return NGHTTP2_ERR_CALLBACK_FAILURE;
   }
@@ -542,6 +542,7 @@ int nghttp2_conn_create_stream(nghttp2_conn *conn, nghttp2_stream **pstream,
   nghttp2_stream_init(
     stream, stream_id,
     &(nghttp2_stream_callbacks){
+      .local_end_stream = conn->callbacks.local_end_stream,
       .write_stream_data_offset = conn->callbacks.write_stream_data_offset,
     },
     NGHTTP2_STREAM_FLAG_NONE, conn->rx.stream_window,
@@ -648,7 +649,7 @@ static int conn_on_end_data(nghttp2_conn *conn, nghttp2_stream *stream,
 
   stream->flags |= NGHTTP2_STREAM_FLAG_SHUT_RD;
 
-  rv = conn_call_end_stream(conn, stream);
+  rv = conn_call_remote_end_stream(conn, stream);
   if (rv != 0) {
     return rv;
   }
@@ -895,7 +896,7 @@ static int conn_on_end_headers(nghttp2_conn *conn, nghttp2_stream *stream,
 
   stream->flags |= NGHTTP2_STREAM_FLAG_SHUT_RD;
 
-  rv = conn_call_end_stream(conn, stream);
+  rv = conn_call_remote_end_stream(conn, stream);
   if (rv != 0) {
     return rv;
   }

@@ -100,8 +100,8 @@ int recv_data(nghttp2_conn *conn, int64_t stream_id, const uint8_t *data,
 } // namespace
 
 namespace {
-int end_stream(nghttp2_conn *conn, int64_t stream_id, void *conn_user_data,
-               void *stream_user_data) {
+int remote_end_stream(nghttp2_conn *conn, int64_t stream_id,
+                      void *conn_user_data, void *stream_user_data) {
   auto client = static_cast<Client *>(conn_user_data);
 
   client->record_ttfb();
@@ -154,7 +154,7 @@ void Http2Session::on_connect() {
     .recv_header = recv_header,
     .end_headers = end_headers,
     .recv_data = recv_data,
-    .end_stream = end_stream,
+    .remote_end_stream = remote_end_stream,
   };
 
   nghttp2_settings settings;
