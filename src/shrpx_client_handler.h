@@ -125,9 +125,6 @@ public:
   // Call this function when HTTP/2 connection header is received at
   // the start of the connection.
   void direct_http2_upgrade();
-  // Performs HTTP/2 Upgrade from the connection managed by |http|. If
-  // this function fails, the connection must be terminated.
-  std::expected<void, Error> perform_http2_upgrade(HttpsUpstream *http);
   bool get_http2_upgrade_allowed() const;
   // Returns upstream scheme, either "http" or "https"
   std::string_view get_upstream_scheme() const;
@@ -251,7 +248,7 @@ private:
   const UpstreamAddr *faddr_;
   Worker *worker_;
   // The number of bytes of HTTP/2 client connection header to read
-  size_t left_connhd_len_{NGHTTP2_CLIENT_MAGIC_LEN};
+  size_t left_connhd_len_{sizeof(NGHTTP2_CLIENT_HTTP2_PREFACE) - 1};
   // hash for session affinity using client IP
   uint32_t affinity_hash_{};
   bool should_close_after_write_{};

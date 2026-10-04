@@ -140,14 +140,14 @@ std::expected<void, Error> APIDownstreamConnection::send_reply(
   auto content_length = util::make_string_ref_uint(balloc, buf.size());
 
   resp.fs.add_header_token("content-length"sv, content_length, false,
-                           http2::HD_CONTENT_LENGTH);
+                           NGHTTP2_HPACK_TOKEN_CONTENT_LENGTH);
 
   switch (http_status) {
   case 400:
   case 405:
   case 413:
     resp.fs.add_header_token("connection"sv, "close"sv, false,
-                             http2::HD_CONNECTION);
+                             NGHTTP2_HPACK_TOKEN_CONNECTION);
     break;
   }
 

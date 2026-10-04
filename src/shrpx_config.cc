@@ -55,8 +55,6 @@
 #  include <openssl/evp.h>
 #endif // !defined(NGHTTP2_OPENSSL_IS_WOLFSSL)
 
-#include <nghttp2/nghttp2.h>
-
 #include "urlparse.h"
 
 #include "shrpx_log.h"
@@ -95,17 +93,6 @@ std::unique_ptr<Config> replace_config(std::unique_ptr<Config> another) {
 void create_config() { config = new Config(); }
 
 Config::~Config() {
-  auto &upstreamconf = http2.upstream;
-
-  nghttp2_option_del(upstreamconf.option);
-  nghttp2_option_del(upstreamconf.alt_mode_option);
-  nghttp2_session_callbacks_del(upstreamconf.callbacks);
-
-  auto &downstreamconf = http2.downstream;
-
-  nghttp2_option_del(downstreamconf.option);
-  nghttp2_session_callbacks_del(downstreamconf.callbacks);
-
   auto &dumpconf = http2.upstream.debug.dump;
 
   if (dumpconf.request_header) {
@@ -406,7 +393,7 @@ std::expected<HeaderRef, Error> parse_header(BlockAllocator &balloc,
 
   if (!nghttp2_check_header_name(
         reinterpret_cast<const uint8_t *>(nv.name.data()), nv.name.size()) ||
-      !nghttp2_check_header_value_rfc9113(
+      !nghttp2_check_header_value(
         reinterpret_cast<const uint8_t *>(nv.value.data()), nv.value.size())) {
     return std::unexpected{Error::INVALID_ARGUMENT};
   }
@@ -4052,11 +4039,6 @@ std::expected<void, Error> parse_config(
     return parse_uint_with_unit<size_t>(opt, optarg)
       .transform([config](auto &&r) {
         config->http2.upstream.encoder_dynamic_table_size = r;
-
-        nghttp2_option_set_max_deflate_dynamic_table_size(
-          config->http2.upstream.option, r);
-        nghttp2_option_set_max_deflate_dynamic_table_size(
-          config->http2.upstream.alt_mode_option, r);
       });
   case SHRPX_OPTID_FRONTEND_HTTP2_DECODER_DYNAMIC_TABLE_SIZE:
     return parse_uint_with_unit<size_t>(opt, optarg)
@@ -4067,9 +4049,6 @@ std::expected<void, Error> parse_config(
     return parse_uint_with_unit<size_t>(opt, optarg)
       .transform([config](auto &&r) {
         config->http2.downstream.encoder_dynamic_table_size = r;
-
-        nghttp2_option_set_max_deflate_dynamic_table_size(
-          config->http2.downstream.option, r);
       });
   case SHRPX_OPTID_BACKEND_HTTP2_DECODER_DYNAMIC_TABLE_SIZE:
     return parse_uint_with_unit<size_t>(opt, optarg)

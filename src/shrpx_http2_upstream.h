@@ -31,7 +31,7 @@
 
 #include <ev.h>
 
-#include <nghttp2/nghttp2.h>
+#include <nghttp2v2/nghttp2.h>
 
 #include "shrpx_upstream.h"
 #include "shrpx_downstream_queue.h"
@@ -45,7 +45,7 @@ namespace shrpx {
 class ClientHandler;
 class HttpsUpstream;
 
-inline constexpr size_t SHRPX_HTTP2_MAX_BUFFER_SIZE = 32_k;
+inline constexpr size_t SHRPX_HTTP2_MAX_BUFFER_SIZE = 16_k;
 
 class Http2Upstream : public Upstream {
 public:
@@ -73,9 +73,8 @@ public:
   void add_pending_downstream(std::unique_ptr<Downstream> downstream);
   std::expected<void, Error> remove_downstream(Downstream *downstream);
 
-  std::expected<void, Error> rst_stream(Downstream *downstream,
-                                        uint32_t error_code);
-  std::expected<void, Error> terminate_session(uint32_t error_code);
+  void shutdown_stream(Downstream *downstream, uint32_t error_code);
+  void terminate_session(uint32_t error_code);
   std::expected<void, Error> error_reply(Downstream *downstream,
                                          unsigned int status_code);
 
@@ -102,14 +101,10 @@ public:
   std::span<const uint8_t> response_peek() const override;
   void response_drain(size_t n) override;
   bool response_empty() const override;
+  std::expected<void, Error> after_write() override;
 
   bool get_flow_control() const;
-  // Perform HTTP/2 upgrade from |upstream|. On success, this object
-  // takes ownership of the |upstream|.
-  std::expected<void, Error> upgrade_upstream(HttpsUpstream *upstream);
-  void start_settings_timer();
-  void stop_settings_timer();
-  std::expected<void, Error> consume(int32_t stream_id, size_t len);
+  std::expected<void, Error> consume(int64_t stream_id, size_t len);
   void log_response_headers(Downstream *downstream,
                             const std::vector<nghttp2_nv> &nva) const;
   std::expected<void, Error> start_downstream(Downstream *downstream);
@@ -120,10 +115,13 @@ public:
   // Starts graceful shutdown period.
   void start_graceful_shutdown();
 
+  void reset_http2_timer();
+  void handle_http2_timeout();
+
   // Called when new request has started.
-  void on_start_request(const nghttp2_frame *frame);
+  void on_start_request(int64_t stream_id);
   std::expected<void, Error> on_request_headers(Downstream *downstream,
-                                                const nghttp2_frame *frame);
+                                                bool fin);
 
   DefaultMemchunks *get_response_buf();
 
@@ -135,18 +133,16 @@ private:
   DefaultMemchunks wb_;
   std::unique_ptr<HttpsUpstream> pre_upstream_;
   DownstreamQueue downstream_queue_;
-  ev_timer settings_timer_;
+  ev_timer http2_timer_;
   ev_timer shutdown_timer_;
   ev_prepare prep_;
   ClientHandler *handler_;
-  nghttp2_session *session_{};
+  nghttp2_conn *conn_{};
   size_t max_buffer_size_{SHRPX_HTTP2_MAX_BUFFER_SIZE};
   // The number of requests seen so far.
   size_t num_requests_{};
   bool flow_control_{true};
 };
-
-nghttp2_session_callbacks *create_http2_upstream_callbacks();
 
 } // namespace shrpx
 

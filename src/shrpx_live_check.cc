@@ -30,8 +30,6 @@
 
 namespace shrpx {
 
-constexpr size_t MAX_BUFFER_SIZE = 4_k;
-
 namespace {
 void readcb(struct ev_loop *loop, ev_io *w, int revents) {
   auto conn = static_cast<Connection *>(w->data);
@@ -80,18 +78,6 @@ void backoff_timeoutcb(struct ev_loop *loop, ev_timer *w, int revents) {
 }
 } // namespace
 
-namespace {
-void settings_timeout_cb(struct ev_loop *loop, ev_timer *w, int revents) {
-  auto live_check = static_cast<LiveCheck *>(w->data);
-
-  if (log_enabled(INFO)) {
-    Log{INFO} << "SETTINGS timeout";
-  }
-
-  live_check->on_failure();
-}
-} // namespace
-
 LiveCheck::LiveCheck(struct ev_loop *loop, SSL_CTX *ssl_ctx, Worker *worker,
                      DownstreamAddr *addr, std::mt19937 &gen)
   : conn_(loop, -1, nullptr, worker->get_mcpool(),
@@ -109,8 +95,14 @@ LiveCheck::LiveCheck(struct ev_loop *loop, SSL_CTX *ssl_ctx, Worker *worker,
 
   // SETTINGS ACK must be received in a short timeout.  Otherwise, we
   // assume that connection is broken.
-  ev_timer_init(&settings_timer_, settings_timeout_cb, 0., 0.);
-  settings_timer_.data = this;
+  ev_timer_init(
+    &http2_timer_,
+    [](struct ev_loop *loop, ev_timer *w, int revents) {
+      auto live_check = static_cast<LiveCheck *>(w->data);
+      live_check->handle_http2_timeout();
+    },
+    0., 0.);
+  http2_timer_.data = this;
 }
 
 LiveCheck::~LiveCheck() {
@@ -133,14 +125,14 @@ void LiveCheck::disconnect() {
   conn_.rlimit.stopw();
   conn_.wlimit.stopw();
 
-  ev_timer_stop(conn_.loop, &settings_timer_);
+  ev_timer_stop(conn_.loop, &http2_timer_);
 
   read_ = write_ = &LiveCheck::noop;
 
   conn_.disconnect();
 
-  nghttp2_session_del(session_);
-  session_ = nullptr;
+  nghttp2_conn_del(h2conn_);
+  h2conn_ = nullptr;
 
   settings_ack_received_ = false;
   session_closing_ = false;
@@ -171,7 +163,59 @@ void LiveCheck::schedule() {
 
 std::expected<void, Error> LiveCheck::do_read() { return read_(*this); }
 
-std::expected<void, Error> LiveCheck::do_write() { return write_(*this); }
+std::expected<void, Error> LiveCheck::do_write() {
+  if (auto rv = write_(*this); !rv) {
+    return rv;
+  }
+
+  reset_http2_timer();
+
+  return {};
+}
+
+void LiveCheck::reset_http2_timer() {
+  if (!h2conn_) {
+    return;
+  }
+
+  auto expiry = nghttp2_conn_get_expiry(h2conn_);
+  if (expiry == UINT64_MAX) {
+    if (ev_is_active(&http2_timer_)) {
+      ev_timer_stop(conn_.loop, &http2_timer_);
+    }
+
+    return;
+  }
+
+  auto now = util::timestamp();
+
+  if (expiry <= now) {
+    ev_feed_event(conn_.loop, &http2_timer_, EV_TIMER);
+
+    return;
+  }
+
+  auto t = static_cast<ev_tstamp>(expiry - now) / NGHTTP2_SECONDS;
+
+  http2_timer_.repeat = t;
+  ev_timer_again(conn_.loop, &http2_timer_);
+}
+
+void LiveCheck::handle_http2_timeout() {
+  ev_timer_stop(conn_.loop, &http2_timer_);
+
+  auto rv = nghttp2_conn_handle_expiry(h2conn_, util::timestamp());
+  if (rv != 0) {
+    Log{ERROR} << "nghttp2_conn_handle_expiry() returned error: "
+               << nghttp2_strerror(rv);
+
+    on_failure();
+
+    return;
+  }
+
+  signal_write();
+}
 
 std::expected<void, Error> LiveCheck::initiate_connection() {
   int rv;
@@ -549,33 +593,18 @@ std::expected<void, Error> LiveCheck::write_clear() {
 }
 
 std::expected<void, Error> LiveCheck::on_read(std::span<const uint8_t> data) {
-  auto rv = nghttp2_session_mem_recv2(session_, data.data(), data.size());
-  if (rv < 0) {
-    Log{ERROR} << "nghttp2_session_mem_recv2() returned error: "
-               << nghttp2_strerror(static_cast<int>(rv));
+  if (auto rv =
+        nghttp2_conn_read(h2conn_, data.data(), data.size(), util::timestamp());
+      rv != 0) {
+    Log{ERROR} << "nghttp2_conn_read() returned error: "
+               << nghttp2_strerror(rv);
+
     return std::unexpected{Error::HTTP2};
   }
 
   if (settings_ack_received_ && !session_closing_) {
     session_closing_ = true;
-    auto rv = nghttp2_session_terminate_session(session_, NGHTTP2_NO_ERROR);
-    if (rv != 0) {
-      return std::unexpected{Error::HTTP2};
-    }
-  }
-
-  if (nghttp2_session_want_read(session_) == 0 &&
-      nghttp2_session_want_write(session_) == 0 && wb_.rleft() == 0) {
-    if (log_enabled(INFO)) {
-      Log{INFO} << "No more read/write for this session";
-    }
-
-    // If we have SETTINGS ACK already, we treat this success.
-    if (settings_ack_received_) {
-      return {};
-    }
-
-    return std::unexpected{Error::DONE};
+    nghttp2_conn_terminate(h2conn_, NGHTTP2_NO_ERROR);
   }
 
   signal_write();
@@ -584,39 +613,27 @@ std::expected<void, Error> LiveCheck::on_read(std::span<const uint8_t> data) {
 }
 
 std::expected<void, Error> LiveCheck::on_write() {
-  for (;;) {
-    const uint8_t *data;
-    auto datalen = nghttp2_session_mem_send2(session_, &data);
-
-    if (datalen < 0) {
-      Log{ERROR} << "nghttp2_session_mem_send2() returned error: "
-                 << nghttp2_strerror(static_cast<int>(datalen));
-      return std::unexpected{Error::HTTP2};
-    }
-    if (datalen == 0) {
-      break;
-    }
-    wb_.append(data, as_unsigned(datalen));
-
-    if (wb_.rleft() >= MAX_BUFFER_SIZE) {
-      break;
-    }
+  if (wb_.rleft()) {
+    return {};
   }
 
-  if (nghttp2_session_want_read(session_) == 0 &&
-      nghttp2_session_want_write(session_) == 0 && wb_.rleft() == 0) {
-    if (log_enabled(INFO)) {
-      Log{INFO} << "No more read/write for this session";
-    }
+  return wb_.append_or_error(
+    16_k, [this](std::span<uint8_t> dest) -> std::expected<size_t, Error> {
+      auto nwrite = nghttp2_conn_write(h2conn_, dest.data(), dest.size(),
+                                       util::timestamp());
+      if (nwrite < 0) {
+        if (settings_ack_received_) {
+          return {};
+        }
 
-    if (settings_ack_received_) {
-      return {};
-    }
+        Log{ERROR} << "nghttp2_conn_write() returned error: "
+                   << nghttp2_strerror(static_cast<int>(nwrite));
 
-    return std::unexpected{Error::DONE};
-  }
+        return std::unexpected{Error::HTTP2};
+      }
 
-  return {};
+      return as_unsigned(nwrite);
+    });
 }
 
 void LiveCheck::on_failure() {
@@ -659,46 +676,12 @@ void LiveCheck::on_success() {
   disconnect();
 }
 
-void LiveCheck::start_settings_timer() {
-  auto &downstreamconf = get_config()->http2.downstream;
-
-  ev_timer_set(&settings_timer_, downstreamconf.timeout.settings, 0.);
-  ev_timer_start(conn_.loop, &settings_timer_);
-}
-
-void LiveCheck::stop_settings_timer() {
-  ev_timer_stop(conn_.loop, &settings_timer_);
-}
-
 void LiveCheck::settings_ack_received() { settings_ack_received_ = true; }
 
 namespace {
-int on_frame_send_callback(nghttp2_session *session, const nghttp2_frame *frame,
-                           void *user_data) {
-  auto live_check = static_cast<LiveCheck *>(user_data);
+int recv_settings_ack(nghttp2_conn *conn, void *conn_user_data) {
+  auto live_check = static_cast<LiveCheck *>(conn_user_data);
 
-  if (frame->hd.type != NGHTTP2_SETTINGS ||
-      (frame->hd.flags & NGHTTP2_FLAG_ACK)) {
-    return 0;
-  }
-
-  live_check->start_settings_timer();
-
-  return 0;
-}
-} // namespace
-
-namespace {
-int on_frame_recv_callback(nghttp2_session *session, const nghttp2_frame *frame,
-                           void *user_data) {
-  auto live_check = static_cast<LiveCheck *>(user_data);
-
-  if (frame->hd.type != NGHTTP2_SETTINGS ||
-      (frame->hd.flags & NGHTTP2_FLAG_ACK) == 0) {
-    return 0;
-  }
-
-  live_check->stop_settings_timer();
   live_check->settings_ack_received();
 
   return 0;
@@ -706,30 +689,24 @@ int on_frame_recv_callback(nghttp2_session *session, const nghttp2_frame *frame,
 } // namespace
 
 std::expected<void, Error> LiveCheck::connection_made() {
-  int rv;
+  static constexpr auto callbacks = nghttp2_callbacks{
+    .rand = util::secure_random,
+    .recv_settings_ack = recv_settings_ack,
+  };
 
-  nghttp2_session_callbacks *callbacks;
-  rv = nghttp2_session_callbacks_new(&callbacks);
-  if (rv != 0) {
-    return std::unexpected{Error::HTTP2};
-  }
+  nghttp2_settings settings;
+  nghttp2_settings_default(&settings);
 
-  nghttp2_session_callbacks_set_on_frame_send_callback(callbacks,
-                                                       on_frame_send_callback);
-  nghttp2_session_callbacks_set_on_frame_recv_callback(callbacks,
-                                                       on_frame_recv_callback);
-  nghttp2_session_callbacks_set_rand_callback(callbacks, util::secure_random);
+  auto &downstreamconf = get_config()->http2.downstream;
 
-  rv = nghttp2_session_client_new(&session_, callbacks, this);
+  settings.settings_timeout = static_cast<nghttp2_duration>(
+    std::chrono::floor<std::chrono::nanoseconds>(
+      util::duration_from(downstreamconf.timeout.settings))
+      .count());
 
-  nghttp2_session_callbacks_del(callbacks);
-
-  if (rv != 0) {
-    return std::unexpected{Error::HTTP2};
-  }
-
-  rv = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, nullptr, 0);
-  if (rv != 0) {
+  if (auto rv =
+        nghttp2_conn_client_new(&h2conn_, &callbacks, &settings, nullptr, this);
+      rv != 0) {
     return std::unexpected{Error::HTTP2};
   }
 
@@ -738,14 +715,12 @@ std::expected<void, Error> LiveCheck::connection_made() {
 
   if (must_terminate) {
     if (log_enabled(INFO)) {
-      Log{INFO} << "TLSv1.2 was not negotiated. HTTP/2 must not be negotiated.";
+      Log{INFO}
+        << "The at least minimum TLS version was not negotiated. HTTP/2 must "
+           "not be negotiated.";
     }
 
-    rv =
-      nghttp2_session_terminate_session(session_, NGHTTP2_INADEQUATE_SECURITY);
-    if (rv != 0) {
-      return std::unexpected{Error::HTTP2};
-    }
+    nghttp2_conn_terminate(h2conn_, NGHTTP2_INADEQUATE_SECURITY);
   }
 
   signal_write();

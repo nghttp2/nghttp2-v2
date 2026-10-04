@@ -30,7 +30,7 @@
 #include <string>
 #include <algorithm>
 
-#include <nghttp2/nghttp2.h>
+#include <nghttp2v2/nghttp2.h>
 
 #include "shrpx_config.h"
 #include "util.h"
@@ -79,10 +79,6 @@ std::string_view create_forwarded(BlockAllocator &balloc, uint32_t params,
 
 // Adds ANSI color codes to HTTP headers |hdrs|.
 std::string colorize_headers(std::string_view hdrs);
-
-nghttp2_ssize select_padding_callback(nghttp2_session *session,
-                                      const nghttp2_frame *frame,
-                                      size_t max_payload, void *user_data);
 
 // Creates set-cookie-string for cookie based affinity.  If |path| is
 // not empty, "; <path>" is added.  If |secure| is true, "; Secure" is

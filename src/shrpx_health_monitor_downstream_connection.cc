@@ -74,7 +74,7 @@ HealthMonitorDownstreamConnection::end_upload_data() {
   resp.http_status = 200;
 
   resp.fs.add_header_token("content-length"sv, "0"sv, false,
-                           http2::HD_CONTENT_LENGTH);
+                           NGHTTP2_HPACK_TOKEN_CONTENT_LENGTH);
 
   if (auto rv = upstream->send_reply(downstream_, {}); !rv) {
     return rv;

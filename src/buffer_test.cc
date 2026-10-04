@@ -27,7 +27,7 @@
 #include <cstring>
 #include <tuple>
 
-#include <nghttp2/nghttp2.h>
+#include <nghttp2v2/nghttp2.h>
 
 #include "buffer.h"
 

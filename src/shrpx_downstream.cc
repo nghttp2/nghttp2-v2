@@ -332,7 +332,7 @@ std::string_view Downstream::assemble_request_cookie() {
   size_t len = 0;
 
   for (auto &kv : req_.fs.headers()) {
-    if (kv.token != http2::HD_COOKIE || kv.value.empty()) {
+    if (kv.token != NGHTTP2_HPACK_TOKEN_COOKIE || kv.value.empty()) {
       continue;
     }
 
@@ -343,7 +343,7 @@ std::string_view Downstream::assemble_request_cookie() {
   auto p = std::ranges::begin(iov);
 
   for (auto &kv : req_.fs.headers()) {
-    if (kv.token != http2::HD_COOKIE || kv.value.empty()) {
+    if (kv.token != NGHTTP2_HPACK_TOKEN_COOKIE || kv.value.empty()) {
       continue;
     }
 
@@ -372,7 +372,7 @@ std::string_view Downstream::assemble_request_cookie() {
 
 uint32_t Downstream::find_affinity_cookie(std::string_view name) {
   for (auto &kv : req_.fs.headers()) {
-    if (kv.token != http2::HD_COOKIE) {
+    if (kv.token != NGHTTP2_HPACK_TOKEN_COOKIE) {
       continue;
     }
 
@@ -417,7 +417,7 @@ uint32_t Downstream::find_affinity_cookie(std::string_view name) {
 size_t Downstream::count_crumble_request_cookie() {
   size_t n = 0;
   for (auto &kv : req_.fs.headers()) {
-    if (kv.token != http2::HD_COOKIE) {
+    if (kv.token != NGHTTP2_HPACK_TOKEN_COOKIE) {
       continue;
     }
 
@@ -438,7 +438,7 @@ size_t Downstream::count_crumble_request_cookie() {
 
 void Downstream::crumble_request_cookie(std::vector<nghttp2_nv> &nva) {
   for (auto &kv : req_.fs.headers()) {
-    if (kv.token != http2::HD_COOKIE) {
+    if (kv.token != NGHTTP2_HPACK_TOKEN_COOKIE) {
       continue;
     }
 
@@ -453,20 +453,21 @@ void Downstream::crumble_request_cookie(std::vector<nghttp2_nv> &nva) {
 
       it = std::ranges::find(it, std::ranges::end(kv.value), ';');
 
-      nva.push_back({(uint8_t *)"cookie", (uint8_t *)first, str_size("cookie"),
-                     (size_t)(it - first),
-                     (uint8_t)(NGHTTP2_NV_FLAG_NO_COPY_NAME |
-                               NGHTTP2_NV_FLAG_NO_COPY_VALUE |
-                               (kv.no_index ? NGHTTP2_NV_FLAG_NO_INDEX : 0))});
+      nva.push_back(
+        {(uint8_t *)"cookie", (uint8_t *)first, str_size("cookie"),
+         (size_t)(it - first),
+         (uint8_t)(NGHTTP2_NV_FLAG_NO_COPY_NAME |
+                   NGHTTP2_NV_FLAG_NO_COPY_VALUE |
+                   (kv.never_index ? NGHTTP2_NV_FLAG_NEVER_INDEX : 0))});
     }
   }
 }
 
 namespace {
 void add_header(size_t &sum, HeaderRefs &headers, std::string_view name,
-                std::string_view value, bool no_index, int32_t token) {
+                std::string_view value, bool never_index, int32_t token) {
   sum += name.size() + value.size();
-  headers.emplace_back(name, value, no_index, token);
+  headers.emplace_back(name, value, never_index, token);
 }
 } // namespace
 
@@ -491,7 +492,8 @@ void append_last_header_key(BlockAllocator &balloc, bool &key_prev, size_t &sum,
     balloc, item.name, std::views::transform(data, util::lowcase));
 
   item.name = name;
-  item.token = http2::lookup_token(item.name);
+  item.token = nghttp2_hpack_lookup_token(
+    reinterpret_cast<const uint8_t *>(item.name.data()), item.name.size());
 }
 } // namespace
 
@@ -510,7 +512,7 @@ std::expected<void, Error> FieldStore::parse_content_length() {
   content_length = -1;
 
   for (auto &kv : headers_) {
-    if (kv.token != http2::HD_CONTENT_LENGTH) {
+    if (kv.token != NGHTTP2_HPACK_TOKEN_CONTENT_LENGTH) {
       continue;
     }
 
@@ -551,13 +553,14 @@ const HeaderRefs::value_type *FieldStore::header(std::string_view name) const {
 }
 
 void FieldStore::add_header_token(std::string_view name, std::string_view value,
-                                  bool no_index, int32_t token) {
-  shrpx::add_header(buffer_size_, headers_, name, value, no_index, token);
+                                  bool never_index, int32_t token) {
+  shrpx::add_header(buffer_size_, headers_, name, value, never_index, token);
 }
 
 void FieldStore::alloc_add_header_name(std::string_view name) {
   auto name_ref = alloc_header_name(balloc_, name);
-  auto token = http2::lookup_token(name_ref);
+  auto token = nghttp2_hpack_lookup_token(
+    reinterpret_cast<const uint8_t *>(name_ref.data()), name_ref.size());
   add_header_token(name_ref, ""sv, false, token);
   header_key_prev_ = true;
 }
@@ -578,16 +581,17 @@ void FieldStore::clear_headers() {
 }
 
 void FieldStore::add_trailer_token(std::string_view name,
-                                   std::string_view value, bool no_index,
+                                   std::string_view value, bool never_index,
                                    int32_t token) {
   // Header size limit should be applied to all header and trailer
   // fields combined.
-  shrpx::add_header(buffer_size_, trailers_, name, value, no_index, token);
+  shrpx::add_header(buffer_size_, trailers_, name, value, never_index, token);
 }
 
 void FieldStore::alloc_add_trailer_name(std::string_view name) {
   auto name_ref = alloc_header_name(balloc_, name);
-  auto token = http2::lookup_token(name_ref);
+  auto token = nghttp2_hpack_lookup_token(
+    reinterpret_cast<const uint8_t *>(name_ref.data()), name_ref.size());
   add_trailer_token(name_ref, ""sv, false, token);
   trailer_key_prev_ = true;
 }
@@ -605,8 +609,8 @@ void FieldStore::append_last_trailer_value(std::string_view data) {
 void FieldStore::erase_content_length_and_transfer_encoding() {
   for (auto &kv : headers_) {
     switch (kv.token) {
-    case http2::HD_CONTENT_LENGTH:
-    case http2::HD_TRANSFER_ENCODING:
+    case NGHTTP2_HPACK_TOKEN_CONTENT_LENGTH:
+    case NGHTTP2_HPACK_TOKEN_TRANSFER_ENCODING:
       kv.name = ""sv;
       kv.token = -1;
       break;
@@ -717,7 +721,7 @@ std::expected<void, Error> Downstream::end_upload_data() {
 
 void Downstream::rewrite_location_response_header(
   std::string_view upstream_scheme) {
-  auto hd = resp_.fs.header(http2::HD_LOCATION);
+  auto hd = resp_.fs.header(NGHTTP2_HPACK_TOKEN_LOCATION);
   if (!hd) {
     return;
   }
@@ -827,7 +831,7 @@ void Downstream::check_upgrade_fulfilled_http1() {
       }
 
       // This is done for HTTP/2 frontend only.
-      auto accept = resp_.fs.header(http2::HD_SEC_WEBSOCKET_ACCEPT);
+      auto accept = resp_.fs.header(NGHTTP2_HPACK_TOKEN_SEC_WEBSOCKET_ACCEPT);
       if (!accept) {
         return;
       }
@@ -864,13 +868,11 @@ void Downstream::inspect_http1_request() {
   if (req_.method == HTTP_CONNECT) {
     req_.upgrade_request = true;
   } else if (req_.http_minor > 0) {
-    auto upgrade = req_.fs.header(http2::HD_UPGRADE);
+    auto upgrade = req_.fs.header(NGHTTP2_HPACK_TOKEN_UPGRADE);
     if (upgrade) {
       const auto &val = upgrade->value;
       // TODO Perform more strict checking for upgrade headers
-      if (NGHTTP2_CLEARTEXT_PROTO_VERSION_ID ""sv == val) {
-        req_.http2_upgrade_seen = true;
-      } else {
+      if (NGHTTP2_CLEARTEXT_PROTO_VERSION_ID != val) {
         req_.upgrade_request = true;
 
         // TODO Should we check Sec-WebSocket-Key, and
@@ -881,18 +883,20 @@ void Downstream::inspect_http1_request() {
       }
     }
   }
-  auto transfer_encoding = req_.fs.header(http2::HD_TRANSFER_ENCODING);
+  auto transfer_encoding =
+    req_.fs.header(NGHTTP2_HPACK_TOKEN_TRANSFER_ENCODING);
   if (transfer_encoding) {
     req_.fs.content_length = -1;
   }
 
-  auto expect = req_.fs.header(http2::HD_EXPECT);
+  auto expect = req_.fs.header(NGHTTP2_HPACK_TOKEN_EXPECT);
   expect_100_continue_ =
     expect && util::strieq(expect->value, "100-continue"sv);
 }
 
 void Downstream::inspect_http1_response() {
-  auto transfer_encoding = resp_.fs.header(http2::HD_TRANSFER_ENCODING);
+  auto transfer_encoding =
+    resp_.fs.header(NGHTTP2_HPACK_TOKEN_TRANSFER_ENCODING);
   if (transfer_encoding) {
     resp_.fs.content_length = -1;
   }
@@ -914,19 +918,6 @@ bool Downstream::supports_non_final_response() const {
 }
 
 bool Downstream::get_upgraded() const { return upgraded_; }
-
-bool Downstream::get_http2_upgrade_request() const {
-  return req_.http2_upgrade_seen && req_.fs.header(http2::HD_HTTP2_SETTINGS) &&
-         response_state_ == DownstreamState::INITIAL;
-}
-
-std::string_view Downstream::get_http2_settings() const {
-  auto http2_settings = req_.fs.header(http2::HD_HTTP2_SETTINGS);
-  if (!http2_settings) {
-    return ""sv;
-  }
-  return http2_settings->value;
-}
 
 void Downstream::set_downstream_stream_id(int64_t stream_id) {
   downstream_stream_id_ = stream_id;
@@ -1107,7 +1098,7 @@ bool Downstream::accesslog_ready() const {
 
 void Downstream::add_retry() { ++num_retry_; }
 
-bool Downstream::no_more_retry() const { return num_retry_ > 50; }
+bool Downstream::no_more_retry() const { return num_retry_ > 5; }
 
 void Downstream::set_request_downstream_host(std::string_view host) {
   request_downstream_host_ = host;

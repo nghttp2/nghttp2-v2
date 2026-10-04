@@ -85,13 +85,15 @@ void test_downstream_field_store_header(void) {
   BlockAllocator balloc(16, 16);
   FieldStore fs(balloc, 0);
   fs.add_header_token("alpha"sv, "0"sv, false, -1);
-  fs.add_header_token(":authority"sv, "1"sv, false, http2::HD__AUTHORITY);
+  fs.add_header_token(":authority"sv, "1"sv, false,
+                      NGHTTP2_HPACK_TOKEN__AUTHORITY);
   fs.add_header_token("content-length"sv, "2"sv, false,
-                      http2::HD_CONTENT_LENGTH);
+                      NGHTTP2_HPACK_TOKEN_CONTENT_LENGTH);
 
   // By token
-  assert_eq(HeaderRef(":authority"sv, "1"sv), *fs.header(http2::HD__AUTHORITY));
-  assert_null(fs.header(http2::HD__METHOD));
+  assert_eq(HeaderRef(":authority"sv, "1"sv),
+            *fs.header(NGHTTP2_HPACK_TOKEN__AUTHORITY));
+  assert_null(fs.header(NGHTTP2_HPACK_TOKEN__METHOD));
 
   // By name
   assert_eq(HeaderRef("alpha"sv, "0"sv), *fs.header("alpha"sv));
@@ -104,9 +106,11 @@ void test_downstream_crumble_request_cookie(void) {
   req.fs.add_header_token(":method"sv, "get"sv, false, -1);
   req.fs.add_header_token(":path"sv, "/"sv, false, -1);
   req.fs.add_header_token("cookie"sv, "alpha; bravo; ; ;; charlie;;"sv, true,
-                          http2::HD_COOKIE);
-  req.fs.add_header_token("cookie"sv, ";delta"sv, false, http2::HD_COOKIE);
-  req.fs.add_header_token("cookie"sv, "echo"sv, false, http2::HD_COOKIE);
+                          NGHTTP2_HPACK_TOKEN_COOKIE);
+  req.fs.add_header_token("cookie"sv, ";delta"sv, false,
+                          NGHTTP2_HPACK_TOKEN_COOKIE);
+  req.fs.add_header_token("cookie"sv, "echo"sv, false,
+                          NGHTTP2_HPACK_TOKEN_COOKIE);
 
   std::vector<nghttp2_nv> nva;
   d.crumble_request_cookie(nva);
@@ -119,7 +123,7 @@ void test_downstream_crumble_request_cookie(void) {
   auto cookies = nva | std::ranges::views::transform([](auto &&nv) {
                    return HeaderRef(as_string_view(nv.name, nv.namelen),
                                     as_string_view(nv.value, nv.valuelen),
-                                    nv.flags & NGHTTP2_NV_FLAG_NO_INDEX);
+                                    nv.flags & NGHTTP2_NV_FLAG_NEVER_INDEX);
                  }) |
                  std::ranges::to<std::vector>();
 
@@ -130,9 +134,9 @@ void test_downstream_crumble_request_cookie(void) {
                     {"cookie"sv, "echo"sv}};
 
   assert_eq(ans, cookies);
-  assert_true(cookies[0].no_index);
-  assert_true(cookies[1].no_index);
-  assert_true(cookies[2].no_index);
+  assert_true(cookies[0].never_index);
+  assert_true(cookies[1].never_index);
+  assert_true(cookies[2].never_index);
 }
 
 void test_downstream_assemble_request_cookie(void) {
@@ -141,10 +145,14 @@ void test_downstream_assemble_request_cookie(void) {
 
   req.fs.add_header_token(":method"sv, "get"sv, false, -1);
   req.fs.add_header_token(":path"sv, "/"sv, false, -1);
-  req.fs.add_header_token("cookie"sv, "alpha"sv, false, http2::HD_COOKIE);
-  req.fs.add_header_token("cookie"sv, "bravo;"sv, false, http2::HD_COOKIE);
-  req.fs.add_header_token("cookie"sv, "charlie; "sv, false, http2::HD_COOKIE);
-  req.fs.add_header_token("cookie"sv, "delta;;"sv, false, http2::HD_COOKIE);
+  req.fs.add_header_token("cookie"sv, "alpha"sv, false,
+                          NGHTTP2_HPACK_TOKEN_COOKIE);
+  req.fs.add_header_token("cookie"sv, "bravo;"sv, false,
+                          NGHTTP2_HPACK_TOKEN_COOKIE);
+  req.fs.add_header_token("cookie"sv, "charlie; "sv, false,
+                          NGHTTP2_HPACK_TOKEN_COOKIE);
+  req.fs.add_header_token("cookie"sv, "delta;;"sv, false,
+                          NGHTTP2_HPACK_TOKEN_COOKIE);
   assert_eq("alpha; bravo; charlie; delta"sv, d.assemble_request_cookie());
 }
 
@@ -155,9 +163,9 @@ void test_downstream_rewrite_location_response_header(void) {
   d.set_request_downstream_host("localhost2"sv);
   req.authority = "localhost:8443"sv;
   resp.fs.add_header_token("location"sv, "http://localhost2:3000/"sv, false,
-                           http2::HD_LOCATION);
+                           NGHTTP2_HPACK_TOKEN_LOCATION);
   d.rewrite_location_response_header("https"sv);
-  auto location = resp.fs.header(http2::HD_LOCATION);
+  auto location = resp.fs.header(NGHTTP2_HPACK_TOKEN_LOCATION);
   assert_eq("https://localhost:8443/"sv, (*location).value);
 }
 
@@ -195,14 +203,15 @@ void test_downstream_find_affinity_cookie(void) {
   Downstream d(nullptr, nullptr, 0);
 
   auto &req = d.request();
-  req.fs.add_header_token("cookie"sv, ""sv, false, http2::HD_COOKIE);
-  req.fs.add_header_token("cookie"sv, "a=b;;c=d"sv, false, http2::HD_COOKIE);
+  req.fs.add_header_token("cookie"sv, ""sv, false, NGHTTP2_HPACK_TOKEN_COOKIE);
+  req.fs.add_header_token("cookie"sv, "a=b;;c=d"sv, false,
+                          NGHTTP2_HPACK_TOKEN_COOKIE);
   req.fs.add_header_token("content-length"sv, "599"sv, false,
-                          http2::HD_CONTENT_LENGTH);
+                          NGHTTP2_HPACK_TOKEN_CONTENT_LENGTH);
   req.fs.add_header_token("cookie"sv, "lb=deadbeef;LB=f1f2f3f4"sv, false,
-                          http2::HD_COOKIE);
+                          NGHTTP2_HPACK_TOKEN_COOKIE);
   req.fs.add_header_token("cookie"sv, "short=e1e2e3e"sv, false,
-                          http2::HD_COOKIE);
+                          NGHTTP2_HPACK_TOKEN_COOKIE);
 
   assert_eq(0xDEADBEEF, d.find_affinity_cookie("lb"sv));
   assert_eq(0xF1F2F3F4, d.find_affinity_cookie("LB"sv));

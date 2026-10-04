@@ -95,6 +95,7 @@ public:
   virtual std::span<const uint8_t> response_peek() const = 0;
   virtual void response_drain(size_t n) = 0;
   virtual bool response_empty() const = 0;
+  virtual std::expected<void, Error> after_write() { return {}; }
 };
 
 } // namespace shrpx

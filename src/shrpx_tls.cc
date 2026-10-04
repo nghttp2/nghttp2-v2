@@ -65,7 +65,7 @@
 #  include <openssl/hpke.h>
 #endif // defined(NGHTTP2_OPENSSL_IS_BORINGSSL)
 
-#include <nghttp2/nghttp2.h>
+#include <nghttp2v2/nghttp2.h>
 
 #ifdef ENABLE_HTTP3
 #  include <ngtcp2/ngtcp2.h>

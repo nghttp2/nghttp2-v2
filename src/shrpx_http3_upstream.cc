@@ -1338,7 +1338,7 @@ Http3Upstream::on_downstream_header_complete(Downstream *downstream) {
   if (!config->http2_proxy && !httpconf.no_server_rewrite) {
     nva.push_back(http3::make_field("server"sv, httpconf.server_name));
   } else {
-    auto server = resp.fs.header(http2::HD_SERVER);
+    auto server = resp.fs.header(NGHTTP2_HPACK_TOKEN_SERVER);
     if (server) {
       nva.push_back(http3::make_field("server"sv, (*server).value));
     }
@@ -1360,7 +1360,7 @@ Http3Upstream::on_downstream_header_complete(Downstream *downstream) {
     }
   }
 
-  auto via = resp.fs.header(http2::HD_VIA);
+  auto via = resp.fs.header(NGHTTP2_HPACK_TOKEN_VIA);
   if (httpconf.no_via) {
     if (via) {
       nva.push_back(http3::make_field("via"sv, (*via).value));
@@ -1394,7 +1394,7 @@ Http3Upstream::on_downstream_header_complete(Downstream *downstream) {
     log_response_headers(downstream, nva);
   }
 
-  auto priority = resp.fs.header(http2::HD_PRIORITY);
+  auto priority = resp.fs.header(NGHTTP2_HPACK_TOKEN_PRIORITY);
   if (priority) {
     nghttp3_pri pri;
 
@@ -1702,19 +1702,19 @@ Http3Upstream::send_reply(Downstream *downstream,
       continue;
     }
     switch (kv.token) {
-    case http2::HD_CONNECTION:
-    case http2::HD_KEEP_ALIVE:
-    case http2::HD_PROXY_CONNECTION:
-    case http2::HD_TE:
-    case http2::HD_TRANSFER_ENCODING:
-    case http2::HD_UPGRADE:
+    case NGHTTP2_HPACK_TOKEN_CONNECTION:
+    case NGHTTP2_HPACK_TOKEN_KEEP_ALIVE:
+    case NGHTTP2_HPACK_TOKEN_PROXY_CONNECTION:
+    case NGHTTP2_HPACK_TOKEN_TE:
+    case NGHTTP2_HPACK_TOKEN_TRANSFER_ENCODING:
+    case NGHTTP2_HPACK_TOKEN_UPGRADE:
       continue;
     }
     nva.push_back(
-      http3::make_field(kv.name, kv.value, http3::never_index(kv.no_index)));
+      http3::make_field(kv.name, kv.value, http3::never_index(kv.never_index)));
   }
 
-  if (!resp.fs.header(http2::HD_SERVER)) {
+  if (!resp.fs.header(NGHTTP2_HPACK_TOKEN_SERVER)) {
     nva.push_back(http3::make_field("server"sv, config->http.server_name));
   }
 
@@ -2151,7 +2151,8 @@ std::expected<void, Error> Http3Upstream::http_recv_request_header(
 
   auto nameref = as_string_view(namebuf.base, namebuf.len);
   auto valueref = as_string_view(valuebuf.base, valuebuf.len);
-  auto token = http2::lookup_token(nameref);
+  auto token = nghttp2_hpack_lookup_token(
+    reinterpret_cast<const uint8_t *>(nameref.data()), nameref.size());
   auto no_index = flags & NGHTTP3_NV_FLAG_NEVER_INDEX;
 
   downstream->add_rcbuf(name);
@@ -2222,7 +2223,7 @@ Http3Upstream::http_end_request_headers(Downstream *downstream, int fin) {
                     << ss;
   }
 
-  auto content_length = req.fs.header(http2::HD_CONTENT_LENGTH);
+  auto content_length = req.fs.header(NGHTTP2_HPACK_TOKEN_CONTENT_LENGTH);
   if (content_length) {
     // libnghttp3 guarantees this can be parsed
     req.fs.content_length =
@@ -2230,10 +2231,10 @@ Http3Upstream::http_end_request_headers(Downstream *downstream, int fin) {
   }
 
   // presence of mandatory header fields are guaranteed by libnghttp3.
-  auto authority = req.fs.header(http2::HD__AUTHORITY);
-  auto path = req.fs.header(http2::HD__PATH);
-  auto method = req.fs.header(http2::HD__METHOD);
-  auto scheme = req.fs.header(http2::HD__SCHEME);
+  auto authority = req.fs.header(NGHTTP2_HPACK_TOKEN__AUTHORITY);
+  auto path = req.fs.header(NGHTTP2_HPACK_TOKEN__PATH);
+  auto method = req.fs.header(NGHTTP2_HPACK_TOKEN__METHOD);
+  auto scheme = req.fs.header(NGHTTP2_HPACK_TOKEN__SCHEME);
 
   auto method_token = http2::lookup_method_token(method->value);
   if (method_token == -1) {
@@ -2266,7 +2267,7 @@ Http3Upstream::http_end_request_headers(Downstream *downstream, int fin) {
   // nghttp2 library guarantees either :authority or host exist
   if (!authority) {
     req.no_authority = true;
-    authority = req.fs.header(http2::HD_HOST);
+    authority = req.fs.header(NGHTTP2_HPACK_TOKEN_HOST);
   }
 
   if (authority) {
@@ -2285,7 +2286,7 @@ Http3Upstream::http_end_request_headers(Downstream *downstream, int fin) {
     }
   }
 
-  auto connect_proto = req.fs.header(http2::HD__PROTOCOL);
+  auto connect_proto = req.fs.header(NGHTTP2_HPACK_TOKEN__PROTOCOL);
   if (connect_proto) {
     if (connect_proto->value != "websocket"sv) {
       return error_reply(downstream, 400);

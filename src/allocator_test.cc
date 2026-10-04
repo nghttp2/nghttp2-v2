@@ -24,7 +24,7 @@
  */
 #include "allocator_test.h"
 
-#include <nghttp2/nghttp2.h>
+#include <nghttp2v2/nghttp2.h>
 
 #include "util.h"
 #include "template.h"

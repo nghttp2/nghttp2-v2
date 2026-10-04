@@ -35,7 +35,7 @@
 #include <cstring>
 #include <random>
 
-#include <nghttp2/nghttp2.h>
+#include <nghttp2v2/nghttp2.h>
 
 #include "util.h"
 #include "template.h"
@@ -297,8 +297,7 @@ void test_util_select_h2(void) {
   // Check single entry and select it.
   const unsigned char t1[] = "\x2h2";
   assert_true(util::select_h2(&out, &outlen, t1, sizeof(t1) - 1));
-  assert_memn_equal(NGHTTP2_PROTO_VERSION_ID, NGHTTP2_PROTO_VERSION_ID_LEN, out,
-                    outlen);
+  assert_memn_equal(NGHTTP2_H2.data(), NGHTTP2_H2.size(), out, outlen);
 
   out = nullptr;
   outlen = 0;
@@ -311,8 +310,7 @@ void test_util_select_h2(void) {
   // Check the case where h2 is located after bogus ID.
   const unsigned char t3[] = "\x2h3\x2h2";
   assert_true(util::select_h2(&out, &outlen, t3, sizeof(t3) - 1));
-  assert_memn_equal(NGHTTP2_PROTO_VERSION_ID, NGHTTP2_PROTO_VERSION_ID_LEN, out,
-                    outlen);
+  assert_memn_equal(NGHTTP2_H2.data(), NGHTTP2_H2.size(), out, outlen);
 
   out = nullptr;
   outlen = 0;

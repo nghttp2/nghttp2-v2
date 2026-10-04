@@ -42,7 +42,7 @@
 
 #include <ev.h>
 
-#include <nghttp2/nghttp2.h>
+#include <nghttp2v2/nghttp2.h>
 
 #include "shrpx_connection.h"
 #include "errors.h"
@@ -82,8 +82,8 @@ public:
   std::expected<void, Error> do_read();
   std::expected<void, Error> do_write();
 
-  // These functions are used to feed / extract data to
-  // nghttp2_session object.
+  // These functions are used to feed / extract data to nghttp2_conn
+  // object.
   std::expected<void, Error> on_read(std::span<const uint8_t> data);
   std::expected<void, Error> on_write();
 
@@ -91,11 +91,11 @@ public:
   // don't call this function for HTTP/1 at the moment.
   std::expected<void, Error> connection_made();
 
-  void start_settings_timer();
-  void stop_settings_timer();
-
   // Call this function when SETTINGS ACK was received from server.
   void settings_ack_received();
+
+  void reset_http2_timer();
+  void handle_http2_timeout();
 
   void signal_write();
 
@@ -104,7 +104,7 @@ private:
   DefaultMemchunks wb_;
   std::mt19937 &gen_;
   ev_timer backoff_timer_;
-  ev_timer settings_timer_;
+  ev_timer http2_timer_;
   std::function<std::expected<void, Error>(LiveCheck &)> read_{
     &LiveCheck::noop},
     write_{&LiveCheck::noop};
@@ -113,7 +113,7 @@ private:
   SSL_CTX *ssl_ctx_;
   // Address of remote endpoint
   DownstreamAddr *addr_;
-  nghttp2_session *session_{};
+  nghttp2_conn *h2conn_{};
   // Actual remote address used to contact backend.  This is initially
   // nullptr, and may point to either &addr_->addr, or
   // resolved_addr_.get().

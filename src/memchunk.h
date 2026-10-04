@@ -46,6 +46,8 @@ struct iovec {
 #include <string>
 #include <utility>
 
+#include <nghttp2v2/nghttp2.h>
+
 #include "template.h"
 
 namespace nghttp2 {
@@ -242,21 +244,41 @@ template <typename Memchunk> struct Memchunks {
   // must return the number of bytes written, or error.
   template <AppendFunc F>
   std::expected<void, error_type_t<F>> append_or_error(size_t max_count, F f) {
-    if (!tail) {
-      head = tail = pool->get();
-    } else if (tail->left() < max_count) {
-      tail->next = pool->get();
-      tail = tail->next;
+    Memchunk *m;
+
+    if (tail && tail->left() >= max_count) {
+      m = tail;
+    } else {
+      m = pool->get();
     }
 
-    assert(tail->left() >= max_count);
+    assert(m->left() >= max_count);
 
-    auto maybe_nwrite = f(std::span{tail->last, max_count});
+    auto maybe_nwrite = f(std::span{m->last, max_count});
     if (!maybe_nwrite) {
+      if (m != tail) {
+        pool->recycle(m);
+      }
+
       return std::unexpected{maybe_nwrite.error()};
     }
 
     auto nwrite = *maybe_nwrite;
+    if (nwrite == 0) {
+      if (m != tail) {
+        pool->recycle(m);
+      }
+
+      return {};
+    }
+
+    if (!tail) {
+      head = tail = m;
+    } else if (m != tail) {
+      tail->next = m;
+      tail = tail->next;
+    }
+
     len += nwrite;
     tail->last += nwrite;
 
@@ -424,6 +446,18 @@ template <typename Memchunk> struct Memchunks {
     for (i = 0; i < iov.size() && m; ++i, m = m->next) {
       iov[i].iov_base = m->pos;
       iov[i].iov_len = m->len();
+    }
+    return iov.first(i);
+  }
+  std::span<const nghttp2_vec> riovec(std::span<nghttp2_vec> iov) const {
+    if (!head || iov.empty()) {
+      return {};
+    }
+    auto m = head;
+    size_t i;
+    for (i = 0; i < iov.size() && m; ++i, m = m->next) {
+      iov[i].base = m->pos;
+      iov[i].len = m->len();
     }
     return iov.first(i);
   }

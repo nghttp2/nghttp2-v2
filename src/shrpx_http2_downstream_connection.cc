@@ -70,7 +70,7 @@ Http2DownstreamConnection::~Http2DownstreamConnection() {
 
     if (http2session_->get_state() == Http2SessionState::CONNECTED &&
         downstream_->get_downstream_stream_id() != -1) {
-      (void)submit_rst_stream(downstream_, error_code);
+      (void)shutdown_stream(downstream_, error_code);
 
       auto &resp = downstream_->response();
 
@@ -120,7 +120,7 @@ Http2DownstreamConnection::detach_downstream(Downstream *downstream) {
   auto &resp = downstream_->response();
 
   if (downstream_->get_downstream_stream_id() != -1) {
-    if (auto rv = submit_rst_stream(downstream); !rv) {
+    if (auto rv = shutdown_stream(downstream); !rv) {
       return rv;
     }
 
@@ -146,8 +146,8 @@ Http2DownstreamConnection::detach_downstream(Downstream *downstream) {
 }
 
 std::expected<void, Error>
-Http2DownstreamConnection::submit_rst_stream(Downstream *downstream,
-                                             uint32_t error_code) {
+Http2DownstreamConnection::shutdown_stream(Downstream *downstream,
+                                           uint32_t error_code) {
   if (http2session_->get_state() == Http2SessionState::CONNECTED &&
       downstream->get_downstream_stream_id() != -1) {
     switch (downstream->get_response_state()) {
@@ -164,48 +164,52 @@ Http2DownstreamConnection::submit_rst_stream(Downstream *downstream,
                       << downstream->get_downstream_stream_id()
                       << ", error_code=" << error_code;
     }
-    return http2session_->submit_rst_stream(
-      static_cast<int32_t>(downstream->get_downstream_stream_id()), error_code);
+
+    http2session_->shutdown_stream(downstream->get_downstream_stream_id(),
+                                   error_code);
+
+    return {};
   }
   return std::unexpected{Error::INTERNAL};
 }
 
 namespace {
-nghttp2_ssize http2_data_read_callback(nghttp2_session *session,
-                                       int32_t stream_id, uint8_t *buf,
-                                       size_t length, uint32_t *data_flags,
-                                       nghttp2_data_source *source,
-                                       void *user_data) {
-  int rv;
-  auto sd = static_cast<StreamData *>(
-    nghttp2_session_get_stream_user_data(session, stream_id));
+nghttp2_ssize http2_read_data(nghttp2_conn *conn, int64_t stream_id,
+                              nghttp2_vec *vec, size_t veccnt, uint32_t *pflags,
+                              void *conn_user_data, void *stream_user_data) {
+  auto sd = static_cast<StreamData *>(stream_user_data);
   if (!sd || !sd->dconn) {
-    return NGHTTP2_ERR_DEFERRED;
+    return NGHTTP2_ERR_WOULDBLOCK;
   }
   auto dconn = sd->dconn;
   auto downstream = dconn->get_downstream();
   if (!downstream) {
     // In this case, RST_STREAM should have been issued. But depending
     // on the priority, DATA frame may come first.
-    return NGHTTP2_ERR_DEFERRED;
+    return NGHTTP2_ERR_WOULDBLOCK;
   }
+
+  if (!downstream->get_request_header_sent()) {
+    downstream->set_request_header_sent(true);
+
+    auto src = downstream->get_blocked_request_buf();
+    if (src->rleft()) {
+      auto dest = downstream->get_request_buf();
+      src->remove(*dest);
+    }
+  }
+
   const auto &req = downstream->request();
   auto input = downstream->get_request_buf();
 
-  auto nread = std::min(input->rleft(), length);
-  auto input_empty = input->rleft() == nread;
-
-  *data_flags |= NGHTTP2_DATA_FLAG_NO_COPY;
-
-  if (input_empty &&
-      downstream->get_request_state() == DownstreamState::MSG_COMPLETE &&
+  if (downstream->get_request_state() == DownstreamState::MSG_COMPLETE &&
       // If connection is upgraded, don't set EOF flag, since HTTP/1
       // will set MSG_COMPLETE to request state after upgrade response
       // header is seen.
       (!req.upgrade_request ||
        (downstream->get_response_state() == DownstreamState::HEADER_COMPLETE &&
         !downstream->get_upgraded()))) {
-    *data_flags |= NGHTTP2_DATA_FLAG_EOF;
+    *pflags |= NGHTTP2_READ_DATA_FLAG_EOF;
 
     const auto &trailers = req.fs.trailers();
     if (!trailers.empty()) {
@@ -213,27 +217,23 @@ nghttp2_ssize http2_data_read_callback(nghttp2_session *session,
       nva.reserve(trailers.size());
       http2::copy_headers_to_nva_nocopy(nva, trailers, http2::HDOP_STRIP_ALL);
       if (!nva.empty()) {
-        rv = nghttp2_submit_trailer(session, stream_id, nva.data(), nva.size());
-        if (rv != 0) {
-          if (nghttp2_is_fatal(rv)) {
+        if (auto rv = nghttp2_conn_submit_trailers(conn, stream_id, nva.data(),
+                                                   nva.size());
+            rv != 0) {
+          if (nghttp2_err_is_fatal(rv)) {
             return NGHTTP2_ERR_CALLBACK_FAILURE;
           }
-        } else {
-          *data_flags |= NGHTTP2_DATA_FLAG_NO_END_STREAM;
         }
       }
     }
+  } else if (input->rleft() == 0) {
+    downstream->disable_downstream_wtimer();
+    return NGHTTP2_ERR_WOULDBLOCK;
   }
 
-  if (nread == 0 && (*data_flags & NGHTTP2_DATA_FLAG_EOF) == 0) {
-    if (input->rleft() == 0) {
-      downstream->disable_downstream_wtimer();
-    }
+  auto v = input->riovec({vec, veccnt});
 
-    return NGHTTP2_ERR_DEFERRED;
-  }
-
-  return as_signed(nread);
+  return as_signed(v.size());
 }
 } // namespace
 
@@ -369,8 +369,9 @@ std::expected<void, Error> Http2DownstreamConnection::push_request_headers() {
        // defined(NGHTTP2_OPENSSL_IS_BORINGSSL) ||
        // defined(NGHTTP2_OPENSSL_IS_WOLFSSL)
 
-  auto fwd =
-    fwdconf.strip_incoming ? nullptr : req.fs.header(http2::HD_FORWARDED);
+  auto fwd = fwdconf.strip_incoming
+               ? nullptr
+               : req.fs.header(NGHTTP2_HPACK_TOKEN_FORWARDED);
 
   if (fwdconf.params) {
     auto params = fwdconf.params;
@@ -398,8 +399,9 @@ std::expected<void, Error> Http2DownstreamConnection::push_request_headers() {
     nva.push_back(http2::make_field("forwarded"sv, fwd->value));
   }
 
-  auto xff =
-    xffconf.strip_incoming ? nullptr : req.fs.header(http2::HD_X_FORWARDED_FOR);
+  auto xff = xffconf.strip_incoming
+               ? nullptr
+               : req.fs.header(NGHTTP2_HPACK_TOKEN_X_FORWARDED_FOR);
 
   if (xffconf.add) {
     std::string_view xff_value;
@@ -417,7 +419,7 @@ std::expected<void, Error> Http2DownstreamConnection::push_request_headers() {
   if (!config->http2_proxy && !req.regular_connect_method()) {
     auto xfp = xfpconf.strip_incoming
                  ? nullptr
-                 : req.fs.header(http2::HD_X_FORWARDED_PROTO);
+                 : req.fs.header(NGHTTP2_HPACK_TOKEN_X_FORWARDED_PROTO);
 
     if (xfpconf.add) {
       std::string_view xfp_value;
@@ -433,7 +435,7 @@ std::expected<void, Error> Http2DownstreamConnection::push_request_headers() {
     }
   }
 
-  auto via = req.fs.header(http2::HD_VIA);
+  auto via = req.fs.header(NGHTTP2_HPACK_TOKEN_VIA);
   if (httpconf.no_via) {
     if (via) {
       nva.push_back(http2::make_field("via"sv, (*via).value));
@@ -458,7 +460,7 @@ std::expected<void, Error> Http2DownstreamConnection::push_request_headers() {
       http2::make_field("via"sv, as_string_view(std::ranges::begin(iov), p)));
   }
 
-  auto te = req.fs.header(http2::HD_TE);
+  auto te = req.fs.header(NGHTTP2_HPACK_TOKEN_TE);
   // HTTP/1 upstream request can contain keyword other than
   // "trailers".  We just forward "trailers".
   // TODO more strict handling required here.
@@ -492,24 +494,25 @@ std::expected<void, Error> Http2DownstreamConnection::push_request_headers() {
     Log{INFO, this} << "HTTP request headers\n" << ss;
   }
 
-  auto transfer_encoding = req.fs.header(http2::HD_TRANSFER_ENCODING);
+  auto transfer_encoding = req.fs.header(NGHTTP2_HPACK_TOKEN_TRANSFER_ENCODING);
 
-  nghttp2_data_provider2 *data_prdptr = nullptr;
-  nghttp2_data_provider2 data_prd;
+  static constexpr auto dr = nghttp2_data_reader{
+    .read_data = http2_read_data,
+  };
+  const nghttp2_data_reader *pdr = nullptr;
 
   // Add body as long as transfer-encoding is given even if
   // req.fs.content_length == 0 to forward trailer fields.
   if (req.method == HTTP_CONNECT || req.connect_proto != ConnectProto::NONE ||
       transfer_encoding || req.fs.content_length > 0 || req.http2_expect_body) {
     // Request-body is expected.
-    data_prd = {{}, http2_data_read_callback};
-    data_prdptr = &data_prd;
+    pdr = &dr;
   }
 
-  if (auto rv = http2session_->submit_request(this, nva.data(), nva.size(),
-                                              data_prdptr);
+  if (auto rv =
+        http2session_->submit_request(this, nva.data(), nva.size(), pdr);
       !rv) {
-    Log{FATAL, this} << "nghttp2_submit_request() failed";
+    Log{FATAL, this} << "nghttp2_conn_submit_request() failed";
     return rv;
   }
 
@@ -617,7 +620,7 @@ std::expected<void, Error> Http2DownstreamConnection::on_timeout() {
     return {};
   }
 
-  if (auto rv = submit_rst_stream(downstream_, NGHTTP2_NO_ERROR); !rv) {
+  if (auto rv = shutdown_stream(downstream_, NGHTTP2_NO_ERROR); !rv) {
     return rv;
   }
 

@@ -70,6 +70,8 @@ using namespace std::literals;
 
 namespace nghttp2 {
 
+constexpr auto NGHTTP2_CLEARTEXT_PROTO_VERSION_ID = "h2c"sv;
+
 inline constexpr auto NGHTTP2_H2_ALPN = "\x2h2"sv;
 inline constexpr auto NGHTTP2_H2 = "h2"sv;
 

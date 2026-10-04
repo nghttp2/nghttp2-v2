@@ -378,8 +378,10 @@ std::expected<void, Error> ClientHandler::upstream_write() {
 
 std::expected<void, Error> ClientHandler::upstream_http2_connhd_read() {
   auto nread = std::min(left_connhd_len_, rb_.rleft());
-  if (memcmp(&NGHTTP2_CLIENT_MAGIC[NGHTTP2_CLIENT_MAGIC_LEN - left_connhd_len_],
-             rb_.pos(), nread) != 0) {
+  if (memcmp(
+        &NGHTTP2_CLIENT_HTTP2_PREFACE[sizeof(NGHTTP2_CLIENT_HTTP2_PREFACE) - 1 -
+                                      left_connhd_len_],
+        rb_.pos(), nread) != 0) {
     // There is no downgrade path here. Just drop the connection.
     if (log_enabled(INFO)) {
       Log{INFO, this} << "invalid client connection header";
@@ -404,15 +406,17 @@ std::expected<void, Error> ClientHandler::upstream_http2_connhd_read() {
 
 std::expected<void, Error> ClientHandler::upstream_http1_connhd_read() {
   auto nread = std::min(left_connhd_len_, rb_.rleft());
-  if (memcmp(&NGHTTP2_CLIENT_MAGIC[NGHTTP2_CLIENT_MAGIC_LEN - left_connhd_len_],
-             rb_.pos(), nread) != 0) {
+  if (memcmp(
+        &NGHTTP2_CLIENT_HTTP2_PREFACE[sizeof(NGHTTP2_CLIENT_HTTP2_PREFACE) - 1 -
+                                      left_connhd_len_],
+        rb_.pos(), nread) != 0) {
     if (log_enabled(INFO)) {
       Log{INFO, this} << "This is HTTP/1.1 connection, "
                       << "but may be upgraded to HTTP/2 later.";
     }
 
     // Reset header length for later HTTP/2 upgrade
-    left_connhd_len_ = NGHTTP2_CLIENT_MAGIC_LEN;
+    left_connhd_len_ = sizeof(NGHTTP2_CLIENT_HTTP2_PREFACE) - 1;
     on_read_ = &ClientHandler::upstream_read;
     on_write_ = &ClientHandler::upstream_write;
 
@@ -671,7 +675,13 @@ std::expected<void, Error> ClientHandler::validate_next_proto() {
 }
 
 std::expected<void, Error> ClientHandler::do_read() { return read_(*this); }
-std::expected<void, Error> ClientHandler::do_write() { return write_(*this); }
+std::expected<void, Error> ClientHandler::do_write() {
+  if (auto rv = write_(*this); !rv) {
+    return rv;
+  }
+
+  return upstream_->after_write();
+}
 
 std::expected<void, Error> ClientHandler::on_read() {
   if (rb_.chunk_avail()) {
@@ -1031,7 +1041,7 @@ ClientHandler::get_downstream_connection(Downstream *downstream) {
     } else if (!req.authority.empty()) {
       authority = req.authority;
     } else {
-      auto h = req.fs.header(http2::HD_HOST);
+      auto h = req.fs.header(NGHTTP2_HPACK_TOKEN_HOST);
       if (h) {
         authority = h->value;
       }
@@ -1129,49 +1139,9 @@ SSL *ClientHandler::get_ssl() const { return conn_.tls.ssl; }
 
 void ClientHandler::direct_http2_upgrade() {
   upstream_ = std::make_unique<Http2Upstream>(this);
-  alpn_ = NGHTTP2_CLEARTEXT_PROTO_VERSION_ID ""sv;
+  alpn_ = NGHTTP2_CLEARTEXT_PROTO_VERSION_ID;
   on_read_ = &ClientHandler::upstream_read;
   write_ = &ClientHandler::write_clear;
-}
-
-std::expected<void, Error>
-ClientHandler::perform_http2_upgrade(HttpsUpstream *http) {
-  auto upstream = std::make_unique<Http2Upstream>(this);
-
-  auto output = upstream->get_response_buf();
-
-  // We might have written non-final header in response_buf, in this
-  // case, response_state is still INITIAL.  If this non-final header
-  // and upgrade header fit in output buffer, do upgrade.  Otherwise,
-  // to avoid to send this non-final header as response body in HTTP/2
-  // upstream, fail upgrade.
-  auto downstream = http->get_downstream();
-  auto input = downstream->get_response_buf();
-
-  if (auto rv = upstream->upgrade_upstream(http); !rv) {
-    return rv;
-  }
-  // http pointer is now owned by upstream.
-  upstream_.release();
-  // TODO We might get other version id in HTTP2-settings, if we
-  // support aliasing for h2, but we just use library default for now.
-  alpn_ = NGHTTP2_CLEARTEXT_PROTO_VERSION_ID ""sv;
-  on_read_ = &ClientHandler::upstream_http2_connhd_read;
-  write_ = &ClientHandler::write_clear;
-
-  input->remove(*output, input->rleft());
-
-  static constexpr auto res =
-    "HTTP/1.1 101 Switching Protocols\r\n"
-    "Connection: Upgrade\r\n"
-    "Upgrade: " NGHTTP2_CLEARTEXT_PROTO_VERSION_ID "\r\n"
-    "\r\n"sv;
-
-  output->append(res);
-  upstream_ = std::move(upstream);
-
-  signal_write();
-  return {};
 }
 
 bool ClientHandler::get_http2_upgrade_allowed() const { return !conn_.tls.ssl; }

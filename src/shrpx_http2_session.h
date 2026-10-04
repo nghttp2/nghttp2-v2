@@ -41,7 +41,7 @@
 
 #include <ev.h>
 
-#include <nghttp2/nghttp2.h>
+#include <nghttp2v2/nghttp2.h>
 
 #include "llhttp.h"
 
@@ -123,16 +123,15 @@ public:
 
   void remove_stream_data(StreamData *sd);
 
-  std::expected<void, Error>
-  submit_request(Http2DownstreamConnection *dconn, const nghttp2_nv *nva,
-                 size_t nvlen, const nghttp2_data_provider2 *data_prd);
+  std::expected<void, Error> submit_request(Http2DownstreamConnection *dconn,
+                                            const nghttp2_nv *nva, size_t nvlen,
+                                            const nghttp2_data_reader *dr);
 
-  std::expected<void, Error> submit_rst_stream(int32_t stream_id,
-                                               uint32_t error_code);
+  void shutdown_stream(int64_t stream_id, uint32_t error_code);
 
-  std::expected<void, Error> terminate_session(uint32_t error_code);
+  void terminate_session(uint32_t error_code);
 
-  nghttp2_session *get_session() const;
+  nghttp2_conn *get_h2conn() const;
 
   std::expected<void, Error> resume_data(Http2DownstreamConnection *dconn);
 
@@ -176,12 +175,12 @@ public:
   Http2SessionState get_state() const;
   void set_state(Http2SessionState state);
 
-  void start_settings_timer();
-  void stop_settings_timer();
+  void reset_http2_timer();
+  void handle_http2_timeout();
 
   SSL *get_ssl() const;
 
-  std::expected<void, Error> consume(int32_t stream_id, size_t len);
+  std::expected<void, Error> consume(int64_t stream_id, size_t len);
 
   // Returns true if request can be issued on downstream connection.
   bool can_push_request(const Downstream *downstream) const;
@@ -247,7 +246,8 @@ public:
 
   // This is called when SETTINGS frame without ACK flag set is
   // received.
-  std::expected<void, Error> on_settings_received(const nghttp2_frame *frame);
+  std::expected<void, Error>
+  on_settings_received(const nghttp2_proto_settings *settings);
 
   bool get_allow_connect_proto() const;
 
@@ -258,7 +258,7 @@ public:
 private:
   Connection conn_;
   DefaultMemchunks wb_;
-  ev_timer settings_timer_;
+  ev_timer http2_timer_;
   // This timer has 2 purpose: when it first timeout, set
   // connection_check_state_ = ConnectionCheck::REQUIRED.  After
   // connection check has started, this timer is started again and
@@ -282,7 +282,7 @@ private:
   std::shared_ptr<DownstreamAddrGroup> group_;
   // Address of remote endpoint
   DownstreamAddr *addr_;
-  nghttp2_session *session_{};
+  nghttp2_conn *h2conn_{};
   // Actual remote address used to contact backend.  This is initially
   // nullptr, and may point to either &addr_->addr,
   // resolved_addr_.get(), or HTTP proxy's address structure.
@@ -298,8 +298,6 @@ private:
   // true if peer enables RFC 8441 CONNECT protocol.
   bool allow_connect_proto_{};
 };
-
-nghttp2_session_callbacks *create_http2_downstream_callbacks();
 
 } // namespace shrpx
 

@@ -36,7 +36,7 @@
 #  include <openssl/ssl.h>
 #endif // !defined(NGHTTP2_OPENSSL_IS_WOLFSSL)
 
-#include <nghttp2/nghttp2.h>
+#include <nghttp2v2/nghttp2.h>
 
 #include "shrpx_downstream_connection.h"
 
@@ -81,8 +81,8 @@ public:
   StreamData *detach_stream_data();
 
   std::expected<void, Error>
-  submit_rst_stream(Downstream *downstream,
-                    uint32_t error_code = NGHTTP2_INTERNAL_ERROR);
+  shutdown_stream(Downstream *downstream,
+                  uint32_t error_code = NGHTTP2_INTERNAL_ERROR);
 
   Http2DownstreamConnection *dlnext{}, *dlprev{};
 

@@ -26,7 +26,7 @@
 
 #include <cstring>
 
-#include <nghttp2/nghttp2.h>
+#include <nghttp2v2/nghttp2.h>
 
 #include "base64.h"
 

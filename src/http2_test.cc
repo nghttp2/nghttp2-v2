@@ -46,7 +46,6 @@ const MunitTest tests[]{
   munit_void_test(test_http2_rewrite_location_uri),
   munit_void_test(test_http2_parse_http_status_code),
   munit_void_test(test_http2_index_header),
-  munit_void_test(test_http2_lookup_token),
   munit_void_test(test_http2_path_join),
   munit_void_test(test_http2_normalize_path),
   munit_void_test(test_http2_rewrite_clean_path),
@@ -75,13 +74,13 @@ void test_http2_add_header(void) {
 
   http2::add_header(nva, "alpha"sv, "123"sv, false, -1);
   assert_eq(Headers::value_type("alpha", "123"), nva[0]);
-  assert_false(nva[0].no_index);
+  assert_false(nva[0].never_index);
 
   nva.clear();
 
   http2::add_header(nva, "alpha"sv, ""sv, true, -1);
   assert_eq(Headers::value_type("alpha", ""), nva[0]);
-  assert_true(nva[0].no_index);
+  assert_true(nva[0].never_index);
 
   nva.clear();
 
@@ -90,8 +89,8 @@ void test_http2_add_header(void) {
 
   nva.clear();
 
-  http2::add_header(nva, "te"sv, "trailers"sv, false, http2::HD_TE);
-  assert_eq(static_cast<int32_t>(http2::HD_TE), nva[0].token);
+  http2::add_header(nva, "te"sv, "trailers"sv, false, NGHTTP2_HPACK_TOKEN_TE);
+  assert_eq(static_cast<int32_t>(NGHTTP2_HPACK_TOKEN_TE), nva[0].token);
 }
 
 void test_http2_get_header(void) {
@@ -116,30 +115,32 @@ namespace {
 constexpr auto headers = std::to_array<HeaderRef>({
   {"alpha"sv, "0"sv, true},
   {"bravo"sv, "1"sv},
-  {"connection"sv, "2"sv, false, http2::HD_CONNECTION},
-  {"connection"sv, "3"sv, false, http2::HD_CONNECTION},
+  {"connection"sv, "2"sv, false, NGHTTP2_HPACK_TOKEN_CONNECTION},
+  {"connection"sv, "3"sv, false, NGHTTP2_HPACK_TOKEN_CONNECTION},
   {"delta"sv, "4"sv},
   {"expect"sv, "5"sv},
   {"foxtrot"sv, "6"sv},
   {"tango"sv, "7"sv},
-  {"te"sv, "8"sv, false, http2::HD_TE},
-  {"te"sv, "9"sv, false, http2::HD_TE},
-  {"x-forwarded-proto"sv, "10"sv, false, http2::HD_X_FORWARDED_FOR},
-  {"x-forwarded-proto"sv, "11"sv, false, http2::HD_X_FORWARDED_FOR},
+  {"te"sv, "8"sv, false, NGHTTP2_HPACK_TOKEN_TE},
+  {"te"sv, "9"sv, false, NGHTTP2_HPACK_TOKEN_TE},
+  {"x-forwarded-proto"sv, "10"sv, false, NGHTTP2_HPACK_TOKEN_X_FORWARDED_FOR},
+  {"x-forwarded-proto"sv, "11"sv, false, NGHTTP2_HPACK_TOKEN_X_FORWARDED_FOR},
   {"zulu"sv, "12"sv},
 });
 } // namespace
 
 namespace {
 constexpr auto headers2 = std::to_array<HeaderRef>({
-  {"x-forwarded-for"sv, "xff1"sv, false, http2::HD_X_FORWARDED_FOR},
-  {"x-forwarded-for"sv, "xff2"sv, false, http2::HD_X_FORWARDED_FOR},
-  {"x-forwarded-proto"sv, "xfp1"sv, false, http2::HD_X_FORWARDED_PROTO},
-  {"x-forwarded-proto"sv, "xfp2"sv, false, http2::HD_X_FORWARDED_PROTO},
-  {"forwarded"sv, "fwd1"sv, false, http2::HD_FORWARDED},
-  {"forwarded"sv, "fwd2"sv, false, http2::HD_FORWARDED},
-  {"via"sv, "via1"sv, false, http2::HD_VIA},
-  {"via"sv, "via2"sv, false, http2::HD_VIA},
+  {"x-forwarded-for"sv, "xff1"sv, false, NGHTTP2_HPACK_TOKEN_X_FORWARDED_FOR},
+  {"x-forwarded-for"sv, "xff2"sv, false, NGHTTP2_HPACK_TOKEN_X_FORWARDED_FOR},
+  {"x-forwarded-proto"sv, "xfp1"sv, false,
+   NGHTTP2_HPACK_TOKEN_X_FORWARDED_PROTO},
+  {"x-forwarded-proto"sv, "xfp2"sv, false,
+   NGHTTP2_HPACK_TOKEN_X_FORWARDED_PROTO},
+  {"forwarded"sv, "fwd1"sv, false, NGHTTP2_HPACK_TOKEN_FORWARDED},
+  {"forwarded"sv, "fwd2"sv, false, NGHTTP2_HPACK_TOKEN_FORWARDED},
+  {"via"sv, "via1"sv, false, NGHTTP2_HPACK_TOKEN_VIA},
+  {"via"sv, "via2"sv, false, NGHTTP2_HPACK_TOKEN_VIA},
 });
 } // namespace
 
@@ -155,7 +156,7 @@ void test_http2_copy_headers_to_nva(void) {
 
     if (ans[i] == 0) {
       assert_eq(NGHTTP2_NV_FLAG_NO_COPY_NAME | NGHTTP2_NV_FLAG_NO_COPY_VALUE |
-                  NGHTTP2_NV_FLAG_NO_INDEX,
+                  NGHTTP2_NV_FLAG_NEVER_INDEX,
                 nva[i].flags);
     } else {
       assert_eq(NGHTTP2_NV_FLAG_NO_COPY_NAME | NGHTTP2_NV_FLAG_NO_COPY_VALUE,
@@ -170,7 +171,7 @@ void test_http2_copy_headers_to_nva(void) {
     check_nv(headers[ans[i]], &nva[i]);
 
     if (ans[i] == 0) {
-      assert_true(nva[i].flags & NGHTTP2_NV_FLAG_NO_INDEX);
+      assert_true(nva[i].flags & NGHTTP2_NV_FLAG_NEVER_INDEX);
     } else {
       assert_false(nva[i].flags);
     }
@@ -279,19 +280,10 @@ void test_http2_index_header(void) {
   http2::HeaderIndex hdidx;
   http2::init_hdidx(hdidx);
 
-  http2::index_header(hdidx, http2::HD__AUTHORITY, 0);
+  http2::index_header(hdidx, NGHTTP2_HPACK_TOKEN__AUTHORITY, 0);
   http2::index_header(hdidx, -1, 1);
 
-  assert_eq(0, hdidx[http2::HD__AUTHORITY]);
-}
-
-void test_http2_lookup_token(void) {
-  assert_eq(static_cast<int32_t>(http2::HD__AUTHORITY),
-            http2::lookup_token(":authority"sv));
-  assert_eq(-1, http2::lookup_token(":authorit"sv));
-  assert_eq(-1, http2::lookup_token(":Authority"sv));
-  assert_eq(static_cast<int32_t>(http2::HD_EXPECT),
-            http2::lookup_token("expect"sv));
+  assert_eq(0, hdidx[NGHTTP2_HPACK_TOKEN__AUTHORITY]);
 }
 
 void test_http2_path_join(void) {

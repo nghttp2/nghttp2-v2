@@ -44,33 +44,32 @@ void copy_headers_to_nva_internal(std::vector<nghttp3_nv> &nva,
       continue;
     }
     switch (kv->token) {
-    case http2::HD_COOKIE:
-    case http2::HD_CONNECTION:
-    case http2::HD_HOST:
-    case http2::HD_HTTP2_SETTINGS:
-    case http2::HD_KEEP_ALIVE:
-    case http2::HD_PROXY_CONNECTION:
-    case http2::HD_SERVER:
-    case http2::HD_TE:
-    case http2::HD_TRANSFER_ENCODING:
-    case http2::HD_UPGRADE:
+    case NGHTTP2_HPACK_TOKEN_COOKIE:
+    case NGHTTP2_HPACK_TOKEN_CONNECTION:
+    case NGHTTP2_HPACK_TOKEN_HOST:
+    case NGHTTP2_HPACK_TOKEN_KEEP_ALIVE:
+    case NGHTTP2_HPACK_TOKEN_PROXY_CONNECTION:
+    case NGHTTP2_HPACK_TOKEN_SERVER:
+    case NGHTTP2_HPACK_TOKEN_TE:
+    case NGHTTP2_HPACK_TOKEN_TRANSFER_ENCODING:
+    case NGHTTP2_HPACK_TOKEN_UPGRADE:
       continue;
-    case http2::HD_EARLY_DATA:
+    case NGHTTP2_HPACK_TOKEN_EARLY_DATA:
       if (flags & http2::HDOP_STRIP_EARLY_DATA) {
         continue;
       }
       break;
-    case http2::HD_SEC_WEBSOCKET_ACCEPT:
+    case NGHTTP2_HPACK_TOKEN_SEC_WEBSOCKET_ACCEPT:
       if (flags & http2::HDOP_STRIP_SEC_WEBSOCKET_ACCEPT) {
         continue;
       }
       break;
-    case http2::HD_SEC_WEBSOCKET_KEY:
+    case NGHTTP2_HPACK_TOKEN_SEC_WEBSOCKET_KEY:
       if (flags & http2::HDOP_STRIP_SEC_WEBSOCKET_KEY) {
         continue;
       }
       break;
-    case http2::HD_FORWARDED:
+    case NGHTTP2_HPACK_TOKEN_FORWARDED:
       if (flags & http2::HDOP_STRIP_FORWARDED) {
         continue;
       }
@@ -83,7 +82,7 @@ void copy_headers_to_nva_internal(std::vector<nghttp3_nv> &nva,
       kv = &(*it_forwarded);
       it_forwarded = it;
       break;
-    case http2::HD_X_FORWARDED_FOR:
+    case NGHTTP2_HPACK_TOKEN_X_FORWARDED_FOR:
       if (flags & http2::HDOP_STRIP_X_FORWARDED_FOR) {
         continue;
       }
@@ -96,7 +95,7 @@ void copy_headers_to_nva_internal(std::vector<nghttp3_nv> &nva,
       kv = &(*it_xff);
       it_xff = it;
       break;
-    case http2::HD_X_FORWARDED_PROTO:
+    case NGHTTP2_HPACK_TOKEN_X_FORWARDED_PROTO:
       if (flags & http2::HDOP_STRIP_X_FORWARDED_PROTO) {
         continue;
       }
@@ -109,7 +108,7 @@ void copy_headers_to_nva_internal(std::vector<nghttp3_nv> &nva,
       kv = &(*it_xfp);
       it_xfp = it;
       break;
-    case http2::HD_VIA:
+    case NGHTTP2_HPACK_TOKEN_VIA:
       if (flags & http2::HDOP_STRIP_VIA) {
         continue;
       }
@@ -124,7 +123,7 @@ void copy_headers_to_nva_internal(std::vector<nghttp3_nv> &nva,
       break;
     }
     nva.push_back(make_field_flags(kv->name, kv->value,
-                                   nv_flags | never_index(kv->no_index)));
+                                   nv_flags | never_index(kv->never_index)));
   }
 }
 } // namespace

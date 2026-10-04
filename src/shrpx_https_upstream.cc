@@ -324,7 +324,7 @@ int htp_hdrs_completecb(llhttp_t *htp) {
   for (auto &kv : req.fs.headers()) {
     kv.value = util::rstrip(balloc, kv.value);
 
-    if (kv.token == http2::HD_TRANSFER_ENCODING &&
+    if (kv.token == NGHTTP2_HPACK_TOKEN_TRANSFER_ENCODING &&
         !http2::check_transfer_encoding(kv.value)) {
       return -1;
     }
@@ -376,7 +376,8 @@ int htp_hdrs_completecb(llhttp_t *htp) {
   // set content-length if method is not CONNECT, and no
   // transfer-encoding is given.  If transfer-encoding is given, leave
   // req.fs.content_length to -1.
-  if (method != HTTP_CONNECT && !req.fs.header(http2::HD_TRANSFER_ENCODING)) {
+  if (method != HTTP_CONNECT &&
+      !req.fs.header(NGHTTP2_HPACK_TOKEN_TRANSFER_ENCODING)) {
     // llhttp sets 0 to htp->content_length if there is no
     // content-length header field.  If we don't have both
     // transfer-encoding and content-length header field, we assume
@@ -388,7 +389,7 @@ int htp_hdrs_completecb(llhttp_t *htp) {
     req.fs.content_length = static_cast<int64_t>(htp->content_length);
   }
 
-  auto host = req.fs.header(http2::HD_HOST);
+  auto host = req.fs.header(NGHTTP2_HPACK_TOKEN_HOST);
 
   if (req.http_major > 1 || req.http_minor > 1) {
     req.http_major = 1;
@@ -412,8 +413,8 @@ int htp_hdrs_completecb(llhttp_t *htp) {
   downstream->inspect_http1_request();
 
   if ((req.upgrade_request || llhttp_get_upgrade(htp)) &&
-      (req.fs.header(http2::HD_TRANSFER_ENCODING) ||
-       req.fs.header(http2::HD_CONTENT_LENGTH))) {
+      (req.fs.header(NGHTTP2_HPACK_TOKEN_TRANSFER_ENCODING) ||
+       req.fs.header(NGHTTP2_HPACK_TOKEN_CONTENT_LENGTH))) {
     if (log_enabled(INFO)) {
       Log{INFO, upstream} << "transfer-encoding and content-length are not "
                              "allowed in CONNECT or upgrade request";
@@ -426,7 +427,7 @@ int htp_hdrs_completecb(llhttp_t *htp) {
     downstream->set_chunked_request(true);
   }
 
-  auto transfer_encoding = req.fs.header(http2::HD_TRANSFER_ENCODING);
+  auto transfer_encoding = req.fs.header(NGHTTP2_HPACK_TOKEN_TRANSFER_ENCODING);
   if (transfer_encoding &&
       http2::legacy_http1(req.http_major, req.http_minor)) {
     return -1;
@@ -607,7 +608,6 @@ int htp_msg_completecb(llhttp_t *htp) {
   if (log_enabled(INFO)) {
     Log{INFO, upstream} << "HTTP request completed";
   }
-  auto handler = upstream->get_client_handler();
   auto downstream = upstream->get_downstream();
   auto &req = downstream->request();
   auto &balloc = downstream->get_block_allocator();
@@ -629,14 +629,6 @@ int htp_msg_completecb(llhttp_t *htp) {
       return HPE_PAUSED;
     }
     return -1;
-  }
-
-  if (handler->get_http2_upgrade_allowed() &&
-      downstream->get_http2_upgrade_request() &&
-      !handler->perform_http2_upgrade(upstream)) {
-    if (log_enabled(INFO)) {
-      Log{INFO, upstream} << "HTTP Upgrade to HTTP/2 failed";
-    }
   }
 
   // Stop further processing to complete this request
@@ -1024,13 +1016,13 @@ HttpsUpstream::send_reply(Downstream *downstream,
   if (httpconf.max_requests <= num_requests_ ||
       worker->get_graceful_shutdown()) {
     resp.fs.add_header_token("connection"sv, "close"sv, false,
-                             http2::HD_CONNECTION);
+                             NGHTTP2_HPACK_TOKEN_CONNECTION);
     connection_close = true;
   } else if (req.http_major <= 0 ||
              (req.http_major == 1 && req.http_minor == 0)) {
     connection_close = true;
   } else {
-    auto c = resp.fs.header(http2::HD_CONNECTION);
+    auto c = resp.fs.header(NGHTTP2_HPACK_TOKEN_CONNECTION);
     if (c && util::strieq("close"sv, c->value)) {
       connection_close = true;
     }
@@ -1059,7 +1051,7 @@ HttpsUpstream::send_reply(Downstream *downstream,
     output->append("\r\n"sv);
   }
 
-  if (!resp.fs.header(http2::HD_SERVER)) {
+  if (!resp.fs.header(NGHTTP2_HPACK_TOKEN_SERVER)) {
     output->append("Server: "sv);
     output->append(config->http.server_name);
     output->append("\r\n"sv);
@@ -1283,7 +1275,7 @@ HttpsUpstream::on_downstream_header_complete(Downstream *downstream) {
     if (req.connect_proto == ConnectProto::WEBSOCKET &&
         resp.http_status / 100 == 2) {
       buf->append("Upgrade: websocket\r\nConnection: Upgrade\r\n"sv);
-      auto key = req.fs.header(http2::HD_SEC_WEBSOCKET_KEY);
+      auto key = req.fs.header(NGHTTP2_HPACK_TOKEN_SEC_WEBSOCKET_KEY);
       if (!key || key->value.size() != base64::encode_length(16)) {
         return std::unexpected{Error::WEBSOCKET_HANDSHAKE};
       }
@@ -1296,14 +1288,14 @@ HttpsUpstream::on_downstream_header_complete(Downstream *downstream) {
       buf->append(*maybe_accept);
       buf->append("\r\n"sv);
     } else {
-      auto connection = resp.fs.header(http2::HD_CONNECTION);
+      auto connection = resp.fs.header(NGHTTP2_HPACK_TOKEN_CONNECTION);
       if (connection) {
         buf->append("Connection: "sv);
         buf->append((*connection).value);
         buf->append("\r\n"sv);
       }
 
-      auto upgrade = resp.fs.header(http2::HD_UPGRADE);
+      auto upgrade = resp.fs.header(NGHTTP2_HPACK_TOKEN_UPGRADE);
       if (upgrade) {
         buf->append("Upgrade: "sv);
         buf->append((*upgrade).value);
@@ -1312,7 +1304,7 @@ HttpsUpstream::on_downstream_header_complete(Downstream *downstream) {
     }
   }
 
-  if (!resp.fs.header(http2::HD_ALT_SVC)) {
+  if (!resp.fs.header(NGHTTP2_HPACK_TOKEN_ALT_SVC)) {
     // We won't change or alter alt-svc from backend for now
     if (!httpconf.altsvcs.empty()) {
       buf->append("Alt-Svc: "sv);
@@ -1326,7 +1318,7 @@ HttpsUpstream::on_downstream_header_complete(Downstream *downstream) {
     buf->append(httpconf.server_name);
     buf->append("\r\n"sv);
   } else {
-    auto server = resp.fs.header(http2::HD_SERVER);
+    auto server = resp.fs.header(NGHTTP2_HPACK_TOKEN_SERVER);
     if (server) {
       buf->append("Server: "sv);
       buf->append((*server).value);
@@ -1350,7 +1342,7 @@ HttpsUpstream::on_downstream_header_complete(Downstream *downstream) {
     }
   }
 
-  auto via = resp.fs.header(http2::HD_VIA);
+  auto via = resp.fs.header(NGHTTP2_HPACK_TOKEN_VIA);
   if (httpconf.no_via) {
     if (via) {
       buf->append("Via: "sv);
@@ -1496,9 +1488,10 @@ HttpsUpstream::redirect_to_https(Downstream *downstream) {
 
   auto &resp = downstream->response();
   resp.http_status = 308;
-  resp.fs.add_header_token("location"sv, loc, false, http2::HD_LOCATION);
+  resp.fs.add_header_token("location"sv, loc, false,
+                           NGHTTP2_HPACK_TOKEN_LOCATION);
   resp.fs.add_header_token("connection"sv, "close"sv, false,
-                           http2::HD_CONNECTION);
+                           NGHTTP2_HPACK_TOKEN_CONNECTION);
 
   return send_reply(downstream, {});
 }

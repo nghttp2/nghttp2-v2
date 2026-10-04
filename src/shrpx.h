@@ -36,8 +36,6 @@
 
 #include <cassert>
 
-#define NGHTTP2_NO_SSIZE_T
-
 #ifndef HAVE__EXIT
 #  define nghttp2_Exit(status) _exit(status)
 #else // defined(HAVE__EXIT)

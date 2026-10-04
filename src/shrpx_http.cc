@@ -172,13 +172,6 @@ std::string colorize_headers(std::string_view hdrs) {
   return nhdrs;
 }
 
-nghttp2_ssize select_padding_callback(nghttp2_session *session,
-                                      const nghttp2_frame *frame,
-                                      size_t max_payload, void *user_data) {
-  return as_signed(
-    std::min(max_payload, frame->hd.length + get_config()->padding));
-}
-
 std::string_view create_affinity_cookie(BlockAllocator &balloc,
                                         std::string_view name,
                                         uint32_t affinity_cookie,

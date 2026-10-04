@@ -37,7 +37,7 @@
 
 #include <ev.h>
 
-#include <nghttp2/nghttp2.h>
+#include <nghttp2v2/nghttp2.h>
 
 #ifdef ENABLE_HTTP3
 #  include <nghttp3/nghttp3.h>
@@ -198,8 +198,7 @@ struct Request {
   // WebSocket upgrade is requested in h1 frontend for convenience.
   ConnectProto connect_proto{ConnectProto::NONE};
   // Returns true if the request is HTTP upgrade (HTTP Upgrade or
-  // CONNECT method).  Upgrade to HTTP/2 is excluded.  For HTTP/2
-  // Upgrade, check get_http2_upgrade_request().
+  // CONNECT method).  Upgrade to HTTP/2 is excluded.
   bool upgrade_request{};
   // true if h2c is seen in Upgrade header field.
   bool http2_upgrade_seen{};
@@ -308,10 +307,6 @@ public:
   // Inspects HTTP/1 request.  This checks whether the request is
   // upgrade request and tranfer-encoding etc.
   void inspect_http1_request();
-  // Returns true if the request is HTTP Upgrade for HTTP/2
-  bool get_http2_upgrade_request() const;
-  // Returns the value of HTTP2-Settings request header field.
-  std::string_view get_http2_settings() const;
 
   // downstream request API
   const Request &request() const { return req_; }

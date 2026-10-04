@@ -55,6 +55,7 @@
 #include "util.h"
 #include "base64.h"
 #include "tls.h"
+#include "app_helper.h"
 
 using namespace nghttp2;
 
@@ -62,8 +63,6 @@ namespace shrpx {
 
 constexpr ev_tstamp CONNCHK_TIMEOUT = 5.;
 constexpr ev_tstamp CONNCHK_PING_TIMEOUT = 1.;
-
-constexpr size_t MAX_BUFFER_SIZE = 32_k;
 
 namespace {
 void connchk_timeout_cb(struct ev_loop *loop, ev_timer *w, int revents) {
@@ -87,25 +86,6 @@ void connchk_timeout_cb(struct ev_loop *loop, ev_timer *w, int revents) {
     }
     http2session->set_connection_check_state(ConnectionCheck::REQUIRED);
   }
-}
-} // namespace
-
-namespace {
-void settings_timeout_cb(struct ev_loop *loop, ev_timer *w, int revents) {
-  auto http2session = static_cast<Http2Session *>(w->data);
-
-  if (log_enabled(INFO)) {
-    Log{INFO, http2session} << "SETTINGS timeout";
-  }
-
-  downstream_failure(http2session->get_addr(), http2session->get_raddr());
-
-  if (!http2session->terminate_session(NGHTTP2_SETTINGS_TIMEOUT)) {
-    delete http2session;
-
-    return;
-  }
-  http2session->signal_write();
 }
 } // namespace
 
@@ -201,11 +181,14 @@ Http2Session::Http2Session(struct ev_loop *loop, SSL_CTX *ssl_ctx,
 
   connchk_timer_.data = this;
 
-  // SETTINGS ACK timeout is 10 seconds for now.  We will reuse this
-  // many times, so use repeat timeout value.
-  ev_timer_init(&settings_timer_, settings_timeout_cb, 0., 0.);
-
-  settings_timer_.data = this;
+  ev_timer_init(
+    &http2_timer_,
+    [](struct ev_loop *loop, ev_timer *w, int revents) {
+      auto http2session = static_cast<Http2Session *>(w->data);
+      http2session->handle_http2_timeout();
+    },
+    0., 0.);
+  http2_timer_.data = this;
 
   ev_timer_init(&initiate_connection_timer_, initiate_connection_cb, 0., 0.);
   initiate_connection_timer_.data = this;
@@ -224,8 +207,8 @@ void Http2Session::disconnect(bool hard) {
   if (log_enabled(INFO)) {
     Log{INFO, this} << "Disconnecting";
   }
-  nghttp2_session_del(session_);
-  session_ = nullptr;
+  nghttp2_conn_del(h2conn_);
+  h2conn_ = nullptr;
 
   wb_.reset();
 
@@ -240,7 +223,7 @@ void Http2Session::disconnect(bool hard) {
   ev_prepare_stop(conn_.loop, &prep_);
 
   ev_timer_stop(conn_.loop, &initiate_connection_timer_);
-  ev_timer_stop(conn_.loop, &settings_timer_);
+  ev_timer_stop(conn_.loop, &http2_timer_);
   ev_timer_stop(conn_.loop, &connchk_timer_);
 
   read_ = write_ = &Http2Session::noop;
@@ -723,16 +706,15 @@ void Http2Session::remove_stream_data(StreamData *sd) {
 std::expected<void, Error>
 Http2Session::submit_request(Http2DownstreamConnection *dconn,
                              const nghttp2_nv *nva, size_t nvlen,
-                             const nghttp2_data_provider2 *data_prd) {
+                             const nghttp2_data_reader *dr) {
   assert(state_ == Http2SessionState::CONNECTED);
   auto sd = std::make_unique<StreamData>();
   sd->dlnext = sd->dlprev = nullptr;
-  // TODO Specify nullptr to pri_spec for now
   auto stream_id =
-    nghttp2_submit_request2(session_, nullptr, nva, nvlen, data_prd, sd.get());
+    nghttp2_conn_submit_request(h2conn_, nva, nvlen, dr, sd.get());
   if (stream_id < 0) {
-    Log{FATAL, this} << "nghttp2_submit_request2() failed: "
-                     << nghttp2_strerror(stream_id);
+    Log{FATAL, this} << "nghttp2_conn_submit_request() failed: "
+                     << nghttp2_strerror((int)stream_id);
     return std::unexpected{Error::HTTP2};
   }
 
@@ -743,40 +725,34 @@ Http2Session::submit_request(Http2DownstreamConnection *dconn,
   return {};
 }
 
-std::expected<void, Error>
-Http2Session::submit_rst_stream(int32_t stream_id, uint32_t error_code) {
+void Http2Session::shutdown_stream(int64_t stream_id, uint32_t error_code) {
   assert(state_ == Http2SessionState::CONNECTED);
   if (log_enabled(INFO)) {
     Log{INFO, this} << "RST_STREAM stream_id=" << stream_id
                     << " with error_code=" << error_code;
   }
-  int rv = nghttp2_submit_rst_stream(session_, NGHTTP2_FLAG_NONE, stream_id,
-                                     error_code);
-  if (rv != 0) {
-    Log{FATAL, this} << "nghttp2_submit_rst_stream() failed: "
-                     << nghttp2_strerror(rv);
-    return std::unexpected{Error::HTTP2};
-  }
-  return {};
+
+  nghttp2_conn_shutdown_stream(h2conn_, 0x00, stream_id, error_code);
 }
 
-nghttp2_session *Http2Session::get_session() const { return session_; }
+nghttp2_conn *Http2Session::get_h2conn() const { return h2conn_; }
 
 std::expected<void, Error>
 Http2Session::resume_data(Http2DownstreamConnection *dconn) {
   assert(state_ == Http2SessionState::CONNECTED);
   auto downstream = dconn->get_downstream();
-  int rv = nghttp2_session_resume_data(
-    session_, static_cast<int32_t>(downstream->get_downstream_stream_id()));
-  switch (rv) {
-  case 0:
-  case NGHTTP2_ERR_INVALID_ARGUMENT:
-    return {};
-  default:
-    Log{FATAL, this} << "nghttp2_resume_session() failed: "
-                     << nghttp2_strerror(rv);
-    return std::unexpected{Error::HTTP2};
+  auto rv =
+    nghttp2_conn_resume_stream(h2conn_, downstream->get_downstream_stream_id());
+  if (rv != 0) {
+    if (rv != NGHTTP2_ERR_INVALID_ARGUMENT) {
+      Log{FATAL, this} << "nghttp2_conn_resume_stream() failed: "
+                       << nghttp2_strerror(rv);
+
+      return std::unexpected{Error::HTTP2};
+    }
   }
+
+  return {};
 }
 
 namespace {
@@ -793,17 +769,22 @@ void call_downstream_readcb(Http2Session *http2session,
 } // namespace
 
 namespace {
-int on_stream_close_callback(nghttp2_session *session, int32_t stream_id,
-                             uint32_t error_code, void *user_data) {
-  auto http2session = static_cast<Http2Session *>(user_data);
+int stream_close(nghttp2_conn *conn, uint32_t flags, int64_t stream_id,
+                 uint32_t error_code, void *conn_user_data,
+                 void *stream_user_data) {
+  auto http2session = static_cast<Http2Session *>(conn_user_data);
+
+  if (!(flags & NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET)) {
+    error_code = NGHTTP2_NO_ERROR;
+  }
+
   if (log_enabled(INFO)) {
     Log{INFO, http2session} << "Stream stream_id=" << stream_id
                             << " is being closed with error code "
                             << error_code;
   }
-  auto sd = static_cast<StreamData *>(
-    nghttp2_session_get_stream_user_data(session, stream_id));
-  if (sd == 0) {
+  auto sd = static_cast<StreamData *>(stream_user_data);
+  if (!sd) {
     // We might get this close callback when pushed streams are
     // closed.
     return 0;
@@ -834,8 +815,7 @@ int on_stream_close_callback(nghttp2_session *session, int32_t stream_id,
                DownstreamState::MSG_BAD_HEADER) {
       downstream->set_response_state(DownstreamState::MSG_RESET);
     }
-    if (downstream->get_response_state() == DownstreamState::MSG_RESET &&
-        downstream->get_response_rst_stream_error_code() == NGHTTP2_NO_ERROR) {
+    if (downstream->get_response_state() == DownstreamState::MSG_RESET) {
       downstream->set_response_rst_stream_error_code(error_code);
     }
     call_downstream_readcb(http2session, downstream);
@@ -848,23 +828,11 @@ int on_stream_close_callback(nghttp2_session *session, int32_t stream_id,
 }
 } // namespace
 
-void Http2Session::start_settings_timer() {
-  auto &downstreamconf = get_config()->http2.downstream;
-
-  ev_timer_set(&settings_timer_, downstreamconf.timeout.settings, 0.);
-  ev_timer_start(conn_.loop, &settings_timer_);
-}
-
-void Http2Session::stop_settings_timer() {
-  ev_timer_stop(conn_.loop, &settings_timer_);
-}
-
 namespace {
-int on_header_callback2(nghttp2_session *session, const nghttp2_frame *frame,
-                        nghttp2_rcbuf *name, nghttp2_rcbuf *value,
-                        uint8_t flags, void *user_data) {
-  auto sd = static_cast<StreamData *>(
-    nghttp2_session_get_stream_user_data(session, frame->hd.stream_id));
+int recv_header(nghttp2_conn *conn, int64_t stream_id, int32_t token,
+                nghttp2_rcbuf *name, nghttp2_rcbuf *value, uint8_t flags,
+                void *conn_user_data, void *stream_user_data) {
+  auto sd = static_cast<StreamData *>(stream_user_data);
   if (!sd || !sd->dconn) {
     return 0;
   }
@@ -876,108 +844,87 @@ int on_header_callback2(nghttp2_session *session, const nghttp2_frame *frame,
   auto &resp = downstream->response();
   auto &httpconf = get_config()->http;
 
-  switch (frame->hd.type) {
-  case NGHTTP2_HEADERS: {
-    auto trailer = frame->headers.cat == NGHTTP2_HCAT_HEADERS &&
-                   !downstream->get_expect_final_response();
-
-    if (resp.fs.buffer_size() + namebuf.len + valuebuf.len >
-          httpconf.response_header_field_buffer ||
-        resp.fs.num_fields() >= httpconf.max_response_header_fields) {
-      if (log_enabled(INFO)) {
-        Log{INFO, downstream}
-          << "Too large or many header field size="
-          << resp.fs.buffer_size() + namebuf.len + valuebuf.len
-          << ", num=" << resp.fs.num_fields() + 1;
-      }
-
-      if (trailer) {
-        // We don't care trailer part exceeds header size limit; just
-        // discard it.
-        return 0;
-      }
-
-      return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+  if (resp.fs.buffer_size() + namebuf.len + valuebuf.len >
+        httpconf.response_header_field_buffer ||
+      resp.fs.num_fields() >= httpconf.max_response_header_fields) {
+    if (log_enabled(INFO)) {
+      Log{INFO, downstream}
+        << "Too large or many header field size="
+        << resp.fs.buffer_size() + namebuf.len + valuebuf.len
+        << ", num=" << resp.fs.num_fields() + 1;
     }
 
-    auto nameref = as_string_view(namebuf.base, namebuf.len);
-    auto valueref = as_string_view(valuebuf.base, valuebuf.len);
-    auto token = http2::lookup_token(nameref);
-    auto no_index = flags & NGHTTP2_NV_FLAG_NO_INDEX;
+    nghttp2_conn_shutdown_stream(conn, 0x00, stream_id, NGHTTP2_INTERNAL_ERROR);
 
-    downstream->add_rcbuf(name);
-    downstream->add_rcbuf(value);
-
-    if (trailer) {
-      // just store header fields for trailer part
-      resp.fs.add_trailer_token(nameref, valueref, no_index, token);
-      return 0;
-    }
-
-    resp.fs.add_header_token(nameref, valueref, no_index, token);
     return 0;
   }
-  }
 
+  auto nameref = as_string_view(namebuf.base, namebuf.len);
+  auto valueref = as_string_view(valuebuf.base, valuebuf.len);
+  auto never_index = flags & NGHTTP2_NV_FLAG_NEVER_INDEX;
+
+  downstream->add_rcbuf(name);
+  downstream->add_rcbuf(value);
+
+  resp.fs.add_header_token(nameref, valueref, never_index, token);
   return 0;
 }
 } // namespace
 
 namespace {
-int on_invalid_header_callback2(nghttp2_session *session,
-                                const nghttp2_frame *frame, nghttp2_rcbuf *name,
-                                nghttp2_rcbuf *value, uint8_t flags,
-                                void *user_data) {
-  auto http2session = static_cast<Http2Session *>(user_data);
-  auto sd = static_cast<StreamData *>(
-    nghttp2_session_get_stream_user_data(session, frame->hd.stream_id));
+int recv_trailer(nghttp2_conn *conn, int64_t stream_id, int32_t token,
+                 nghttp2_rcbuf *name, nghttp2_rcbuf *value, uint8_t flags,
+                 void *conn_user_data, void *stream_user_data) {
+  auto sd = static_cast<StreamData *>(stream_user_data);
   if (!sd || !sd->dconn) {
     return 0;
   }
+  auto downstream = sd->dconn->get_downstream();
 
-  auto stream_id = frame->hd.stream_id;
+  auto namebuf = nghttp2_rcbuf_get_buf(name);
+  auto valuebuf = nghttp2_rcbuf_get_buf(value);
 
-  if (log_enabled(INFO)) {
-    auto namebuf = nghttp2_rcbuf_get_buf(name);
-    auto valuebuf = nghttp2_rcbuf_get_buf(value);
+  auto &resp = downstream->response();
+  auto &httpconf = get_config()->http;
 
-    Log{INFO, http2session}
-      << "Invalid header field for stream_id=" << stream_id
-      << " in frame type=" << static_cast<uint32_t>(frame->hd.type)
-      << ": name=[" << as_string_view(namebuf.base, namebuf.len) << "], value=["
-      << as_string_view(valuebuf.base, valuebuf.len) << "]";
+  if (resp.fs.buffer_size() + namebuf.len + valuebuf.len >
+        httpconf.response_header_field_buffer ||
+      resp.fs.num_fields() >= httpconf.max_response_header_fields) {
+    if (log_enabled(INFO)) {
+      Log{INFO, downstream}
+        << "Too large or many header field size="
+        << resp.fs.buffer_size() + namebuf.len + valuebuf.len
+        << ", num=" << resp.fs.num_fields() + 1;
+    }
+
+    // We don't care trailer part exceeds header size limit; just
+    // discard it.
+
+    return 0;
   }
 
-  if (!http2session->submit_rst_stream(stream_id, NGHTTP2_PROTOCOL_ERROR)) {
-    return NGHTTP2_ERR_CALLBACK_FAILURE;
-  }
+  auto nameref = as_string_view(namebuf.base, namebuf.len);
+  auto valueref = as_string_view(valuebuf.base, valuebuf.len);
+  auto never_index = flags & NGHTTP2_NV_FLAG_NEVER_INDEX;
 
-  return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+  downstream->add_rcbuf(name);
+  downstream->add_rcbuf(value);
+
+  resp.fs.add_trailer_token(nameref, valueref, never_index, token);
+  return 0;
 }
 } // namespace
 
 namespace {
-int on_begin_headers_callback(nghttp2_session *session,
-                              const nghttp2_frame *frame, void *user_data) {
-  auto http2session = static_cast<Http2Session *>(user_data);
+int begin_headers(nghttp2_conn *conn, int64_t stream_id, void *conn_user_data,
+                  void *stream_user_data) {
+  auto http2session = static_cast<Http2Session *>(conn_user_data);
 
-  switch (frame->hd.type) {
-  case NGHTTP2_HEADERS: {
-    if (frame->headers.cat != NGHTTP2_HCAT_RESPONSE) {
-      return 0;
-    }
-    auto sd = static_cast<StreamData *>(
-      nghttp2_session_get_stream_user_data(session, frame->hd.stream_id));
-    if (!sd || !sd->dconn) {
-      if (!http2session->submit_rst_stream(frame->hd.stream_id,
-                                           NGHTTP2_INTERNAL_ERROR)) {
-        return NGHTTP2_ERR_CALLBACK_FAILURE;
-      }
+  auto sd = static_cast<StreamData *>(stream_user_data);
+  if (!sd || !sd->dconn) {
+    http2session->shutdown_stream(stream_id, NGHTTP2_INTERNAL_ERROR);
 
-      return 0;
-    }
     return 0;
-  }
   }
 
   return 0;
@@ -987,8 +934,7 @@ int on_begin_headers_callback(nghttp2_session *session,
 namespace {
 std::expected<void, Error> on_response_headers(Http2Session *http2session,
                                                Downstream *downstream,
-                                               nghttp2_session *session,
-                                               const nghttp2_frame *frame) {
+                                               int64_t stream_id, bool fin) {
   auto upstream = downstream->get_upstream();
   auto handler = upstream->get_client_handler();
   const auto &req = downstream->request();
@@ -1001,7 +947,7 @@ std::expected<void, Error> on_response_headers(Http2Session *http2session,
 
   downstream->set_expect_final_response(false);
 
-  auto status = resp.fs.header(http2::HD__STATUS);
+  auto status = resp.fs.header(NGHTTP2_HPACK_TOKEN__STATUS);
   // libnghttp2 guarantees this exists and can be parsed
   assert(status);
   auto status_code = *http2::parse_http_status_code(status->value);
@@ -1024,9 +970,9 @@ std::expected<void, Error> on_response_headers(Http2Session *http2session,
       ss += nv.value;
       ss += '\n';
     }
-    Log{INFO, http2session}
-      << "HTTP response headers. stream_id=" << frame->hd.stream_id << "\n"
-      << ss;
+    Log{INFO, http2session} << "HTTP response headers. stream_id=" << stream_id
+                            << "\n"
+                            << ss;
   }
 
   if (downstream->get_non_final_response()) {
@@ -1038,11 +984,7 @@ std::expected<void, Error> on_response_headers(Http2Session *http2session,
     // After Upstream::on_downstream_header_complete, Dowstream's
     // response headers are erased.
     if (!upstream->on_downstream_header_complete(downstream)) {
-      if (auto rv = http2session->submit_rst_stream(frame->hd.stream_id,
-                                                    NGHTTP2_PROTOCOL_ERROR);
-          !rv) {
-        return rv;
-      }
+      http2session->shutdown_stream(stream_id, NGHTTP2_PROTOCOL_ERROR);
 
       downstream->set_response_state(DownstreamState::MSG_RESET);
     }
@@ -1062,10 +1004,10 @@ std::expected<void, Error> on_response_headers(Http2Session *http2session,
     downstream->set_request_state(DownstreamState::HEADER_COMPLETE);
     if (log_enabled(INFO)) {
       Log{INFO, http2session} << "HTTP upgrade success. stream_id="
-                              << frame->hd.stream_id;
+                              << stream_id;
     }
   } else {
-    auto content_length = resp.fs.header(http2::HD_CONTENT_LENGTH);
+    auto content_length = resp.fs.header(NGHTTP2_HPACK_TOKEN_CONTENT_LENGTH);
     if (content_length) {
       // libnghttp2 guarantees this can be parsed
       resp.fs.content_length =
@@ -1083,13 +1025,13 @@ std::expected<void, Error> on_response_headers(Http2Session *http2session,
         // open.  In HTTP2, we are supposed not to receive
         // transfer-encoding.
         resp.fs.add_header_token("transfer-encoding"sv, "chunked"sv, false,
-                                 http2::HD_TRANSFER_ENCODING);
+                                 NGHTTP2_HPACK_TOKEN_TRANSFER_ENCODING);
         downstream->set_chunked_response(true);
       }
     }
   }
 
-  if (frame->hd.flags & NGHTTP2_FLAG_END_STREAM) {
+  if (fin) {
     resp.headers_only = true;
   }
 
@@ -1102,17 +1044,9 @@ std::expected<void, Error> on_response_headers(Http2Session *http2session,
     // Handling early return (in other words, response was hijacked by
     // mruby scripting).
     if (downstream->get_response_state() == DownstreamState::MSG_COMPLETE) {
-      if (auto rv = http2session->submit_rst_stream(frame->hd.stream_id,
-                                                    NGHTTP2_CANCEL);
-          !rv) {
-        return rv;
-      }
+      http2session->shutdown_stream(stream_id, NGHTTP2_CANCEL);
     } else {
-      if (auto rv = http2session->submit_rst_stream(frame->hd.stream_id,
-                                                    NGHTTP2_INTERNAL_ERROR);
-          !rv) {
-        return rv;
-      }
+      http2session->shutdown_stream(stream_id, NGHTTP2_INTERNAL_ERROR);
 
       downstream->set_response_state(DownstreamState::MSG_RESET);
     }
@@ -1123,154 +1057,107 @@ std::expected<void, Error> on_response_headers(Http2Session *http2session,
 } // namespace
 
 namespace {
-int on_frame_recv_callback(nghttp2_session *session, const nghttp2_frame *frame,
-                           void *user_data) {
-  auto http2session = static_cast<Http2Session *>(user_data);
-
-  switch (frame->hd.type) {
-  case NGHTTP2_DATA: {
-    auto sd = static_cast<StreamData *>(
-      nghttp2_session_get_stream_user_data(session, frame->hd.stream_id));
-    if (!sd || !sd->dconn) {
-      return 0;
-    }
-    auto downstream = sd->dconn->get_downstream();
-    auto upstream = downstream->get_upstream();
-    if (auto rv = upstream->on_downstream_body(downstream, {}, true); !rv) {
-      if (!http2session->submit_rst_stream(frame->hd.stream_id,
-                                           NGHTTP2_INTERNAL_ERROR)) {
-        return NGHTTP2_ERR_CALLBACK_FAILURE;
-      }
-
-      downstream->set_response_state(DownstreamState::MSG_RESET);
-
-    } else if (frame->hd.flags & NGHTTP2_FLAG_END_STREAM) {
-      downstream->disable_downstream_rtimer();
-
-      if (downstream->get_response_state() ==
-          DownstreamState::HEADER_COMPLETE) {
-        downstream->set_response_state(DownstreamState::MSG_COMPLETE);
-
-        if (!upstream->on_downstream_body_complete(downstream)) {
-          downstream->set_response_state(DownstreamState::MSG_RESET);
-        }
-      }
-    }
-
-    call_downstream_readcb(http2session, downstream);
+int end_headers(nghttp2_conn *conn, int64_t stream_id, int fin,
+                void *conn_user_data, void *stream_user_data) {
+  auto http2session = static_cast<Http2Session *>(conn_user_data);
+  auto sd = static_cast<StreamData *>(stream_user_data);
+  if (!sd || !sd->dconn) {
     return 0;
   }
-  case NGHTTP2_HEADERS: {
-    auto sd = static_cast<StreamData *>(
-      nghttp2_session_get_stream_user_data(session, frame->hd.stream_id));
-    if (!sd || !sd->dconn) {
-      return 0;
-    }
-    auto downstream = sd->dconn->get_downstream();
+  auto downstream = sd->dconn->get_downstream();
 
-    if (frame->headers.cat == NGHTTP2_HCAT_RESPONSE) {
-      if (!on_response_headers(http2session, downstream, session, frame)) {
-        return NGHTTP2_ERR_CALLBACK_FAILURE;
-      }
-    } else if (frame->headers.cat == NGHTTP2_HCAT_HEADERS) {
-      if (downstream->get_expect_final_response() &&
-          !on_response_headers(http2session, downstream, session, frame)) {
-        return NGHTTP2_ERR_CALLBACK_FAILURE;
-      }
-    }
-
-    if (frame->hd.flags & NGHTTP2_FLAG_END_STREAM) {
-      downstream->disable_downstream_rtimer();
-
-      if (downstream->get_response_state() ==
-          DownstreamState::HEADER_COMPLETE) {
-        downstream->set_response_state(DownstreamState::MSG_COMPLETE);
-
-        auto upstream = downstream->get_upstream();
-
-        if (!upstream->on_downstream_body_complete(downstream)) {
-          downstream->set_response_state(DownstreamState::MSG_RESET);
-        }
-      }
-    } else {
-      downstream->reset_downstream_rtimer();
-    }
-
-    // This may delete downstream
-    call_downstream_readcb(http2session, downstream);
-
-    return 0;
+  if (!on_response_headers(http2session, downstream, stream_id, fin)) {
+    return NGHTTP2_ERR_CALLBACK_FAILURE;
   }
-  case NGHTTP2_RST_STREAM: {
-    auto sd = static_cast<StreamData *>(
-      nghttp2_session_get_stream_user_data(session, frame->hd.stream_id));
-    if (sd && sd->dconn) {
-      auto downstream = sd->dconn->get_downstream();
-      downstream->set_response_rst_stream_error_code(
-        frame->rst_stream.error_code);
-      call_downstream_readcb(http2session, downstream);
-    }
-    return 0;
-  }
-  case NGHTTP2_SETTINGS: {
-    if ((frame->hd.flags & NGHTTP2_FLAG_ACK) == 0) {
-      if (!http2session->on_settings_received(frame)) {
-        return NGHTTP2_ERR_CALLBACK_FAILURE;
-      }
 
-      return 0;
-    }
+  downstream->reset_downstream_rtimer();
 
-    http2session->stop_settings_timer();
+  // This may delete downstream
+  call_downstream_readcb(http2session, downstream);
 
-    auto addr = http2session->get_addr();
-    auto &connect_blocker = addr->connect_blocker;
-
-    connect_blocker->on_success();
-
-    return 0;
-  }
-  case NGHTTP2_PING:
-    if (frame->hd.flags & NGHTTP2_FLAG_ACK) {
-      if (log_enabled(INFO)) {
-        Log{INFO} << "PING ACK received";
-      }
-
-      if (!http2session->connection_alive()) {
-        return NGHTTP2_ERR_CALLBACK_FAILURE;
-      }
-    }
-    return 0;
-  case NGHTTP2_GOAWAY:
-    if (log_enabled(INFO)) {
-      auto debug_data = util::ascii_dump(frame->goaway.opaque_data,
-                                         frame->goaway.opaque_data_len);
-
-      Log{INFO, http2session}
-        << "GOAWAY received: last-stream-id=" << frame->goaway.last_stream_id
-        << ", error_code=" << frame->goaway.error_code
-        << ", debug_data=" << debug_data;
-    }
-    return 0;
-  default:
-    return 0;
-  }
+  return 0;
 }
 } // namespace
 
 namespace {
-int on_data_chunk_recv_callback(nghttp2_session *session, uint8_t flags,
-                                int32_t stream_id, const uint8_t *data,
-                                size_t len, void *user_data) {
-  auto http2session = static_cast<Http2Session *>(user_data);
-  auto sd = static_cast<StreamData *>(
-    nghttp2_session_get_stream_user_data(session, stream_id));
+int remote_end_stream(nghttp2_conn *conn, int64_t stream_id,
+                      void *conn_user_data, void *stream_user_data) {
+  auto sd = static_cast<StreamData *>(stream_user_data);
   if (!sd || !sd->dconn) {
-    if (!http2session->submit_rst_stream(stream_id, NGHTTP2_INTERNAL_ERROR)) {
-      return NGHTTP2_ERR_CALLBACK_FAILURE;
-    }
+    return 0;
+  }
+  auto downstream = sd->dconn->get_downstream();
 
-    if (!http2session->consume(stream_id, len)) {
+  downstream->disable_downstream_rtimer();
+
+  if (downstream->get_response_state() == DownstreamState::HEADER_COMPLETE) {
+    downstream->set_response_state(DownstreamState::MSG_COMPLETE);
+
+    auto upstream = downstream->get_upstream();
+
+    if (!upstream->on_downstream_body_complete(downstream)) {
+      downstream->set_response_state(DownstreamState::MSG_RESET);
+    }
+  }
+
+  return 0;
+}
+} // namespace
+
+namespace {
+int recv_settings(nghttp2_conn *conn, const nghttp2_proto_settings *settings,
+                  void *conn_user_data) {
+  auto http2session = static_cast<Http2Session *>(conn_user_data);
+
+  if (!http2session->on_settings_received(settings)) {
+    return NGHTTP2_ERR_CALLBACK_FAILURE;
+  }
+
+  return 0;
+}
+} // namespace
+
+namespace {
+int recv_ping_ack(nghttp2_conn *conn, const nghttp2_ping_data *data,
+                  nghttp2_duration rtt, void *conn_user_data) {
+  auto http2session = static_cast<Http2Session *>(conn_user_data);
+
+  if (log_enabled(INFO)) {
+    Log{INFO} << "PING ACK received";
+  }
+
+  if (!http2session->connection_alive()) {
+    return NGHTTP2_ERR_CALLBACK_FAILURE;
+  }
+
+  return 0;
+}
+} // namespace
+
+namespace {
+int http2_shutdown(nghttp2_conn *conn, int64_t last_stream_id,
+                   uint32_t error_code, void *conn_user_data) {
+  auto http2session = static_cast<Http2Session *>(conn_user_data);
+
+  if (log_enabled(INFO)) {
+    Log{INFO, http2session}
+      << "GOAWAY received: last-stream-id=" << last_stream_id
+      << ", error_code=" << error_code;
+  }
+
+  return 0;
+}
+} // namespace
+
+namespace {
+int recv_data(nghttp2_conn *conn, int64_t stream_id, const uint8_t *data,
+              size_t datalen, void *conn_user_data, void *stream_user_data) {
+  auto http2session = static_cast<Http2Session *>(conn_user_data);
+  auto sd = static_cast<StreamData *>(stream_user_data);
+  if (!sd || !sd->dconn) {
+    http2session->shutdown_stream(stream_id, NGHTTP2_INTERNAL_ERROR);
+
+    if (!http2session->consume(stream_id, datalen)) {
       return NGHTTP2_ERR_CALLBACK_FAILURE;
     }
 
@@ -1278,25 +1165,9 @@ int on_data_chunk_recv_callback(nghttp2_session *session, uint8_t flags,
   }
   auto downstream = sd->dconn->get_downstream();
   if (!downstream->expect_response_body()) {
-    if (!http2session->submit_rst_stream(stream_id, NGHTTP2_INTERNAL_ERROR)) {
-      return NGHTTP2_ERR_CALLBACK_FAILURE;
-    }
+    http2session->shutdown_stream(stream_id, NGHTTP2_INTERNAL_ERROR);
 
-    if (!http2session->consume(stream_id, len)) {
-      return NGHTTP2_ERR_CALLBACK_FAILURE;
-    }
-
-    return 0;
-  }
-
-  // We don't want DATA after non-final response, which is illegal in
-  // HTTP.
-  if (downstream->get_non_final_response()) {
-    if (!http2session->submit_rst_stream(stream_id, NGHTTP2_PROTOCOL_ERROR)) {
-      return NGHTTP2_ERR_CALLBACK_FAILURE;
-    }
-
-    if (!http2session->consume(stream_id, len)) {
+    if (!http2session->consume(stream_id, datalen)) {
       return NGHTTP2_ERR_CALLBACK_FAILURE;
     }
 
@@ -1307,17 +1178,15 @@ int on_data_chunk_recv_callback(nghttp2_session *session, uint8_t flags,
 
   auto &resp = downstream->response();
 
-  resp.recv_body_length += len;
-  resp.unconsumed_body_length += len;
+  resp.recv_body_length += datalen;
+  resp.unconsumed_body_length += datalen;
 
   auto upstream = downstream->get_upstream();
-  if (auto rv = upstream->on_downstream_body(downstream, {data, len}, false);
+  if (auto rv = upstream->on_downstream_body(downstream, {data, datalen}, true);
       !rv) {
-    if (!http2session->submit_rst_stream(stream_id, NGHTTP2_INTERNAL_ERROR)) {
-      return NGHTTP2_ERR_CALLBACK_FAILURE;
-    }
+    http2session->shutdown_stream(stream_id, NGHTTP2_INTERNAL_ERROR);
 
-    if (!http2session->consume(stream_id, len)) {
+    if (!http2session->consume(stream_id, datalen)) {
       return NGHTTP2_ERR_CALLBACK_FAILURE;
     }
 
@@ -1330,204 +1199,45 @@ int on_data_chunk_recv_callback(nghttp2_session *session, uint8_t flags,
 } // namespace
 
 namespace {
-int on_frame_send_callback(nghttp2_session *session, const nghttp2_frame *frame,
-                           void *user_data) {
-  auto http2session = static_cast<Http2Session *>(user_data);
-
-  if (frame->hd.type == NGHTTP2_DATA || frame->hd.type == NGHTTP2_HEADERS) {
-    auto sd = static_cast<StreamData *>(
-      nghttp2_session_get_stream_user_data(session, frame->hd.stream_id));
-
-    if (!sd || !sd->dconn) {
-      return 0;
-    }
-
-    auto downstream = sd->dconn->get_downstream();
-
-    if (frame->hd.type == NGHTTP2_HEADERS &&
-        frame->headers.cat == NGHTTP2_HCAT_REQUEST) {
-      downstream->set_request_header_sent(true);
-      auto src = downstream->get_blocked_request_buf();
-      if (src->rleft()) {
-        auto dest = downstream->get_request_buf();
-        src->remove(*dest);
-        if (!http2session->resume_data(sd->dconn)) {
-          return NGHTTP2_ERR_CALLBACK_FAILURE;
-        }
-        downstream->ensure_downstream_wtimer();
-      }
-    }
-
-    if ((frame->hd.flags & NGHTTP2_FLAG_END_STREAM) == 0) {
-      return 0;
-    }
-
-    downstream->reset_downstream_rtimer();
-
+int write_stream_data_offset(nghttp2_conn *conn, int64_t stream_id,
+                             uint64_t offset, size_t len, void *conn_user_data,
+                             void *stream_user_data) {
+  auto sd = static_cast<StreamData *>(stream_user_data);
+  if (!sd || !sd->dconn) {
     return 0;
   }
 
-  if (frame->hd.type == NGHTTP2_SETTINGS &&
-      (frame->hd.flags & NGHTTP2_FLAG_ACK) == 0) {
-    http2session->start_settings_timer();
-  }
-  return 0;
-}
-} // namespace
-
-namespace {
-int on_frame_not_send_callback(nghttp2_session *session,
-                               const nghttp2_frame *frame, int lib_error_code,
-                               void *user_data) {
-  auto http2session = static_cast<Http2Session *>(user_data);
-  if (log_enabled(INFO)) {
-    Log{INFO, http2session} << "Failed to send control frame type="
-                            << static_cast<uint32_t>(frame->hd.type)
-                            << ", lib_error_code=" << lib_error_code << ": "
-                            << nghttp2_strerror(lib_error_code);
-  }
-  if (frame->hd.type != NGHTTP2_HEADERS ||
-      lib_error_code == NGHTTP2_ERR_STREAM_CLOSED ||
-      lib_error_code == NGHTTP2_ERR_STREAM_CLOSING) {
-    return 0;
-  }
-
-  auto sd = static_cast<StreamData *>(
-    nghttp2_session_get_stream_user_data(session, frame->hd.stream_id));
-  if (!sd) {
-    return 0;
-  }
-  if (!sd->dconn) {
-    return 0;
-  }
   auto downstream = sd->dconn->get_downstream();
+  auto body = downstream->get_request_buf();
 
-  if (lib_error_code == NGHTTP2_ERR_START_STREAM_NOT_ALLOWED) {
-    // Migrate to another downstream connection.
-    auto upstream = downstream->get_upstream();
+  body->drain(len);
 
-    if (!upstream->on_downstream_reset(downstream, false)) {
-      // This should be done for h1 upstream only.  Deleting
-      // ClientHandler for h2 upstream may lead to crash.
-      delete upstream->get_client_handler();
-    }
+  if (body->rleft()) {
+    downstream->reset_downstream_wtimer();
+  } else {
+    downstream->disable_downstream_wtimer();
+  }
 
+  downstream->reset_downstream_rtimer();
+
+  auto upstream = downstream->get_upstream();
+
+  // This is important because it will handle flow control stuff.
+  if (!upstream->resume_read(SHRPX_NO_BUFFER, downstream, len)) {
+    // In this case, downstream may be deleted.
+    nghttp2_conn_shutdown_stream(conn, 0x00, stream_id, NGHTTP2_INTERNAL_ERROR);
     return 0;
   }
 
-  // To avoid stream hanging around, flag DownstreamState::MSG_RESET.
-  downstream->set_response_state(DownstreamState::MSG_RESET);
-  call_downstream_readcb(http2session, downstream);
+  // Here sd->dconn could be nullptr, because Upstream::resume_read()
+  // may delete downstream which will delete dconn.  Is this still
+  // really true?
 
   return 0;
 }
 } // namespace
-
-constexpr auto PADDING = std::array<uint8_t, 256>{};
-
-namespace {
-int send_data_callback(nghttp2_session *session, nghttp2_frame *frame,
-                       const uint8_t *framehd, size_t length,
-                       nghttp2_data_source *source, void *user_data) {
-  auto http2session = static_cast<Http2Session *>(user_data);
-  auto sd = static_cast<StreamData *>(
-    nghttp2_session_get_stream_user_data(session, frame->hd.stream_id));
-
-  if (sd == nullptr) {
-    return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
-  }
-
-  auto dconn = sd->dconn;
-  auto downstream = dconn->get_downstream();
-  auto input = downstream->get_request_buf();
-  auto wb = http2session->get_request_buf();
-
-  size_t padlen = 0;
-
-  wb->append(framehd, 9);
-  if (frame->data.padlen > 0) {
-    padlen = frame->data.padlen - 1;
-    wb->append(static_cast<char>(padlen));
-  }
-
-  input->remove(*wb, length);
-
-  wb->append(PADDING.data(), padlen);
-
-  if (input->rleft() == 0) {
-    downstream->disable_downstream_wtimer();
-  } else {
-    downstream->reset_downstream_wtimer();
-  }
-
-  if (length > 0) {
-    // This is important because it will handle flow control
-    // stuff.
-    if (!downstream->get_upstream()->resume_read(SHRPX_NO_BUFFER, downstream,
-                                                 length)) {
-      // In this case, downstream may be deleted.
-      return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
-    }
-
-    // Here sd->dconn could be nullptr, because
-    // Upstream::resume_read() may delete downstream which will delete
-    // dconn.  Is this still really true?
-  }
-
-  return 0;
-}
-} // namespace
-
-nghttp2_session_callbacks *create_http2_downstream_callbacks() {
-  int rv;
-  nghttp2_session_callbacks *callbacks;
-
-  rv = nghttp2_session_callbacks_new(&callbacks);
-
-  if (rv != 0) {
-    return nullptr;
-  }
-
-  nghttp2_session_callbacks_set_on_stream_close_callback(
-    callbacks, on_stream_close_callback);
-
-  nghttp2_session_callbacks_set_on_frame_recv_callback(callbacks,
-                                                       on_frame_recv_callback);
-
-  nghttp2_session_callbacks_set_on_data_chunk_recv_callback(
-    callbacks, on_data_chunk_recv_callback);
-
-  nghttp2_session_callbacks_set_on_frame_send_callback(callbacks,
-                                                       on_frame_send_callback);
-
-  nghttp2_session_callbacks_set_on_frame_not_send_callback(
-    callbacks, on_frame_not_send_callback);
-
-  nghttp2_session_callbacks_set_on_header_callback2(callbacks,
-                                                    on_header_callback2);
-
-  nghttp2_session_callbacks_set_on_invalid_header_callback2(
-    callbacks, on_invalid_header_callback2);
-
-  nghttp2_session_callbacks_set_on_begin_headers_callback(
-    callbacks, on_begin_headers_callback);
-
-  nghttp2_session_callbacks_set_send_data_callback(callbacks,
-                                                   send_data_callback);
-
-  if (get_config()->padding) {
-    nghttp2_session_callbacks_set_select_padding_callback2(
-      callbacks, http::select_padding_callback);
-  }
-
-  nghttp2_session_callbacks_set_rand_callback(callbacks, util::secure_random);
-
-  return callbacks;
-}
 
 std::expected<void, Error> Http2Session::connection_made() {
-  int rv;
-
   state_ = Http2SessionState::CONNECTED;
 
   on_write_ = &Http2Session::downstream_write;
@@ -1557,46 +1267,38 @@ std::expected<void, Error> Http2Session::connection_made() {
   auto config = get_config();
   auto &http2conf = config->http2;
 
-  rv = nghttp2_session_client_new2(&session_, http2conf.downstream.callbacks,
-                                   this, http2conf.downstream.option);
+  static constexpr auto callbacks = nghttp2_callbacks{
+    .rand = util::secure_random,
+    .recv_settings = recv_settings,
+    .stream_close = stream_close,
+    .write_stream_data_offset = write_stream_data_offset,
+    .begin_headers = begin_headers,
+    .recv_header = recv_header,
+    .end_headers = end_headers,
+    .recv_trailer = recv_trailer,
+    .recv_data = recv_data,
+    .remote_end_stream = remote_end_stream,
+    .recv_ping_ack = recv_ping_ack,
+    .shutdown = http2_shutdown,
+  };
 
-  if (rv != 0) {
-    return std::unexpected{Error::HTTP2};
-  }
+  nghttp2_settings settings;
+  nghttp2_settings_default(&settings);
 
-  std::array<nghttp2_settings_entry, 5> entry;
-  size_t nentry = 4;
-  entry[0].settings_id = NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS;
-  entry[0].value =
-    static_cast<uint32_t>(http2conf.downstream.max_concurrent_streams);
+  settings.settings_timeout = static_cast<nghttp2_duration>(
+    std::chrono::floor<std::chrono::nanoseconds>(
+      util::duration_from(http2conf.downstream.timeout.settings))
+      .count());
+  settings.initial_max_stream_data =
+    as_unsigned(http2conf.downstream.window_size);
+  settings.initial_max_data =
+    as_unsigned(http2conf.downstream.connection_window_size);
+  settings.hpack_max_dtable_capacity =
+    http2conf.downstream.decoder_dynamic_table_size;
 
-  entry[1].settings_id = NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE;
-  entry[1].value = as_unsigned(http2conf.downstream.window_size);
-
-  entry[2].settings_id = NGHTTP2_SETTINGS_NO_RFC7540_PRIORITIES;
-  entry[2].value = 1;
-
-  entry[3].settings_id = NGHTTP2_SETTINGS_ENABLE_PUSH;
-  entry[3].value = 0;
-
-  if (http2conf.downstream.decoder_dynamic_table_size !=
-      NGHTTP2_DEFAULT_HEADER_TABLE_SIZE) {
-    entry[nentry].settings_id = NGHTTP2_SETTINGS_HEADER_TABLE_SIZE;
-    entry[nentry].value =
-      static_cast<uint32_t>(http2conf.downstream.decoder_dynamic_table_size);
-    ++nentry;
-  }
-
-  rv =
-    nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, entry.data(), nentry);
-  if (rv != 0) {
-    return std::unexpected{Error::HTTP2};
-  }
-
-  rv = nghttp2_session_set_local_window_size(
-    session_, NGHTTP2_FLAG_NONE, 0,
-    http2conf.downstream.connection_window_size);
-  if (rv != 0) {
+  if (auto rv =
+        nghttp2_conn_client_new(&h2conn_, &callbacks, &settings, NULL, this);
+      rv != 0) {
     return std::unexpected{Error::HTTP2};
   }
 
@@ -1618,23 +1320,68 @@ Http2Session::on_read(std::span<const uint8_t> data) {
   return on_read_(*this, data);
 }
 
-std::expected<void, Error> Http2Session::on_write() { return on_write_(*this); }
+std::expected<void, Error> Http2Session::on_write() {
+  if (auto rv = on_write_(*this); !rv) {
+    return rv;
+  }
+
+  reset_http2_timer();
+
+  return {};
+}
+
+void Http2Session::reset_http2_timer() {
+  if (!h2conn_) {
+    return;
+  }
+
+  auto expiry = nghttp2_conn_get_expiry(h2conn_);
+  if (expiry == UINT64_MAX) {
+    if (ev_is_active(&http2_timer_)) {
+      ev_timer_stop(conn_.loop, &http2_timer_);
+    }
+
+    return;
+  }
+
+  auto now = util::timestamp();
+
+  if (expiry <= now) {
+    ev_feed_event(conn_.loop, &http2_timer_, EV_TIMER);
+
+    return;
+  }
+
+  auto t = static_cast<ev_tstamp>(expiry - now) / NGHTTP2_SECONDS;
+
+  http2_timer_.repeat = t;
+  ev_timer_again(conn_.loop, &http2_timer_);
+}
+
+void Http2Session::handle_http2_timeout() {
+  ev_timer_stop(conn_.loop, &http2_timer_);
+
+  auto rv = nghttp2_conn_handle_expiry(h2conn_, util::timestamp());
+  if (rv != 0) {
+    Log{ERROR, this} << "nghttp2_conn_handle_expiry() returned error: "
+                     << nghttp2_strerror(rv);
+
+    downstream_failure(addr_, raddr_);
+    terminate_session(nghttp2_err_infer_http2_error_code(rv));
+  }
+
+  signal_write();
+}
 
 std::expected<void, Error>
 Http2Session::downstream_read(std::span<const uint8_t> data) {
-  auto rv = nghttp2_session_mem_recv2(session_, data.data(), data.size());
-  if (rv < 0) {
-    Log{ERROR, this} << "nghttp2_session_mem_recv2() returned error: "
-                     << nghttp2_strerror(static_cast<int>(rv));
-    return std::unexpected{Error::HTTP2};
-  }
+  auto rv =
+    nghttp2_conn_read(h2conn_, data.data(), data.size(), util::timestamp());
+  if (rv != 0) {
+    Log{ERROR, this} << "nghttp2_conn_read() returned error: "
+                     << nghttp2_strerror(rv);
 
-  if (nghttp2_session_want_read(session_) == 0 &&
-      nghttp2_session_want_write(session_) == 0 && wb_.rleft() == 0) {
-    if (log_enabled(INFO)) {
-      Log{INFO, this} << "No more read/write for this HTTP2 session";
-    }
-    return std::unexpected{Error::DONE};
+    return std::unexpected{Error::HTTP2};
   }
 
   signal_write();
@@ -1642,33 +1389,25 @@ Http2Session::downstream_read(std::span<const uint8_t> data) {
 }
 
 std::expected<void, Error> Http2Session::downstream_write() {
-  for (;;) {
-    const uint8_t *data;
-    auto datalen = nghttp2_session_mem_send2(session_, &data);
-    if (datalen < 0) {
-      Log{ERROR, this} << "nghttp2_session_mem_send2() returned error: "
-                       << nghttp2_strerror(static_cast<int>(datalen));
-      return std::unexpected{Error::HTTP2};
-    }
-    if (datalen == 0) {
-      break;
-    }
-    wb_.append(data, as_unsigned(datalen));
-
-    if (wb_.rleft() >= MAX_BUFFER_SIZE) {
-      break;
-    }
+  if (wb_.rleft()) {
+    return {};
   }
 
-  if (nghttp2_session_want_read(session_) == 0 &&
-      nghttp2_session_want_write(session_) == 0 && wb_.rleft() == 0) {
-    if (log_enabled(INFO)) {
-      Log{INFO, this} << "No more read/write for this session";
-    }
-    return std::unexpected{Error::DONE};
-  }
+  return wb_.append_or_error(
+    16_k, [this](std::span<uint8_t> dest) -> std::expected<size_t, Error> {
+      auto nwrite = nghttp2_conn_write(h2conn_, dest.data(), dest.size(),
+                                       util::timestamp());
+      if (nwrite < 0) {
+        if (nwrite != NGHTTP2_ERR_CLOSING) {
+          Log{ERROR, this} << "nghttp2_conn_write() returned error: "
+                           << nghttp2_strerror(static_cast<int>(nwrite));
+        }
 
-  return {};
+        return std::unexpected{Error::HTTP2};
+      }
+
+      return as_unsigned(nwrite);
+    });
 }
 
 void Http2Session::signal_write() {
@@ -1701,30 +1440,29 @@ Http2SessionState Http2Session::get_state() const { return state_; }
 
 void Http2Session::set_state(Http2SessionState state) { state_ = state; }
 
-std::expected<void, Error>
-Http2Session::terminate_session(uint32_t error_code) {
-  int rv;
-  rv = nghttp2_session_terminate_session(session_, error_code);
-  if (rv != 0) {
-    return std::unexpected{Error::HTTP2};
-  }
-  return {};
+void Http2Session::terminate_session(uint32_t error_code) {
+  nghttp2_conn_terminate(h2conn_, error_code);
 }
 
 SSL *Http2Session::get_ssl() const { return conn_.tls.ssl; }
 
-std::expected<void, Error> Http2Session::consume(int32_t stream_id,
+std::expected<void, Error> Http2Session::consume(int64_t stream_id,
                                                  size_t len) {
-  int rv;
-
-  if (!session_) {
+  if (!h2conn_) {
     return {};
   }
 
-  rv = nghttp2_session_consume(session_, stream_id, len);
+  if (auto rv = nghttp2_conn_extend_max_stream_offset(h2conn_, stream_id, len);
+      rv != 0) {
+    Log{WARN, this}
+      << "nghttp2_conn_extend_max_stream_offset() returned error: "
+      << nghttp2_strerror(rv);
 
-  if (rv != 0) {
-    Log{WARN, this} << "nghttp2_session_consume() returned error: "
+    return std::unexpected{Error::HTTP2};
+  }
+
+  if (auto rv = nghttp2_conn_extend_max_offset(h2conn_, len); rv != 0) {
+    Log{WARN, this} << "nghttp2_conn_extend_max_offset() returned error: "
                     << nghttp2_strerror(rv);
 
     return std::unexpected{Error::HTTP2};
@@ -1750,7 +1488,13 @@ void Http2Session::start_checking_connection() {
   Log{INFO, this} << "Start checking connection";
   // If connection is down, we may get error when writing data.  Issue
   // ping frame to see whether connection is alive.
-  nghttp2_submit_ping(session_, NGHTTP2_FLAG_NONE, nullptr);
+  nghttp2_ping_data data;
+  util::secure_random(data.data, sizeof(data.data));
+
+  if (auto rv = nghttp2_conn_submit_ping(h2conn_, &data); rv != 0) {
+    Log{WARN, this} << "nghttp2_conn_submit_ping() returned error: "
+                    << nghttp2_strerror(rv);
+  }
 
   // set ping timeout and start timer again
   reset_connection_check_timer(CONNCHK_PING_TIMEOUT);
@@ -2072,16 +1816,15 @@ DownstreamAddr *Http2Session::get_addr() const { return addr_; }
 size_t Http2Session::get_num_dconns() const { return dconns_.size(); }
 
 bool Http2Session::max_concurrency_reached(size_t extra) const {
-  if (!session_) {
+  if (!h2conn_) {
     return dconns_.size() + extra >= 100;
   }
 
   // If session does not allow further requests, it effectively means
   // that maximum concurrency is reached.
-  return !nghttp2_session_check_request_allowed(session_) ||
+  return nghttp2_conn_get_streams_left(h2conn_) == 0 ||
          dconns_.size() + extra >=
-           nghttp2_session_get_remote_settings(
-             session_, NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS);
+           nghttp2_conn_get_remote_settings(h2conn_)->max_concurrent_streams;
 }
 
 const std::shared_ptr<DownstreamAddrGroup> &
@@ -2154,13 +1897,11 @@ void Http2Session::check_retire() {
 
   ev_prepare_stop(conn_.loop, &prep_);
 
-  if (!session_) {
+  if (!h2conn_) {
     return;
   }
 
-  auto last_stream_id = nghttp2_session_get_last_proc_stream_id(session_);
-  nghttp2_submit_goaway(session_, NGHTTP2_FLAG_NONE, last_stream_id,
-                        NGHTTP2_NO_ERROR, nullptr, 0);
+  nghttp2_conn_shutdown(h2conn_);
 
   signal_write();
 }
@@ -2168,7 +1909,7 @@ void Http2Session::check_retire() {
 const Address *Http2Session::get_raddr() const { return raddr_; }
 
 std::expected<void, Error>
-Http2Session::on_settings_received(const nghttp2_frame *frame) {
+Http2Session::on_settings_received(const nghttp2_proto_settings *settings) {
   // TODO This effectively disallows nghttpx to change its behaviour
   // based on the 2nd SETTINGS.
   if (settings_recved_) {
@@ -2176,14 +1917,7 @@ Http2Session::on_settings_received(const nghttp2_frame *frame) {
   }
 
   settings_recved_ = true;
-
-  for (size_t i = 0; i < frame->settings.niv; ++i) {
-    auto &ent = frame->settings.iv[i];
-    if (ent.settings_id == NGHTTP2_SETTINGS_ENABLE_CONNECT_PROTOCOL) {
-      allow_connect_proto_ = true;
-      break;
-    }
-  }
+  allow_connect_proto_ = settings->enable_connect_protocol;
 
   return submit_pending_requests();
 }

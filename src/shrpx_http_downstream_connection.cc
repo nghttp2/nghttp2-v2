@@ -541,14 +541,14 @@ std::expected<void, Error> HttpDownstreamConnection::push_request_headers() {
 
     buf->append("Upgrade: websocket\r\nConnection: Upgrade\r\n"sv);
   } else if (!connect_method && req.upgrade_request) {
-    auto connection = req.fs.header(http2::HD_CONNECTION);
+    auto connection = req.fs.header(NGHTTP2_HPACK_TOKEN_CONNECTION);
     if (connection) {
       buf->append("Connection: "sv);
       buf->append((*connection).value);
       buf->append("\r\n"sv);
     }
 
-    auto upgrade = req.fs.header(http2::HD_UPGRADE);
+    auto upgrade = req.fs.header(NGHTTP2_HPACK_TOKEN_UPGRADE);
     if (upgrade) {
       buf->append("Upgrade: "sv);
       buf->append((*upgrade).value);
@@ -572,8 +572,9 @@ std::expected<void, Error> HttpDownstreamConnection::push_request_headers() {
        // defined(NGHTTP2_OPENSSL_IS_BORINGSSL) ||
        // defined(NGHTTP2_OPENSSL_IS_WOLFSSL)
 
-  auto fwd =
-    fwdconf.strip_incoming ? nullptr : req.fs.header(http2::HD_FORWARDED);
+  auto fwd = fwdconf.strip_incoming
+               ? nullptr
+               : req.fs.header(NGHTTP2_HPACK_TOKEN_FORWARDED);
 
   if (fwdconf.params) {
     auto params = fwdconf.params;
@@ -604,8 +605,9 @@ std::expected<void, Error> HttpDownstreamConnection::push_request_headers() {
     buf->append("\r\n"sv);
   }
 
-  auto xff =
-    xffconf.strip_incoming ? nullptr : req.fs.header(http2::HD_X_FORWARDED_FOR);
+  auto xff = xffconf.strip_incoming
+               ? nullptr
+               : req.fs.header(NGHTTP2_HPACK_TOKEN_X_FORWARDED_FOR);
 
   if (xffconf.add) {
     buf->append("X-Forwarded-For: "sv);
@@ -623,7 +625,7 @@ std::expected<void, Error> HttpDownstreamConnection::push_request_headers() {
   if (!config->http2_proxy && !connect_method) {
     auto xfp = xfpconf.strip_incoming
                  ? nullptr
-                 : req.fs.header(http2::HD_X_FORWARDED_PROTO);
+                 : req.fs.header(NGHTTP2_HPACK_TOKEN_X_FORWARDED_PROTO);
 
     if (xfpconf.add) {
       buf->append("X-Forwarded-Proto: "sv);
@@ -640,7 +642,7 @@ std::expected<void, Error> HttpDownstreamConnection::push_request_headers() {
       buf->append("\r\n"sv);
     }
   }
-  auto via = req.fs.header(http2::HD_VIA);
+  auto via = req.fs.header(NGHTTP2_HPACK_TOKEN_VIA);
   if (httpconf.no_via) {
     if (via) {
       buf->append("Via: "sv);
@@ -924,7 +926,7 @@ int htp_hdrs_completecb(llhttp_t *htp) {
   for (auto &kv : resp.fs.headers()) {
     kv.value = util::rstrip(balloc, kv.value);
 
-    if (kv.token == http2::HD_TRANSFER_ENCODING &&
+    if (kv.token == NGHTTP2_HPACK_TOKEN_TRANSFER_ENCODING &&
         !http2::check_transfer_encoding(kv.value)) {
       return -1;
     }
@@ -953,7 +955,7 @@ int htp_hdrs_completecb(llhttp_t *htp) {
   // code 2xx to a CONNECT request.  Same holds true with
   // Content-Length.
   if (resp.http_status == 204) {
-    if (resp.fs.header(http2::HD_TRANSFER_ENCODING)) {
+    if (resp.fs.header(NGHTTP2_HPACK_TOKEN_TRANSFER_ENCODING)) {
       return -1;
     }
     // Some server send content-length: 0 for 204.  Until they get
@@ -1011,7 +1013,8 @@ int htp_hdrs_completecb(llhttp_t *htp) {
     downstream->set_chunked_response(true);
   }
 
-  auto transfer_encoding = resp.fs.header(http2::HD_TRANSFER_ENCODING);
+  auto transfer_encoding =
+    resp.fs.header(NGHTTP2_HPACK_TOKEN_TRANSFER_ENCODING);
   if (transfer_encoding && !downstream->get_chunked_response()) {
     resp.connection_close = true;
   }

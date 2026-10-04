@@ -57,7 +57,7 @@
 
 #include <ev.h>
 
-#include <nghttp2/nghttp2.h>
+#include <nghttp2v2/nghttp2.h>
 
 #include "shrpx_log.h"
 #include "shrpx_router.h"
@@ -919,9 +919,6 @@ struct Http2Config {
     struct {
       ev_tstamp settings;
     } timeout;
-    nghttp2_option *option;
-    nghttp2_option *alt_mode_option;
-    nghttp2_session_callbacks *callbacks;
     size_t max_concurrent_streams;
     size_t encoder_dynamic_table_size;
     size_t decoder_dynamic_table_size;
@@ -934,8 +931,6 @@ struct Http2Config {
     struct {
       ev_tstamp settings;
     } timeout;
-    nghttp2_option *option;
-    nghttp2_session_callbacks *callbacks;
     size_t encoder_dynamic_table_size;
     size_t decoder_dynamic_table_size;
     int32_t window_size;

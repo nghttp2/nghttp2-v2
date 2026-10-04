@@ -127,7 +127,8 @@ mrb_value response_mod_header(mrb_state *mrb, mrb_value self, bool repl) {
 
   mrb_gc_arena_restore(mrb, ai);
 
-  auto token = http2::lookup_token(keyref);
+  auto token = nghttp2_hpack_lookup_token(
+    reinterpret_cast<const uint8_t *>(keyref.data()), keyref.size());
 
   if (repl) {
     size_t p = 0;
@@ -225,7 +226,7 @@ mrb_value response_return(mrb_state *mrb, mrb_value self) {
     body = as_uint8_span(std::span{val, as_unsigned(vallen)});
   }
 
-  auto cl = resp.fs.header(http2::HD_CONTENT_LENGTH);
+  auto cl = resp.fs.header(NGHTTP2_HPACK_TOKEN_CONTENT_LENGTH);
 
   if (resp.http_status == 204 ||
       (resp.http_status == 200 && req.method == HTTP_CONNECT)) {
@@ -242,19 +243,19 @@ mrb_value response_return(mrb_state *mrb, mrb_value self) {
       cl->value = content_length;
     } else {
       resp.fs.add_header_token("content-length"sv, content_length, false,
-                               http2::HD_CONTENT_LENGTH);
+                               NGHTTP2_HPACK_TOKEN_CONTENT_LENGTH);
     }
 
     resp.fs.content_length = static_cast<int64_t>(body.size());
   }
 
-  auto date = resp.fs.header(http2::HD_DATE);
+  auto date = resp.fs.header(NGHTTP2_HPACK_TOKEN_DATE);
   if (!date) {
     auto lgconf = log_config();
     lgconf->update_tstamp(std::chrono::system_clock::now());
     resp.fs.add_header_token("date"sv,
                              make_string_ref(balloc, lgconf->tstamp->time_http),
-                             false, http2::HD_DATE);
+                             false, NGHTTP2_HPACK_TOKEN_DATE);
   }
 
   auto upstream = downstream->get_upstream();
@@ -313,7 +314,8 @@ mrb_value response_send_info(mrb_state *mrb, mrb_value self) {
 
     mrb_gc_arena_restore(mrb, ai);
 
-    auto token = http2::lookup_token(keyref);
+    auto token = nghttp2_hpack_lookup_token(
+      reinterpret_cast<const uint8_t *>(keyref.data()), keyref.size());
 
     if (mrb_array_p(values)) {
       auto n = RARRAY_LEN(values);

@@ -86,7 +86,7 @@
 #endif // !defined(NGHTTP2_OPENSSL_IS_WOLFSSL)
 #include <ev.h>
 
-#include <nghttp2/nghttp2.h>
+#include <nghttp2v2/nghttp2.h>
 
 #ifdef ENABLE_HTTP3
 #  include <ngtcp2/ngtcp2.h>
@@ -1711,23 +1711,6 @@ void fill_default_config(Config *config) {
 
     upstreamconf.encoder_dynamic_table_size = 4_k;
     upstreamconf.decoder_dynamic_table_size = 4_k;
-
-    nghttp2_option_new(&upstreamconf.option);
-    nghttp2_option_set_no_auto_window_update(upstreamconf.option, 1);
-    nghttp2_option_set_no_recv_client_magic(upstreamconf.option, 1);
-    nghttp2_option_set_max_deflate_dynamic_table_size(
-      upstreamconf.option, upstreamconf.encoder_dynamic_table_size);
-    nghttp2_option_set_server_fallback_rfc7540_priorities(upstreamconf.option,
-                                                          1);
-    nghttp2_option_set_builtin_recv_extension_type(upstreamconf.option,
-                                                   NGHTTP2_PRIORITY_UPDATE);
-
-    // For API endpoint, we enable automatic window update.  This is
-    // because we are a sink.
-    nghttp2_option_new(&upstreamconf.alt_mode_option);
-    nghttp2_option_set_no_recv_client_magic(upstreamconf.alt_mode_option, 1);
-    nghttp2_option_set_max_deflate_dynamic_table_size(
-      upstreamconf.alt_mode_option, upstreamconf.encoder_dynamic_table_size);
   }
 
   {
@@ -1744,12 +1727,6 @@ void fill_default_config(Config *config) {
 
     downstreamconf.encoder_dynamic_table_size = 4_k;
     downstreamconf.decoder_dynamic_table_size = 4_k;
-
-    nghttp2_option_new(&downstreamconf.option);
-    nghttp2_option_set_no_auto_window_update(downstreamconf.option, 1);
-    nghttp2_option_set_peer_max_concurrent_streams(downstreamconf.option, 100);
-    nghttp2_option_set_max_deflate_dynamic_table_size(
-      downstreamconf.option, downstreamconf.encoder_dynamic_table_size);
   }
 
 #ifdef ENABLE_HTTP3
@@ -3756,18 +3733,6 @@ std::expected<void, Error> process_options(
     *p = '\0';
     fwdconf.by_obfuscated = as_string_view(std::ranges::begin(iov), p);
   }
-
-  if (config->http2.upstream.debug.frame_debug) {
-    // To make it sync to logging
-    set_output(stderr);
-    if (isatty(fileno(stdout))) {
-      set_color_output(true);
-    }
-    reset_timer();
-  }
-
-  config->http2.upstream.callbacks = create_http2_upstream_callbacks();
-  config->http2.downstream.callbacks = create_http2_downstream_callbacks();
 
   if (!config->http.altsvcs.empty()) {
     config->http.altsvc_header_value =

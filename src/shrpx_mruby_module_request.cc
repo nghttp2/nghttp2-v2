@@ -238,7 +238,8 @@ mrb_value request_mod_header(mrb_state *mrb, mrb_value self, bool repl) {
 
   mrb_gc_arena_restore(mrb, ai);
 
-  auto token = http2::lookup_token(keyref);
+  auto token = nghttp2_hpack_lookup_token(
+    reinterpret_cast<const uint8_t *>(keyref.data()), keyref.size());
 
   if (repl) {
     size_t p = 0;
