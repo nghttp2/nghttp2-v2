@@ -321,6 +321,26 @@ void run_test(nghttp2_conn *conn, FuzzedDataProvider &fdp) {
     if (fdp.ConsumeBool()) {
       auto stream_id = static_cast<int64_t>(
         fdp.ConsumeIntegralInRange<int32_t>(0, INT32_MAX) | 0x1);
+      auto len = fdp.ConsumeIntegral<size_t>();
+
+      auto rv = nghttp2_conn_extend_max_stream_offset(conn, stream_id, len);
+      if (nghttp2_err_is_fatal(rv)) {
+        return;
+      }
+    }
+
+    if (fdp.ConsumeBool()) {
+      auto len = fdp.ConsumeIntegral<size_t>();
+
+      auto rv = nghttp2_conn_extend_max_offset(conn, len);
+      if (nghttp2_err_is_fatal(rv)) {
+        return;
+      }
+    }
+
+    if (fdp.ConsumeBool()) {
+      auto stream_id = static_cast<int64_t>(
+        fdp.ConsumeIntegralInRange<int32_t>(0, INT32_MAX) | 0x1);
 
       nghttp2_conn_shutdown_stream(conn, 0x00, stream_id, NGHTTP2_NO_ERROR);
     }
