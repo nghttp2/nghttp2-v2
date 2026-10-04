@@ -82,5 +82,6 @@ munit_void_test_decl(test_nghttp2_conn_is_server)
 munit_void_test_decl(test_nghttp2_conn_get_timestamp)
 munit_void_test_decl(test_nghttp2_conn_get_stream_priority)
 munit_void_test_decl(test_nghttp2_conn_set_stream_user_data)
+munit_void_test_decl(test_nghttp2_conn_get_settings)
 
 #endif /* !defined(NGHTTP2_CONN_TEST_H) */

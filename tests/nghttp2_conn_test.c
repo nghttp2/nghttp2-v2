@@ -82,6 +82,7 @@ static const MunitTest tests[] = {
   munit_void_test(test_nghttp2_conn_get_timestamp),
   munit_void_test(test_nghttp2_conn_get_stream_priority),
   munit_void_test(test_nghttp2_conn_set_stream_user_data),
+  munit_void_test(test_nghttp2_conn_get_settings),
   munit_test_end(),
 };
 
@@ -15720,6 +15721,20 @@ void test_nghttp2_conn_set_stream_user_data(void) {
   rv = nghttp2_conn_set_stream_user_data(conn, 0x03, &rv);
 
   assert_int(NGHTTP2_ERR_STREAM_NOT_FOUND, ==, rv);
+
+  nghttp2_conn_del(conn);
+}
+
+void test_nghttp2_conn_get_settings(void) {
+  nghttp2_conn *conn;
+  const nghttp2_settings *settings;
+
+  setup_default_server(&conn);
+
+  settings = nghttp2_conn_get_settings(conn);
+
+  assert_uint32(100, ==, settings->max_concurrent_streams_remote);
+  assert_ptr_equal(log_write, settings->log_write);
 
   nghttp2_conn_del(conn);
 }
