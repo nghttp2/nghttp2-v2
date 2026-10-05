@@ -3893,3 +3893,8 @@ size_t nghttp2_conn_get_headers_field_blocklen(const nghttp2_conn *conn) {
 
   return conn->rx.frrd.fr.headers.field_blocklen;
 }
+
+const nghttp2_proto_settings *
+nghttp2_conn_get_remote_settings(const nghttp2_conn *conn) {
+  return &conn->remote.settings;
+}

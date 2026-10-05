@@ -84,6 +84,7 @@ static const MunitTest tests[] = {
   munit_void_test(test_nghttp2_conn_set_stream_user_data),
   munit_void_test(test_nghttp2_conn_get_settings),
   munit_void_test(test_nghttp2_conn_get_headers_field_blocklen),
+  munit_void_test(test_nghttp2_conn_get_remote_settings),
   munit_test_end(),
 };
 
@@ -15898,4 +15899,34 @@ void test_nghttp2_conn_get_headers_field_blocklen(void) {
   nghttp2_conn_del(conn);
 
   nghttp2_buf_free(&hbuf, mem);
+}
+
+void test_nghttp2_conn_get_remote_settings(void) {
+  static const nghttp2_settings_entry iv[] = {
+    {
+      .id = NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS,
+      .value = 10,
+    },
+  };
+  nghttp2_conn *conn;
+  nghttp2_settings settings;
+  nghttp2_tstamp ts = 0;
+  const nghttp2_proto_settings *remote_settings;
+  conn_options opts;
+
+  client_default_settings(&settings);
+  settings.max_concurrent_streams_local = 100;
+
+  opts = (conn_options){
+    .settings = &settings,
+  };
+
+  setup_default_client_with_options(&conn, opts);
+  read_server_preface(conn, iv, nghttp2_arraylen(iv), ts);
+
+  remote_settings = nghttp2_conn_get_remote_settings(conn);
+
+  assert_uint32(10, ==, remote_settings->max_concurrent_streams);
+
+  nghttp2_conn_del(conn);
 }

@@ -2040,6 +2040,17 @@ NGHTTP2_EXTERN size_t
 nghttp2_conn_get_headers_field_blocklen(const nghttp2_conn *conn);
 
 /**
+ * @function
+ *
+ * `nghttp2_conn_get_remote_settings` returns the latest remote
+ * settings.  Before getting SETTINGS frame from the remote endpoint,
+ * it is synthesized from the protocol defaults and the local
+ * settings.
+ */
+NGHTTP2_EXTERN const nghttp2_proto_settings *
+nghttp2_conn_get_remote_settings(const nghttp2_conn *conn);
+
+/**
  * @macrosection
  *
  * HTTP stream priority flags
