@@ -2184,7 +2184,6 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
     case NGHTTP2_FRAME_READ_STATE_DATA_DATA:
       len = nghttp2_min(frrd->field_left, (size_t)(end - p));
 
-      p += len;
       frrd->field_left -= len;
       frrd->left -= len;
 
@@ -2192,6 +2191,8 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
       if (rv != 0) {
         return nghttp2_conn_handle_error(conn, rv);
       }
+
+      p += len;
 
       if (frrd->field_left) {
         return 0;
