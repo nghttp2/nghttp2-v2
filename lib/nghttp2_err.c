@@ -66,6 +66,8 @@ const char *nghttp2_strerror(int liberr) {
     return "ERR_STREAM_NOT_FOUND";
   case NGHTTP2_ERR_STREAM_STATE:
     return "ERR_STREAM_STATE";
+  case NGHTTP2_ERR_STOP_READING:
+    return "ERR_STOP_READING";
   case NGHTTP2_ERR_CLOSING:
     return "ERR_CLOSING";
   case NGHTTP2_ERR_DRAINING:
