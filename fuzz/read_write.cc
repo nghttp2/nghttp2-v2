@@ -160,8 +160,10 @@ std::tuple<nghttp2_conn *, bool> setup_conn(FuzzedDataProvider &fdp,
   settings.hpack_encoder_max_dtable_capacity = fdp.ConsumeIntegral<size_t>();
   settings.max_concurrent_streams_local = fdp.ConsumeIntegral<uint32_t>();
   settings.max_concurrent_streams_remote = fdp.ConsumeIntegral<uint32_t>();
-  settings.initial_max_stream_data = fdp.ConsumeIntegral<uint32_t>();
-  settings.initial_max_data = fdp.ConsumeIntegral<uint32_t>();
+  settings.initial_max_stream_data =
+    fdp.ConsumeIntegralInRange<size_t>(0, std::numeric_limits<int32_t>::max());
+  settings.initial_max_data =
+    fdp.ConsumeIntegralInRange<size_t>(0, std::numeric_limits<int32_t>::max());
   settings.enable_connect_protocol = fdp.ConsumeBool();
   settings.glitch_ratelim_burst = fdp.ConsumeIntegral<uint64_t>();
   settings.glitch_ratelim_rate = fdp.ConsumeIntegral<uint64_t>();
