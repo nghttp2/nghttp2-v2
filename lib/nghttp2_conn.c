@@ -2717,7 +2717,6 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
     case NGHTTP2_FRAME_READ_STATE_PRIORITY_UPDATE_PRI:
       len = nghttp2_min(frrd->left, (size_t)(end - p));
 
-      p += len;
       frrd->left -= len;
 
       assert(len + frrd->scratch.priority_update.prilen <=
@@ -2726,12 +2725,14 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
       if (frrd->left == 0 && frrd->scratch.priority_update.prilen == 0) {
         /* The incoming buffer contains the complete priority field
            value */
-        fr->priority_update.pri = p - len;
+        fr->priority_update.pri = p;
         fr->priority_update.prilen = len;
+        p += len;
       } else {
         memcpy(frrd->scratch.priority_update.pri +
                  frrd->scratch.priority_update.prilen,
-               p - len, len);
+               p, len);
+        p += len;
         frrd->scratch.priority_update.prilen += len;
 
         if (frrd->left) {
