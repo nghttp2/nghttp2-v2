@@ -191,7 +191,7 @@ static int conn_call_stream_open(nghttp2_conn *conn,
   return 0;
 }
 
-static int conn_call_stream_close(nghttp2_conn *conn,
+static int conn_call_stream_close(nghttp2_conn *conn, nghttp2_context ctx,
                                   const nghttp2_stream *stream) {
   uint32_t flags = NGHTTP2_STREAM_CLOSE_FLAG_NONE;
   int rv;
@@ -211,7 +211,8 @@ static int conn_call_stream_close(nghttp2_conn *conn,
     return NGHTTP2_ERR_CALLBACK_FAILURE;
   }
 
-  if (conn->rx.frrd.state == NGHTTP2_FRAME_READ_STATE_CLOSING) {
+  if (ctx.phase == NGHTTP2_PHASE_READ &&
+      conn->rx.frrd.state == NGHTTP2_FRAME_READ_STATE_CLOSING) {
     return NGHTTP2_ERR_STOP_READING;
   }
 
@@ -608,15 +609,17 @@ int nghttp2_conn_should_close_stream(const nghttp2_conn *conn,
 }
 
 int nghttp2_conn_close_stream_if_shut_rdwr(nghttp2_conn *conn,
+                                           nghttp2_context ctx,
                                            nghttp2_stream *stream) {
   if (!nghttp2_conn_should_close_stream(conn, stream)) {
     return 0;
   }
 
-  return nghttp2_conn_close_stream(conn, stream);
+  return nghttp2_conn_close_stream(conn, ctx, stream);
 }
 
-int nghttp2_conn_close_stream(nghttp2_conn *conn, nghttp2_stream *stream) {
+int nghttp2_conn_close_stream(nghttp2_conn *conn, nghttp2_context ctx,
+                              nghttp2_stream *stream) {
   int rv;
 
   /* First remove stream from conn->streams so that an application can
@@ -627,7 +630,7 @@ int nghttp2_conn_close_stream(nghttp2_conn *conn, nghttp2_stream *stream) {
   assert(0 == rv);
 
   if (!(stream->flags & NGHTTP2_STREAM_FLAG_REFUSED)) {
-    rv = conn_call_stream_close(conn, stream);
+    rv = conn_call_stream_close(conn, ctx, stream);
     /* Continue to free stream */
   }
 
@@ -646,7 +649,8 @@ static int conn_max_data_violated(nghttp2_conn *conn, size_t datalen) {
   return conn->rx.max_offset - conn->rx.offset < datalen;
 }
 
-static int conn_on_end_data(nghttp2_conn *conn, nghttp2_stream *stream,
+static int conn_on_end_data(nghttp2_conn *conn, nghttp2_context ctx,
+                            nghttp2_stream *stream,
                             const nghttp2_frame_data *fr) {
   int rv;
 
@@ -674,7 +678,7 @@ static int conn_on_end_data(nghttp2_conn *conn, nghttp2_stream *stream,
     return rv;
   }
 
-  return nghttp2_conn_close_stream_if_shut_rdwr(conn, stream);
+  return nghttp2_conn_close_stream_if_shut_rdwr(conn, ctx, stream);
 }
 
 static int conn_on_data(nghttp2_conn *conn, const nghttp2_frame_data *fr,
@@ -695,7 +699,8 @@ static int conn_on_data(nghttp2_conn *conn, const nghttp2_frame_data *fr,
   return conn_call_recv_data(conn, stream, data, datalen);
 }
 
-static int conn_recv_data(nghttp2_conn *conn, const nghttp2_frame_data *fr) {
+static int conn_recv_data(nghttp2_conn *conn, nghttp2_context ctx,
+                          const nghttp2_frame_data *fr) {
   nghttp2_stream *stream;
   int rv;
 
@@ -723,11 +728,11 @@ static int conn_recv_data(nghttp2_conn *conn, const nghttp2_frame_data *fr) {
     }
   }
 
-  return conn_on_end_data(conn, stream, fr);
+  return conn_on_end_data(conn, ctx, stream, fr);
 }
 
-static int conn_recv_data_hd(nghttp2_conn *conn, nghttp2_frame_data *fr,
-                             nghttp2_tstamp ts) {
+static int conn_recv_data_hd(nghttp2_conn *conn, nghttp2_context ctx,
+                             nghttp2_frame_data *fr, nghttp2_tstamp ts) {
   nghttp2_stream *stream;
   uint64_t end_offset;
   int rv;
@@ -818,7 +823,7 @@ static int conn_recv_data_hd(nghttp2_conn *conn, nghttp2_frame_data *fr,
     }
   }
 
-  return conn_on_end_data(conn, stream, fr);
+  return conn_on_end_data(conn, ctx, stream, fr);
 }
 
 static int conn_update_stream_priority(nghttp2_conn *conn,
@@ -839,7 +844,8 @@ static int conn_update_stream_priority(nghttp2_conn *conn,
   return 0;
 }
 
-static int conn_on_end_headers(nghttp2_conn *conn, nghttp2_stream *stream,
+static int conn_on_end_headers(nghttp2_conn *conn, nghttp2_context ctx,
+                               nghttp2_stream *stream,
                                const nghttp2_frame_headers *fr) {
   int rv;
 
@@ -921,10 +927,10 @@ static int conn_on_end_headers(nghttp2_conn *conn, nghttp2_stream *stream,
     return rv;
   }
 
-  return nghttp2_conn_close_stream_if_shut_rdwr(conn, stream);
+  return nghttp2_conn_close_stream_if_shut_rdwr(conn, ctx, stream);
 }
 
-static int conn_recv_headers(nghttp2_conn *conn,
+static int conn_recv_headers(nghttp2_conn *conn, nghttp2_context ctx,
                              const nghttp2_frame_headers *fr) {
   nghttp2_stream *stream;
   int rv;
@@ -941,11 +947,11 @@ static int conn_recv_headers(nghttp2_conn *conn,
     }
   }
 
-  return conn_on_end_headers(conn, stream, fr);
+  return conn_on_end_headers(conn, ctx, stream, fr);
 }
 
-static int conn_recv_headers_hd(nghttp2_conn *conn, nghttp2_frame_headers *fr,
-                                nghttp2_tstamp ts) {
+static int conn_recv_headers_hd(nghttp2_conn *conn, nghttp2_context ctx,
+                                nghttp2_frame_headers *fr, nghttp2_tstamp ts) {
   nghttp2_stream *stream;
   size_t num_streams;
   size_t min_len = 0;
@@ -1097,7 +1103,7 @@ static int conn_recv_headers_hd(nghttp2_conn *conn, nghttp2_frame_headers *fr,
     return rv;
   }
 
-  return conn_on_end_headers(conn, stream, fr);
+  return conn_on_end_headers(conn, ctx, stream, fr);
 }
 
 int nghttp2_conn_decode_field_block(nghttp2_conn *conn, int64_t stream_id,
@@ -1227,7 +1233,7 @@ static int conn_recv_rst_stream_hd(nghttp2_conn *conn,
   return conn_update_glitch_ratelim(conn, 1, ts);
 }
 
-static int conn_recv_rst_stream(nghttp2_conn *conn,
+static int conn_recv_rst_stream(nghttp2_conn *conn, nghttp2_context ctx,
                                 const nghttp2_frame_rst_stream *fr) {
   nghttp2_stream *stream;
 
@@ -1248,7 +1254,7 @@ static int conn_recv_rst_stream(nghttp2_conn *conn,
                    NGHTTP2_STREAM_FLAG_RST_STREAM_RECVED |
                    NGHTTP2_STREAM_FLAG_SHUT_RD | NGHTTP2_STREAM_FLAG_SHUT_WR;
 
-  return nghttp2_conn_close_stream_if_shut_rdwr(conn, stream);
+  return nghttp2_conn_close_stream_if_shut_rdwr(conn, ctx, stream);
 }
 
 static int conn_recv_settings_hd(nghttp2_conn *conn, nghttp2_frame_settings *fr,
@@ -1706,8 +1712,8 @@ static int conn_recv_priority_update(nghttp2_conn *conn,
   return conn_update_stream_priority(conn, stream, &pri);
 }
 
-static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
-                     nghttp2_tstamp ts) {
+static int conn_read(nghttp2_conn *conn, nghttp2_context ctx,
+                     const uint8_t *data, size_t datalen, nghttp2_tstamp ts) {
   const uint8_t *p, *end;
   nghttp2_int_reader *ird = &conn->rx.ird;
   nghttp2_frame_reader *frrd = &conn->rx.frrd;
@@ -1782,7 +1788,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
 
         switch (fr->meta.hd.type) {
         case NGHTTP2_FRAME_DATA:
-          rv = conn_recv_data_hd(conn, &fr->data, ts);
+          rv = conn_recv_data_hd(conn, ctx, &fr->data, ts);
           if (rv != 0) {
             return nghttp2_conn_handle_error(conn, rv);
           }
@@ -1806,7 +1812,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
               return nghttp2_conn_handle_error(conn, rv);
             }
 
-            rv = conn_recv_data(conn, &fr->data);
+            rv = conn_recv_data(conn, ctx, &fr->data);
             if (rv != 0) {
               return nghttp2_conn_handle_error(conn, rv);
             }
@@ -1828,7 +1834,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
 
           break;
         case NGHTTP2_FRAME_HEADERS:
-          rv = conn_recv_headers_hd(conn, &fr->headers, ts);
+          rv = conn_recv_headers_hd(conn, ctx, &fr->headers, ts);
           if (rv != 0) {
             return nghttp2_conn_handle_error(conn, rv);
           }
@@ -1863,7 +1869,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
             }
 
             if (fr->headers.hd.flags & NGHTTP2_HEADERS_FLAG_END_HEADERS) {
-              rv = conn_recv_headers(conn, &fr->headers);
+              rv = conn_recv_headers(conn, ctx, &fr->headers);
               if (rv != 0) {
                 return nghttp2_conn_handle_error(conn, rv);
               }
@@ -1911,7 +1917,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
 
             p += nread;
 
-            rv = conn_recv_rst_stream(conn, &fr->rst_stream);
+            rv = conn_recv_rst_stream(conn, ctx, &fr->rst_stream);
             if (rv != 0) {
               return nghttp2_conn_handle_error(conn, rv);
             }
@@ -2164,7 +2170,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
       }
 
       if (frrd->left == 0) {
-        rv = conn_recv_data(conn, &fr->data);
+        rv = conn_recv_data(conn, ctx, &fr->data);
         if (rv != 0) {
           return nghttp2_conn_handle_error(conn, rv);
         }
@@ -2199,7 +2205,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
       }
 
       if (frrd->left == 0) {
-        rv = conn_recv_data(conn, &fr->data);
+        rv = conn_recv_data(conn, ctx, &fr->data);
         if (rv != 0) {
           return nghttp2_conn_handle_error(conn, rv);
         }
@@ -2226,7 +2232,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
         return 0;
       }
 
-      rv = conn_recv_data(conn, &fr->data);
+      rv = conn_recv_data(conn, ctx, &fr->data);
       if (rv != 0) {
         return nghttp2_conn_handle_error(conn, rv);
       }
@@ -2251,7 +2257,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
 
         if (frrd->left == 0) {
           if (fr->headers.hd.flags & NGHTTP2_HEADERS_FLAG_END_HEADERS) {
-            rv = conn_recv_headers(conn, &fr->headers);
+            rv = conn_recv_headers(conn, ctx, &fr->headers);
             if (rv != 0) {
               return nghttp2_conn_handle_error(conn, rv);
             }
@@ -2289,7 +2295,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
 
       if (frrd->left == 0) {
         if (fr->headers.hd.flags & NGHTTP2_HEADERS_FLAG_END_HEADERS) {
-          rv = conn_recv_headers(conn, &fr->headers);
+          rv = conn_recv_headers(conn, ctx, &fr->headers);
           if (rv != 0) {
             return nghttp2_conn_handle_error(conn, rv);
           }
@@ -2334,7 +2340,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
         assert(fr->headers.padlen == 0);
 
         if (fr->headers.hd.flags & NGHTTP2_HEADERS_FLAG_END_HEADERS) {
-          rv = conn_recv_headers(conn, &fr->headers);
+          rv = conn_recv_headers(conn, ctx, &fr->headers);
           if (rv != 0) {
             return nghttp2_conn_handle_error(conn, rv);
           }
@@ -2367,7 +2373,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
       }
 
       if (fr->headers.hd.flags & NGHTTP2_HEADERS_FLAG_END_HEADERS) {
-        rv = conn_recv_headers(conn, &fr->headers);
+        rv = conn_recv_headers(conn, ctx, &fr->headers);
         if (rv != 0) {
           return nghttp2_conn_handle_error(conn, rv);
         }
@@ -2459,7 +2465,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
             return nghttp2_conn_handle_error(conn, rv);
           }
 
-          rv = conn_recv_headers(conn, &fr->headers);
+          rv = conn_recv_headers(conn, ctx, &fr->headers);
           if (rv != 0) {
             return nghttp2_conn_handle_error(conn, rv);
           }
@@ -2490,7 +2496,7 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
 
       fr->rst_stream.error_code = nghttp2_int_reader_final(ird);
 
-      rv = conn_recv_rst_stream(conn, &fr->rst_stream);
+      rv = conn_recv_rst_stream(conn, ctx, &fr->rst_stream);
       if (rv != 0) {
         return nghttp2_conn_handle_error(conn, rv);
       }
@@ -2778,6 +2784,9 @@ static int conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
 
 int nghttp2_conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
                       nghttp2_tstamp ts) {
+  static const nghttp2_context ctx = {
+    .phase = NGHTTP2_PHASE_READ,
+  };
   int rv;
 
   conn_update_timestamp(conn, ts);
@@ -2786,7 +2795,7 @@ int nghttp2_conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
     return 0;
   }
 
-  rv = conn_read(conn, data, datalen, ts);
+  rv = conn_read(conn, ctx, data, datalen, ts);
   if (rv == NGHTTP2_ERR_STOP_READING) {
     return 0;
   }
@@ -2794,8 +2803,8 @@ int nghttp2_conn_read(nghttp2_conn *conn, const uint8_t *data, size_t datalen,
   return rv;
 }
 
-static int conn_write(nghttp2_conn *conn, nghttp2_buf *dest,
-                      nghttp2_tstamp ts) {
+static int conn_write(nghttp2_conn *conn, nghttp2_context ctx,
+                      nghttp2_buf *dest, nghttp2_tstamp ts) {
   nghttp2_stream *stream;
   int rv;
 
@@ -2803,10 +2812,10 @@ static int conn_write(nghttp2_conn *conn, nghttp2_buf *dest,
     if (nghttp2_http_writer_frame_flow_controlled(
           &conn->sched.stream_inprogress->tx.hw)) {
       rv = nghttp2_conn_write_stream_flow_controlled(
-        conn, dest, conn->sched.stream_inprogress);
+        conn, ctx, dest, conn->sched.stream_inprogress);
     } else {
-      rv = nghttp2_conn_write_stream(conn, dest, conn->sched.stream_inprogress,
-                                     ts);
+      rv = nghttp2_conn_write_stream(conn, ctx, dest,
+                                     conn->sched.stream_inprogress, ts);
     }
 
     if (rv != 0) {
@@ -2826,7 +2835,7 @@ static int conn_write(nghttp2_conn *conn, nghttp2_buf *dest,
   for (; conn->strmq_head;) {
     stream = conn->strmq_head;
 
-    rv = nghttp2_conn_write_stream(conn, dest, stream, ts);
+    rv = nghttp2_conn_write_stream(conn, ctx, dest, stream, ts);
     if (rv != 0) {
       return rv;
     }
@@ -2848,7 +2857,7 @@ static int conn_write(nghttp2_conn *conn, nghttp2_buf *dest,
       return 0;
     }
 
-    rv = nghttp2_conn_write_stream_flow_controlled(conn, dest, stream);
+    rv = nghttp2_conn_write_stream_flow_controlled(conn, ctx, dest, stream);
     if (rv != 0) {
       return rv;
     }
@@ -2872,6 +2881,9 @@ static int conn_should_close(const nghttp2_conn *conn) {
 
 nghttp2_ssize nghttp2_conn_write(nghttp2_conn *conn, uint8_t *rawdest,
                                  size_t rawdestlen, nghttp2_tstamp ts) {
+  static const nghttp2_context ctx = {
+    .phase = NGHTTP2_PHASE_WRITE,
+  };
   nghttp2_buf dest;
   nghttp2_ssize nwrite;
 
@@ -2887,7 +2899,7 @@ nghttp2_ssize nghttp2_conn_write(nghttp2_conn *conn, uint8_t *rawdest,
 
   nghttp2_buf_wrap_init(&dest, rawdest, rawdestlen);
 
-  nwrite = conn_write(conn, &dest, ts);
+  nwrite = conn_write(conn, ctx, &dest, ts);
   if (nwrite < 0 && nwrite != NGHTTP2_ERR_NOBUF) {
     return nwrite;
   }
@@ -2913,8 +2925,9 @@ nghttp2_stream *nghttp2_conn_get_next_tx_stream(nghttp2_conn *conn) {
   return NULL;
 }
 
-int nghttp2_conn_write_stream(nghttp2_conn *conn, nghttp2_buf *dest,
-                              nghttp2_stream *stream, nghttp2_tstamp ts) {
+int nghttp2_conn_write_stream(nghttp2_conn *conn, nghttp2_context ctx,
+                              nghttp2_buf *dest, nghttp2_stream *stream,
+                              nghttp2_tstamp ts) {
   nghttp2_frame fr;
   int rv;
 
@@ -3029,7 +3042,7 @@ int nghttp2_conn_write_stream(nghttp2_conn *conn, nghttp2_buf *dest,
 
 fin:
   if (nghttp2_conn_should_close_stream(conn, stream)) {
-    return nghttp2_conn_close_stream(conn, stream);
+    return nghttp2_conn_close_stream(conn, ctx, stream);
   }
 
   if (!nghttp2_stream_require_strmq(stream)) {
@@ -3040,6 +3053,7 @@ fin:
 }
 
 int nghttp2_conn_write_stream_flow_controlled(nghttp2_conn *conn,
+                                              nghttp2_context ctx,
                                               nghttp2_buf *dest,
                                               nghttp2_stream *stream) {
   int rv;
@@ -3061,7 +3075,7 @@ int nghttp2_conn_write_stream_flow_controlled(nghttp2_conn *conn,
   }
 
   if (nghttp2_conn_should_close_stream(conn, stream)) {
-    return nghttp2_conn_close_stream(conn, stream);
+    return nghttp2_conn_close_stream(conn, ctx, stream);
   }
 
   if (nghttp2_stream_require_strmq(stream)) {

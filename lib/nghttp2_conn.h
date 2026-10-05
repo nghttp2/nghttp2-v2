@@ -77,6 +77,15 @@
 nghttp2_static_ringbuf_def(ping_data, NGHTTP2_MAX_PING_ACK,
                            sizeof(nghttp2_ping_data))
 
+typedef enum nghttp2_phase {
+  NGHTTP2_PHASE_READ,
+  NGHTTP2_PHASE_WRITE,
+} nghttp2_phase;
+
+typedef struct nghttp2_context {
+  nghttp2_phase phase;
+} nghttp2_context;
+
 struct nghttp2_conn {
   const nghttp2_mem *mem;
   nghttp2_callbacks callbacks;
@@ -192,22 +201,26 @@ int nghttp2_conn_create_stream(nghttp2_conn *conn, nghttp2_stream **pstream,
                                int64_t stream_id, void *stream_user_data);
 
 int nghttp2_conn_close_stream_if_shut_rdwr(nghttp2_conn *conn,
+                                           nghttp2_context ctx,
                                            nghttp2_stream *stream);
 
 int nghttp2_conn_should_close_stream(const nghttp2_conn *conn,
                                      const nghttp2_stream *stream);
 
-int nghttp2_conn_close_stream(nghttp2_conn *conn, nghttp2_stream *stream);
+int nghttp2_conn_close_stream(nghttp2_conn *conn, nghttp2_context ctx,
+                              nghttp2_stream *stream);
 
 int nghttp2_conn_decode_field_block(nghttp2_conn *conn, int64_t stream_id,
                                     const uint8_t *src, size_t srclen, int fin);
 
 nghttp2_stream *nghttp2_conn_get_next_tx_stream(nghttp2_conn *conn);
 
-int nghttp2_conn_write_stream(nghttp2_conn *conn, nghttp2_buf *dest,
-                              nghttp2_stream *stream, nghttp2_tstamp ts);
+int nghttp2_conn_write_stream(nghttp2_conn *conn, nghttp2_context ctx,
+                              nghttp2_buf *dest, nghttp2_stream *stream,
+                              nghttp2_tstamp ts);
 
 int nghttp2_conn_write_stream_flow_controlled(nghttp2_conn *conn,
+                                              nghttp2_context ctx,
                                               nghttp2_buf *dest,
                                               nghttp2_stream *stream);
 
