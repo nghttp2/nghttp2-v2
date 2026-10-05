@@ -125,12 +125,12 @@ struct nghttp2_conn {
        send. */
     uint64_t max_offset;
     /* window is the connection-level flow control window size. */
-    uint32_t window;
+    size_t window;
     /* stream_window is the stream-level flow control window size. */
-    uint32_t stream_window;
+    size_t stream_window;
     /* max_concurrent_streams is the number of streams that the remote
        endpoint can open concurrently. */
-    uint32_t max_concurrent_streams;
+    size_t max_concurrent_streams;
     /* last_stream_id is the latest stream ID received so far. */
     int64_t last_stream_id;
     /* last_processed_stream_id is the largest stream ID that is

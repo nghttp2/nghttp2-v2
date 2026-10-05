@@ -104,7 +104,7 @@ extern "C" {
  * :macro:`NGHTTP2_INITIAL_WINDOW_SIZE` is he default initial window
  * size for both connection and stream-level flow control.
  */
-#define NGHTTP2_INITIAL_WINDOW_SIZE ((uint32_t)((1U << 16) - 1))
+#define NGHTTP2_INITIAL_WINDOW_SIZE ((size_t)((1U << 16) - 1))
 
 /**
  * @macrosection
@@ -1006,22 +1006,22 @@ typedef struct nghttp2_settings {
    * not included in the frame, the limit is unchanged because the
    * unlimited concurrent stream is insane.
    */
-  uint32_t max_concurrent_streams_local;
+  size_t max_concurrent_streams_local;
   /**
    * :member:`max_concurrent_streams_remote` is the number of
    * concurrent streams that a remote endpoint can open.
    */
-  uint32_t max_concurrent_streams_remote;
+  size_t max_concurrent_streams_remote;
   /**
    * :member:`initial_max_stream_data` is the window size for
    * stream-level flow control.
    */
-  uint32_t initial_max_stream_data;
+  size_t initial_max_stream_data;
   /**
    * :member:`initial_max_data` is the window size for
    * connection-level flow control.
    */
-  uint32_t initial_max_data;
+  size_t initial_max_data;
   /**
    * :member:`enable_connect_protocol`, if set to nonzero, enables
    * Extended CONNECT Method (see :rfc:`9220`).  Client ignores this
@@ -1092,19 +1092,19 @@ typedef struct nghttp2_proto_settings {
    * concurrent streams that the receiver can open.  It corresponds to
    * ``SETTINGS_MAX_CONCURRENT_STREAMS``.
    */
-  uint32_t max_concurrent_streams;
+  size_t max_concurrent_streams;
   /**
    * :member:`initial_max_stream_data` is the initial window size of
    * stream-level flow control.  It corresponds to
    * ``SETTINGS_INITIAL_WINDOW_SIZE``.
    */
-  uint32_t initial_max_stream_data;
+  size_t initial_max_stream_data;
   /**
    * :member:`max_field_section_size` specifies the maximum header
    * section (block) size.  It corresponds to
    * ``SETTINGS_MAX_HEADER_LIST_SIZE``.
    */
-  uint32_t max_field_section_size;
+  size_t max_field_section_size;
   /**
    * :member:`enable_connect_protocol`, if set to nonzero, enables
    * Extended CONNECT Method (see :rfc:`8441`).  Client ignores this

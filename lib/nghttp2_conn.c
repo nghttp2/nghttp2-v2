@@ -356,6 +356,9 @@ static int conn_new(nghttp2_conn **pconn, const nghttp2_callbacks *callbacks,
   assert(callbacks);
   assert(callbacks->rand);
   assert(settings);
+  assert(settings->max_concurrent_streams_remote <= UINT32_MAX);
+  assert(settings->initial_max_stream_data <= INT32_MAX);
+  assert(settings->initial_max_data <= INT32_MAX);
 
   if (!mem) {
     mem = nghttp2_mem_default();
@@ -3101,7 +3104,7 @@ int nghttp2_conn_write_settings(nghttp2_conn *conn, nghttp2_buf *dest,
 
   iv[0] = (nghttp2_settings_entry){
     .id = NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS,
-    .value = settings->max_concurrent_streams_remote,
+    .value = (uint32_t)settings->max_concurrent_streams_remote,
   };
   iv[1] = (nghttp2_settings_entry){
     .id = NGHTTP2_SETTINGS_NO_RFC7540_PRIORITIES,
@@ -3119,7 +3122,7 @@ int nghttp2_conn_write_settings(nghttp2_conn *conn, nghttp2_buf *dest,
   if (settings->initial_max_stream_data != NGHTTP2_INITIAL_WINDOW_SIZE) {
     iv[niv++] = (nghttp2_settings_entry){
       .id = NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE,
-      .value = settings->initial_max_stream_data,
+      .value = (uint32_t)settings->initial_max_stream_data,
     };
   }
 

@@ -5011,11 +5011,11 @@ void test_nghttp2_conn_recv_settings(void) {
   assert_size(1, ==, ud.recv_settings.ncalled);
   assert_size(NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY, ==,
               ud.recv_settings.settings.hpack_max_dtable_capacity);
-  assert_uint32(0, ==, ud.recv_settings.settings.max_concurrent_streams);
-  assert_uint32(NGHTTP2_INITIAL_WINDOW_SIZE, ==,
-                ud.recv_settings.settings.initial_max_stream_data);
-  assert_uint32(0, ==, ud.recv_settings.settings.max_field_section_size);
-  assert_uint32(0, ==, ud.recv_settings.settings.enable_connect_protocol);
+  assert_size(0, ==, ud.recv_settings.settings.max_concurrent_streams);
+  assert_size(NGHTTP2_INITIAL_WINDOW_SIZE, ==,
+              ud.recv_settings.settings.initial_max_stream_data);
+  assert_size(0, ==, ud.recv_settings.settings.max_field_section_size);
+  assert_size(0, ==, ud.recv_settings.settings.enable_connect_protocol);
 
   nghttp2_conn_del(conn);
 
@@ -5091,12 +5091,10 @@ void test_nghttp2_conn_recv_settings(void) {
   assert_int(0, ==, rv);
   assert_size(1, ==, ud.recv_settings.ncalled);
   assert_size(2048, ==, ud.recv_settings.settings.hpack_max_dtable_capacity);
-  assert_uint32(0, ==, ud.recv_settings.settings.max_concurrent_streams);
-  assert_uint32(INT32_MAX, ==,
-                ud.recv_settings.settings.initial_max_stream_data);
-  assert_uint32(UINT32_MAX, ==,
-                ud.recv_settings.settings.max_field_section_size);
-  assert_uint32(1, ==, ud.recv_settings.settings.enable_connect_protocol);
+  assert_size(0, ==, ud.recv_settings.settings.max_concurrent_streams);
+  assert_size(INT32_MAX, ==, ud.recv_settings.settings.initial_max_stream_data);
+  assert_size(UINT32_MAX, ==, ud.recv_settings.settings.max_field_section_size);
+  assert_uint8(1, ==, ud.recv_settings.settings.enable_connect_protocol);
 
   nghttp2_conn_del(conn);
 
@@ -5122,12 +5120,10 @@ void test_nghttp2_conn_recv_settings(void) {
 
   assert_size(1, ==, ud.recv_settings.ncalled);
   assert_size(2048, ==, ud.recv_settings.settings.hpack_max_dtable_capacity);
-  assert_uint32(0, ==, ud.recv_settings.settings.max_concurrent_streams);
-  assert_uint32(INT32_MAX, ==,
-                ud.recv_settings.settings.initial_max_stream_data);
-  assert_uint32(UINT32_MAX, ==,
-                ud.recv_settings.settings.max_field_section_size);
-  assert_uint32(1, ==, ud.recv_settings.settings.enable_connect_protocol);
+  assert_size(0, ==, ud.recv_settings.settings.max_concurrent_streams);
+  assert_size(INT32_MAX, ==, ud.recv_settings.settings.initial_max_stream_data);
+  assert_size(UINT32_MAX, ==, ud.recv_settings.settings.max_field_section_size);
+  assert_uint8(1, ==, ud.recv_settings.settings.enable_connect_protocol);
 
   nghttp2_conn_del(conn);
 
@@ -5156,12 +5152,10 @@ void test_nghttp2_conn_recv_settings(void) {
 
   assert_size(1, ==, ud.recv_settings.ncalled);
   assert_size(2048, ==, ud.recv_settings.settings.hpack_max_dtable_capacity);
-  assert_uint32(0, ==, ud.recv_settings.settings.max_concurrent_streams);
-  assert_uint32(INT32_MAX, ==,
-                ud.recv_settings.settings.initial_max_stream_data);
-  assert_uint32(UINT32_MAX, ==,
-                ud.recv_settings.settings.max_field_section_size);
-  assert_uint32(1, ==, ud.recv_settings.settings.enable_connect_protocol);
+  assert_size(0, ==, ud.recv_settings.settings.max_concurrent_streams);
+  assert_size(INT32_MAX, ==, ud.recv_settings.settings.initial_max_stream_data);
+  assert_size(UINT32_MAX, ==, ud.recv_settings.settings.max_field_section_size);
+  assert_uint8(1, ==, ud.recv_settings.settings.enable_connect_protocol);
 
   nghttp2_conn_del(conn);
 
@@ -5427,7 +5421,7 @@ void test_nghttp2_conn_recv_settings(void) {
   assert_int(0, ==, rv);
   assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
               ==, conn->rx.frrd.state);
-  assert_uint32(100, ==, conn->rx.max_concurrent_streams);
+  assert_size(100, ==, conn->rx.max_concurrent_streams);
 
   nghttp2_conn_del(conn);
 
@@ -7442,7 +7436,7 @@ void test_nghttp2_conn_recv_settings_ack(void) {
 
   assert_int(0, ==, rv);
   assert_false(conn->flags & NGHTTP2_CONN_FLAG_EXPECT_SETTINGS_ACK);
-  assert_uint32(100, ==, conn->rx.max_concurrent_streams);
+  assert_size(100, ==, conn->rx.max_concurrent_streams);
 
   nghttp2_conn_del(conn);
 
@@ -7499,7 +7493,7 @@ void test_nghttp2_conn_recv_settings_ack(void) {
 
   assert_int(0, ==, rv);
   assert_false(conn->flags & NGHTTP2_CONN_FLAG_EXPECT_SETTINGS_ACK);
-  assert_uint32(100, ==, conn->rx.max_concurrent_streams);
+  assert_size(100, ==, conn->rx.max_concurrent_streams);
 
   stream = nghttp2_conn_find_stream(conn, 0x01);
 
@@ -7507,7 +7501,7 @@ void test_nghttp2_conn_recv_settings_ack(void) {
   assert_uint64(1 << 17, ==, stream->rx.max_offset);
   assert_uint64(1 << 17, ==, stream->rx.unsent_max_offset);
   assert_uint64(1 << 17, ==, stream->rx.max_offset);
-  assert_uint32(1 << 17, ==, conn->rx.stream_window);
+  assert_size(1 << 17, ==, conn->rx.stream_window);
   assert_null(stream->strmq_prev);
 
   nghttp2_hpack_encoder_free(&enc);
@@ -7686,7 +7680,7 @@ void test_nghttp2_conn_recv_settings_ack(void) {
   assert_not_null(stream);
   assert_uint64(8194, ==, stream->rx.unsent_max_offset);
   assert_uint64(1 << 15, ==, stream->rx.max_offset);
-  assert_uint32(1 << 15, ==, conn->rx.stream_window);
+  assert_size(1 << 15, ==, conn->rx.stream_window);
 
   nghttp2_hpack_encoder_free(&enc);
   nghttp2_conn_del(conn);
@@ -7784,7 +7778,7 @@ void test_nghttp2_conn_recv_settings_ack(void) {
   assert_not_null(stream);
   assert_uint64((uint64_t)-57342, ==, stream->rx.unsent_max_offset);
   assert_uint64(0, ==, stream->rx.max_offset);
-  assert_uint32(0, ==, conn->rx.stream_window);
+  assert_size(0, ==, conn->rx.stream_window);
   assert_null(stream->strmq_prev);
 
   rv = nghttp2_conn_extend_max_stream_offset(conn, 0x01, 57341);
@@ -7836,7 +7830,7 @@ void test_nghttp2_conn_conn_rx_flow_control(void) {
 
   assert_uint64(1 << 20, ==, conn->rx.unsent_max_offset);
   assert_uint64(1 << 20, ==, conn->rx.max_offset);
-  assert_uint32(1 << 20, ==, conn->rx.window);
+  assert_size(1 << 20, ==, conn->rx.window);
 
   nghttp2_conn_del(conn);
 
@@ -7854,7 +7848,7 @@ void test_nghttp2_conn_conn_rx_flow_control(void) {
 
   assert_uint64(32768, ==, conn->rx.unsent_max_offset);
   assert_uint64(NGHTTP2_INITIAL_WINDOW_SIZE, ==, conn->rx.max_offset);
-  assert_uint32(1 << 15, ==, conn->rx.window);
+  assert_size(1 << 15, ==, conn->rx.window);
 
   nghttp2_conn_del(conn);
 
@@ -7872,7 +7866,7 @@ void test_nghttp2_conn_conn_rx_flow_control(void) {
 
   assert_uint64(0, ==, conn->rx.unsent_max_offset);
   assert_uint64(NGHTTP2_INITIAL_WINDOW_SIZE, ==, conn->rx.max_offset);
-  assert_uint32(0, ==, conn->rx.window);
+  assert_size(0, ==, conn->rx.window);
 
   nghttp2_conn_del(conn);
 
@@ -15791,7 +15785,7 @@ void test_nghttp2_conn_get_settings(void) {
 
   settings = nghttp2_conn_get_settings(conn);
 
-  assert_uint32(100, ==, settings->max_concurrent_streams_remote);
+  assert_size(100, ==, settings->max_concurrent_streams_remote);
   assert_ptr_equal(log_write, settings->log_write);
 
   nghttp2_conn_del(conn);
@@ -15926,7 +15920,7 @@ void test_nghttp2_conn_get_remote_settings(void) {
 
   remote_settings = nghttp2_conn_get_remote_settings(conn);
 
-  assert_uint32(10, ==, remote_settings->max_concurrent_streams);
+  assert_size(10, ==, remote_settings->max_concurrent_streams);
 
   nghttp2_conn_del(conn);
 }
