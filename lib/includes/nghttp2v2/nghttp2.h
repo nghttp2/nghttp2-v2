@@ -1101,7 +1101,7 @@ typedef struct nghttp2_proto_settings {
   uint32_t initial_max_stream_data;
   /**
    * :member:`max_field_section_size` specifies the maximum header
-   * section (block) size.  It correspoinds to
+   * section (block) size.  It corresponds to
    * ``SETTINGS_MAX_HEADER_LIST_SIZE``.
    */
   uint32_t max_field_section_size;
