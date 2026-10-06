@@ -657,7 +657,7 @@ void index_header(HeaderIndex &hdidx, int32_t token, size_t idx) {
   if (token == -1) {
     return;
   }
-  assert(token < HD_MAXIDX);
+  assert(static_cast<size_t>(token) < HD_MAXIDX);
   hdidx[static_cast<size_t>(token)] = static_cast<int8_t>(idx);
 }
 
