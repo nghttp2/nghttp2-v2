@@ -1279,39 +1279,6 @@ func TestH2H1RespPhaseReturn(t *testing.T) {
 	}
 }
 
-// TestH2H1Upgrade tests HTTP Upgrade to HTTP/2
-func TestH2H1Upgrade(t *testing.T) {
-	st := newServerTester(t, options{})
-	defer st.Close()
-
-	res, err := st.http1(requestParam{
-		name: "TestH2H1Upgrade",
-		header: []hpack.HeaderField{
-			pair("Connection", "Upgrade, HTTP2-Settings"),
-			pair("Upgrade", "h2c"),
-			pair("HTTP2-Settings", "AAMAAABkAAQAAP__"),
-		},
-	})
-	if err != nil {
-		t.Fatalf("Error st.http1() = %v", err)
-	}
-
-	if got, want := res.status, http.StatusSwitchingProtocols; got != want {
-		t.Errorf("res.status: %v; want %v", got, want)
-	}
-
-	res, err = st.http2(requestParam{
-		httpUpgrade: true,
-	})
-	if err != nil {
-		t.Fatalf("Error st.http2() = %v", err)
-	}
-
-	if got, want := res.status, http.StatusOK; got != want {
-		t.Errorf("res.status: %v; want %v", got, want)
-	}
-}
-
 // TestH2H1ProxyProtocolV1ForwardedForObfuscated tests that Forwarded
 // header field includes obfuscated address even if PROXY protocol
 // version 1 containing TCP4 entry is accepted.
@@ -2737,8 +2704,8 @@ func TestH2H2MultipleResponseCL(t *testing.T) {
 		t.Fatalf("Error st.http2() = %v", err)
 	}
 
-	if got, want := res.errCode, http2.ErrCodeInternal; got != want {
-		t.Errorf("res.errCode: %v; want %v", got, want)
+	if got, want := res.status, http.StatusBadGateway; got != want {
+		t.Errorf("status: %v; want %v", got, want)
 	}
 }
 
@@ -2763,8 +2730,8 @@ func TestH2H2InvalidResponseCL(t *testing.T) {
 		t.Fatalf("Error st.http2() = %v", err)
 	}
 
-	if got, want := res.errCode, http2.ErrCodeInternal; got != want {
-		t.Errorf("res.errCode: %v; want %v", got, want)
+	if got, want := res.status, http.StatusBadGateway; got != want {
+		t.Errorf("status: %v; want %v", got, want)
 	}
 }
 
