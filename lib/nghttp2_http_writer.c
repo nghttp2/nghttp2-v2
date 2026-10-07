@@ -397,6 +397,7 @@ int nghttp2_http_writer_write_data(nghttp2_http_writer *hw, nghttp2_buf *dest,
 
     if (left < v->len) {
       dest->last = nghttp2_cpymem(dest->last, v->base, (size_t)left);
+      v->base += left;
       v->len -= (size_t)left;
 
       break;
