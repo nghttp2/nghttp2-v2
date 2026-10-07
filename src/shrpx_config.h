@@ -93,28 +93,18 @@ inline constexpr auto SHRPX_OPT_SUBCERT = "subcert"sv;
 inline constexpr auto SHRPX_OPT_BACKEND = "backend"sv;
 inline constexpr auto SHRPX_OPT_FRONTEND = "frontend"sv;
 inline constexpr auto SHRPX_OPT_WORKERS = "workers"sv;
-inline constexpr auto SHRPX_OPT_HTTP2_MAX_CONCURRENT_STREAMS =
-  "http2-max-concurrent-streams"sv;
 inline constexpr auto SHRPX_OPT_LOG_LEVEL = "log-level"sv;
 inline constexpr auto SHRPX_OPT_DAEMON = "daemon"sv;
 inline constexpr auto SHRPX_OPT_HTTP2_PROXY = "http2-proxy"sv;
-inline constexpr auto SHRPX_OPT_HTTP2_BRIDGE = "http2-bridge"sv;
-inline constexpr auto SHRPX_OPT_CLIENT_PROXY = "client-proxy"sv;
 inline constexpr auto SHRPX_OPT_ADD_X_FORWARDED_FOR = "add-x-forwarded-for"sv;
 inline constexpr auto SHRPX_OPT_STRIP_INCOMING_X_FORWARDED_FOR =
   "strip-incoming-x-forwarded-for"sv;
 inline constexpr auto SHRPX_OPT_NO_VIA = "no-via"sv;
-inline constexpr auto SHRPX_OPT_FRONTEND_HTTP2_READ_TIMEOUT =
-  "frontend-http2-read-timeout"sv;
-inline constexpr auto SHRPX_OPT_FRONTEND_READ_TIMEOUT =
-  "frontend-read-timeout"sv;
 inline constexpr auto SHRPX_OPT_FRONTEND_WRITE_TIMEOUT =
   "frontend-write-timeout"sv;
 inline constexpr auto SHRPX_OPT_BACKEND_READ_TIMEOUT = "backend-read-timeout"sv;
 inline constexpr auto SHRPX_OPT_BACKEND_WRITE_TIMEOUT =
   "backend-write-timeout"sv;
-inline constexpr auto SHRPX_OPT_STREAM_READ_TIMEOUT = "stream-read-timeout"sv;
-inline constexpr auto SHRPX_OPT_STREAM_WRITE_TIMEOUT = "stream-write-timeout"sv;
 inline constexpr auto SHRPX_OPT_ACCESSLOG_FILE = "accesslog-file"sv;
 inline constexpr auto SHRPX_OPT_ACCESSLOG_SYSLOG = "accesslog-syslog"sv;
 inline constexpr auto SHRPX_OPT_ACCESSLOG_FORMAT = "accesslog-format"sv;
@@ -122,28 +112,13 @@ inline constexpr auto SHRPX_OPT_ERRORLOG_FILE = "errorlog-file"sv;
 inline constexpr auto SHRPX_OPT_ERRORLOG_SYSLOG = "errorlog-syslog"sv;
 inline constexpr auto SHRPX_OPT_BACKEND_KEEP_ALIVE_TIMEOUT =
   "backend-keep-alive-timeout"sv;
-inline constexpr auto SHRPX_OPT_FRONTEND_HTTP2_WINDOW_BITS =
-  "frontend-http2-window-bits"sv;
-inline constexpr auto SHRPX_OPT_BACKEND_HTTP2_WINDOW_BITS =
-  "backend-http2-window-bits"sv;
-inline constexpr auto SHRPX_OPT_FRONTEND_HTTP2_CONNECTION_WINDOW_BITS =
-  "frontend-http2-connection-window-bits"sv;
-inline constexpr auto SHRPX_OPT_BACKEND_HTTP2_CONNECTION_WINDOW_BITS =
-  "backend-http2-connection-window-bits"sv;
-inline constexpr auto SHRPX_OPT_FRONTEND_NO_TLS = "frontend-no-tls"sv;
-inline constexpr auto SHRPX_OPT_BACKEND_NO_TLS = "backend-no-tls"sv;
-inline constexpr auto SHRPX_OPT_BACKEND_TLS_SNI_FIELD =
-  "backend-tls-sni-field"sv;
 inline constexpr auto SHRPX_OPT_PID_FILE = "pid-file"sv;
 inline constexpr auto SHRPX_OPT_USER = "user"sv;
 inline constexpr auto SHRPX_OPT_SYSLOG_FACILITY = "syslog-facility"sv;
 inline constexpr auto SHRPX_OPT_BACKLOG = "backlog"sv;
 inline constexpr auto SHRPX_OPT_CIPHERS = "ciphers"sv;
-inline constexpr auto SHRPX_OPT_CLIENT = "client"sv;
 inline constexpr auto SHRPX_OPT_INSECURE = "insecure"sv;
 inline constexpr auto SHRPX_OPT_CACERT = "cacert"sv;
-inline constexpr auto SHRPX_OPT_BACKEND_IPV4 = "backend-ipv4"sv;
-inline constexpr auto SHRPX_OPT_BACKEND_IPV6 = "backend-ipv6"sv;
 inline constexpr auto SHRPX_OPT_BACKEND_HTTP_PROXY_URI =
   "backend-http-proxy-uri"sv;
 inline constexpr auto SHRPX_OPT_READ_RATE = "read-rate"sv;
@@ -154,8 +129,6 @@ inline constexpr auto SHRPX_OPT_WORKER_READ_RATE = "worker-read-rate"sv;
 inline constexpr auto SHRPX_OPT_WORKER_READ_BURST = "worker-read-burst"sv;
 inline constexpr auto SHRPX_OPT_WORKER_WRITE_RATE = "worker-write-rate"sv;
 inline constexpr auto SHRPX_OPT_WORKER_WRITE_BURST = "worker-write-burst"sv;
-inline constexpr auto SHRPX_OPT_NPN_LIST = "npn-list"sv;
-inline constexpr auto SHRPX_OPT_TLS_PROTO_LIST = "tls-proto-list"sv;
 inline constexpr auto SHRPX_OPT_VERIFY_CLIENT = "verify-client"sv;
 inline constexpr auto SHRPX_OPT_VERIFY_CLIENT_CACERT = "verify-client-cacert"sv;
 inline constexpr auto SHRPX_OPT_CLIENT_PRIVATE_KEY_FILE =
@@ -175,11 +148,6 @@ inline constexpr auto SHRPX_OPT_ADD_RESPONSE_HEADER = "add-response-header"sv;
 inline constexpr auto SHRPX_OPT_WORKER_FRONTEND_CONNECTIONS =
   "worker-frontend-connections"sv;
 inline constexpr auto SHRPX_OPT_NO_LOCATION_REWRITE = "no-location-rewrite"sv;
-inline constexpr auto SHRPX_OPT_NO_HOST_REWRITE = "no-host-rewrite"sv;
-inline constexpr auto SHRPX_OPT_BACKEND_HTTP1_CONNECTIONS_PER_HOST =
-  "backend-http1-connections-per-host"sv;
-inline constexpr auto SHRPX_OPT_BACKEND_HTTP1_CONNECTIONS_PER_FRONTEND =
-  "backend-http1-connections-per-frontend"sv;
 inline constexpr auto SHRPX_OPT_LISTENER_DISABLE_TIMEOUT =
   "listener-disable-timeout"sv;
 inline constexpr auto SHRPX_OPT_TLS_TICKET_KEY_FILE = "tls-ticket-key-file"sv;
@@ -188,21 +156,10 @@ inline constexpr auto SHRPX_OPT_BACKEND_REQUEST_BUFFER =
   "backend-request-buffer"sv;
 inline constexpr auto SHRPX_OPT_BACKEND_RESPONSE_BUFFER =
   "backend-response-buffer"sv;
-inline constexpr auto SHRPX_OPT_NO_SERVER_PUSH = "no-server-push"sv;
-inline constexpr auto SHRPX_OPT_BACKEND_HTTP2_CONNECTIONS_PER_WORKER =
-  "backend-http2-connections-per-worker"sv;
-inline constexpr auto SHRPX_OPT_FETCH_OCSP_RESPONSE_FILE =
-  "fetch-ocsp-response-file"sv;
-inline constexpr auto SHRPX_OPT_OCSP_UPDATE_INTERVAL = "ocsp-update-interval"sv;
-inline constexpr auto SHRPX_OPT_NO_OCSP = "no-ocsp"sv;
-inline constexpr auto SHRPX_OPT_HEADER_FIELD_BUFFER = "header-field-buffer"sv;
-inline constexpr auto SHRPX_OPT_MAX_HEADER_FIELDS = "max-header-fields"sv;
 inline constexpr auto SHRPX_OPT_INCLUDE = "include"sv;
 inline constexpr auto SHRPX_OPT_TLS_TICKET_KEY_CIPHER =
   "tls-ticket-key-cipher"sv;
 inline constexpr auto SHRPX_OPT_HOST_REWRITE = "host-rewrite"sv;
-inline constexpr auto SHRPX_OPT_TLS_SESSION_CACHE_MEMCACHED =
-  "tls-session-cache-memcached"sv;
 inline constexpr auto SHRPX_OPT_TLS_TICKET_KEY_MEMCACHED =
   "tls-ticket-key-memcached"sv;
 inline constexpr auto SHRPX_OPT_TLS_TICKET_KEY_MEMCACHED_INTERVAL =
@@ -212,8 +169,6 @@ inline constexpr auto SHRPX_OPT_TLS_TICKET_KEY_MEMCACHED_MAX_RETRY =
 inline constexpr auto SHRPX_OPT_TLS_TICKET_KEY_MEMCACHED_MAX_FAIL =
   "tls-ticket-key-memcached-max-fail"sv;
 inline constexpr auto SHRPX_OPT_MRUBY_FILE = "mruby-file"sv;
-inline constexpr auto SHRPX_OPT_ACCEPT_PROXY_PROTOCOL =
-  "accept-proxy-protocol"sv;
 inline constexpr auto SHRPX_OPT_FASTOPEN = "fastopen"sv;
 inline constexpr auto SHRPX_OPT_TLS_DYN_REC_WARMUP_THRESHOLD =
   "tls-dyn-rec-warmup-threshold"sv;
@@ -234,19 +189,6 @@ inline constexpr auto SHRPX_OPT_MAX_RESPONSE_HEADER_FIELDS =
   "max-response-header-fields"sv;
 inline constexpr auto SHRPX_OPT_NO_HTTP2_CIPHER_BLOCK_LIST =
   "no-http2-cipher-block-list"sv;
-inline constexpr auto SHRPX_OPT_NO_HTTP2_CIPHER_BLACK_LIST =
-  "no-http2-cipher-black-list"sv;
-inline constexpr auto SHRPX_OPT_BACKEND_HTTP1_TLS = "backend-http1-tls"sv;
-inline constexpr auto SHRPX_OPT_TLS_SESSION_CACHE_MEMCACHED_TLS =
-  "tls-session-cache-memcached-tls"sv;
-inline constexpr auto SHRPX_OPT_TLS_SESSION_CACHE_MEMCACHED_CERT_FILE =
-  "tls-session-cache-memcached-cert-file"sv;
-inline constexpr auto SHRPX_OPT_TLS_SESSION_CACHE_MEMCACHED_PRIVATE_KEY_FILE =
-  "tls-session-cache-memcached-private-key-file"sv;
-inline constexpr auto SHRPX_OPT_TLS_SESSION_CACHE_MEMCACHED_ADDRESS_FAMILY =
-  "tls-session-cache-memcached-address-family"sv;
-inline constexpr auto SHRPX_OPT_TLS_TICKET_KEY_MEMCACHED_TLS =
-  "tls-ticket-key-memcached-tls"sv;
 inline constexpr auto SHRPX_OPT_TLS_TICKET_KEY_MEMCACHED_CERT_FILE =
   "tls-ticket-key-memcached-cert-file"sv;
 inline constexpr auto SHRPX_OPT_TLS_TICKET_KEY_MEMCACHED_PRIVATE_KEY_FILE =
@@ -261,7 +203,6 @@ inline constexpr auto SHRPX_OPT_BACKEND_HTTP2_MAX_CONCURRENT_STREAMS =
   "backend-http2-max-concurrent-streams"sv;
 inline constexpr auto SHRPX_OPT_BACKEND_CONNECTIONS_PER_FRONTEND =
   "backend-connections-per-frontend"sv;
-inline constexpr auto SHRPX_OPT_BACKEND_TLS = "backend-tls"sv;
 inline constexpr auto SHRPX_OPT_BACKEND_CONNECTIONS_PER_HOST =
   "backend-connections-per-host"sv;
 inline constexpr auto SHRPX_OPT_ERROR_PAGE = "error-page"sv;
@@ -294,7 +235,6 @@ inline constexpr auto SHRPX_OPT_BACKEND_HTTP2_ENCODER_DYNAMIC_TABLE_SIZE =
   "backend-http2-encoder-dynamic-table-size"sv;
 inline constexpr auto SHRPX_OPT_BACKEND_HTTP2_DECODER_DYNAMIC_TABLE_SIZE =
   "backend-http2-decoder-dynamic-table-size"sv;
-inline constexpr auto SHRPX_OPT_ECDH_CURVES = "ecdh-curves"sv;
 inline constexpr auto SHRPX_OPT_TLS_SCT_DIR = "tls-sct-dir"sv;
 inline constexpr auto SHRPX_OPT_BACKEND_CONNECT_TIMEOUT =
   "backend-connect-timeout"sv;
@@ -307,8 +247,6 @@ inline constexpr auto SHRPX_OPT_PSK_SECRETS = "psk-secrets"sv;
 inline constexpr auto SHRPX_OPT_CLIENT_PSK_SECRETS = "client-psk-secrets"sv;
 inline constexpr auto SHRPX_OPT_CLIENT_NO_HTTP2_CIPHER_BLOCK_LIST =
   "client-no-http2-cipher-block-list"sv;
-inline constexpr auto SHRPX_OPT_CLIENT_NO_HTTP2_CIPHER_BLACK_LIST =
-  "client-no-http2-cipher-black-list"sv;
 inline constexpr auto SHRPX_OPT_CLIENT_CIPHERS = "client-ciphers"sv;
 inline constexpr auto SHRPX_OPT_ACCESSLOG_WRITE_EARLY =
   "accesslog-write-early"sv;
@@ -325,8 +263,6 @@ inline constexpr auto SHRPX_OPT_NO_ADD_X_FORWARDED_PROTO =
   "no-add-x-forwarded-proto"sv;
 inline constexpr auto SHRPX_OPT_NO_STRIP_INCOMING_X_FORWARDED_PROTO =
   "no-strip-incoming-x-forwarded-proto"sv;
-inline constexpr auto SHRPX_OPT_OCSP_STARTUP = "ocsp-startup"sv;
-inline constexpr auto SHRPX_OPT_NO_VERIFY_OCSP = "no-verify-ocsp"sv;
 inline constexpr auto SHRPX_OPT_VERIFY_CLIENT_TOLERATE_EXPIRED =
   "verify-client-tolerate-expired"sv;
 inline constexpr auto SHRPX_OPT_IGNORE_PER_PATTERN_MRUBY_ERROR =
@@ -342,8 +278,6 @@ inline constexpr auto SHRPX_OPT_QUIC_BPF_PROGRAM_FILE =
   "quic-bpf-program-file"sv;
 inline constexpr auto SHRPX_OPT_NO_QUIC_BPF = "no-quic-bpf"sv;
 inline constexpr auto SHRPX_OPT_HTTP2_ALTSVC = "http2-altsvc"sv;
-inline constexpr auto SHRPX_OPT_FRONTEND_HTTP3_READ_TIMEOUT =
-  "frontend-http3-read-timeout"sv;
 inline constexpr auto SHRPX_OPT_FRONTEND_QUIC_IDLE_TIMEOUT =
   "frontend-quic-idle-timeout"sv;
 inline constexpr auto SHRPX_OPT_FRONTEND_QUIC_DEBUG_LOG =
@@ -1147,7 +1081,6 @@ void create_config();
 
 // generated by gennghttpxfun.py
 enum {
-  SHRPX_OPTID_ACCEPT_PROXY_PROTOCOL,
   SHRPX_OPTID_ACCESSLOG_FILE,
   SHRPX_OPTID_ACCESSLOG_FORMAT,
   SHRPX_OPTID_ACCESSLOG_SYSLOG,
@@ -1165,42 +1098,28 @@ enum {
   SHRPX_OPTID_BACKEND_CONNECTIONS_PER_FRONTEND,
   SHRPX_OPTID_BACKEND_CONNECTIONS_PER_HOST,
   SHRPX_OPTID_BACKEND_HTTP_PROXY_URI,
-  SHRPX_OPTID_BACKEND_HTTP1_CONNECTIONS_PER_FRONTEND,
-  SHRPX_OPTID_BACKEND_HTTP1_CONNECTIONS_PER_HOST,
-  SHRPX_OPTID_BACKEND_HTTP1_TLS,
-  SHRPX_OPTID_BACKEND_HTTP2_CONNECTION_WINDOW_BITS,
   SHRPX_OPTID_BACKEND_HTTP2_CONNECTION_WINDOW_SIZE,
-  SHRPX_OPTID_BACKEND_HTTP2_CONNECTIONS_PER_WORKER,
   SHRPX_OPTID_BACKEND_HTTP2_DECODER_DYNAMIC_TABLE_SIZE,
   SHRPX_OPTID_BACKEND_HTTP2_ENCODER_DYNAMIC_TABLE_SIZE,
   SHRPX_OPTID_BACKEND_HTTP2_MAX_CONCURRENT_STREAMS,
   SHRPX_OPTID_BACKEND_HTTP2_SETTINGS_TIMEOUT,
-  SHRPX_OPTID_BACKEND_HTTP2_WINDOW_BITS,
   SHRPX_OPTID_BACKEND_HTTP2_WINDOW_SIZE,
-  SHRPX_OPTID_BACKEND_IPV4,
-  SHRPX_OPTID_BACKEND_IPV6,
   SHRPX_OPTID_BACKEND_KEEP_ALIVE_TIMEOUT,
   SHRPX_OPTID_BACKEND_MAX_BACKOFF,
-  SHRPX_OPTID_BACKEND_NO_TLS,
   SHRPX_OPTID_BACKEND_READ_TIMEOUT,
   SHRPX_OPTID_BACKEND_REQUEST_BUFFER,
   SHRPX_OPTID_BACKEND_RESPONSE_BUFFER,
   SHRPX_OPTID_BACKEND_STREAM_READ_TIMEOUT,
   SHRPX_OPTID_BACKEND_STREAM_WRITE_TIMEOUT,
-  SHRPX_OPTID_BACKEND_TLS,
-  SHRPX_OPTID_BACKEND_TLS_SNI_FIELD,
   SHRPX_OPTID_BACKEND_WRITE_TIMEOUT,
   SHRPX_OPTID_BACKLOG,
   SHRPX_OPTID_CACERT,
   SHRPX_OPTID_CERTIFICATE_FILE,
   SHRPX_OPTID_CIPHERS,
-  SHRPX_OPTID_CLIENT,
   SHRPX_OPTID_CLIENT_CERT_FILE,
   SHRPX_OPTID_CLIENT_CIPHERS,
-  SHRPX_OPTID_CLIENT_NO_HTTP2_CIPHER_BLACK_LIST,
   SHRPX_OPTID_CLIENT_NO_HTTP2_CIPHER_BLOCK_LIST,
   SHRPX_OPTID_CLIENT_PRIVATE_KEY_FILE,
-  SHRPX_OPTID_CLIENT_PROXY,
   SHRPX_OPTID_CLIENT_PSK_SECRETS,
   SHRPX_OPTID_CONF,
   SHRPX_OPTID_DAEMON,
@@ -1208,20 +1127,17 @@ enum {
   SHRPX_OPTID_DNS_CACHE_TIMEOUT,
   SHRPX_OPTID_DNS_LOOKUP_TIMEOUT,
   SHRPX_OPTID_DNS_MAX_TRY,
-  SHRPX_OPTID_ECDH_CURVES,
   SHRPX_OPTID_ECH_CONFIG_FILE,
   SHRPX_OPTID_ECH_RETRY_CONFIG_FILE,
   SHRPX_OPTID_ERROR_PAGE,
   SHRPX_OPTID_ERRORLOG_FILE,
   SHRPX_OPTID_ERRORLOG_SYSLOG,
   SHRPX_OPTID_FASTOPEN,
-  SHRPX_OPTID_FETCH_OCSP_RESPONSE_FILE,
   SHRPX_OPTID_FORWARDED_BY,
   SHRPX_OPTID_FORWARDED_FOR,
   SHRPX_OPTID_FRONTEND,
   SHRPX_OPTID_FRONTEND_FRAME_DEBUG,
   SHRPX_OPTID_FRONTEND_HEADER_TIMEOUT,
-  SHRPX_OPTID_FRONTEND_HTTP2_CONNECTION_WINDOW_BITS,
   SHRPX_OPTID_FRONTEND_HTTP2_CONNECTION_WINDOW_SIZE,
   SHRPX_OPTID_FRONTEND_HTTP2_DECODER_DYNAMIC_TABLE_SIZE,
   SHRPX_OPTID_FRONTEND_HTTP2_DUMP_REQUEST_HEADER,
@@ -1231,23 +1147,19 @@ enum {
   SHRPX_OPTID_FRONTEND_HTTP2_MAX_CONCURRENT_STREAMS,
   SHRPX_OPTID_FRONTEND_HTTP2_OPTIMIZE_WINDOW_SIZE,
   SHRPX_OPTID_FRONTEND_HTTP2_OPTIMIZE_WRITE_BUFFER_SIZE,
-  SHRPX_OPTID_FRONTEND_HTTP2_READ_TIMEOUT,
   SHRPX_OPTID_FRONTEND_HTTP2_SETTINGS_TIMEOUT,
-  SHRPX_OPTID_FRONTEND_HTTP2_WINDOW_BITS,
   SHRPX_OPTID_FRONTEND_HTTP2_WINDOW_SIZE,
   SHRPX_OPTID_FRONTEND_HTTP3_CONNECTION_WINDOW_SIZE,
   SHRPX_OPTID_FRONTEND_HTTP3_IDLE_TIMEOUT,
   SHRPX_OPTID_FRONTEND_HTTP3_MAX_CONCURRENT_STREAMS,
   SHRPX_OPTID_FRONTEND_HTTP3_MAX_CONNECTION_WINDOW_SIZE,
   SHRPX_OPTID_FRONTEND_HTTP3_MAX_WINDOW_SIZE,
-  SHRPX_OPTID_FRONTEND_HTTP3_READ_TIMEOUT,
   SHRPX_OPTID_FRONTEND_HTTP3_WINDOW_SIZE,
   SHRPX_OPTID_FRONTEND_INITIAL_WRITE_RATE_TIMEOUT,
   SHRPX_OPTID_FRONTEND_KEEP_ALIVE_TIMEOUT,
   SHRPX_OPTID_FRONTEND_MAX_REQUESTS,
   SHRPX_OPTID_FRONTEND_MAX_WRITE_RATE_TIMEOUT,
   SHRPX_OPTID_FRONTEND_MIN_WRITE_RATE,
-  SHRPX_OPTID_FRONTEND_NO_TLS,
   SHRPX_OPTID_FRONTEND_QUIC_CONGESTION_CONTROLLER,
   SHRPX_OPTID_FRONTEND_QUIC_DEBUG_LOG,
   SHRPX_OPTID_FRONTEND_QUIC_EARLY_DATA,
@@ -1256,16 +1168,12 @@ enum {
   SHRPX_OPTID_FRONTEND_QUIC_QLOG_DIR,
   SHRPX_OPTID_FRONTEND_QUIC_REQUIRE_TOKEN,
   SHRPX_OPTID_FRONTEND_QUIC_SECRET_FILE,
-  SHRPX_OPTID_FRONTEND_READ_TIMEOUT,
   SHRPX_OPTID_FRONTEND_STREAM_READ_TIMEOUT,
   SHRPX_OPTID_FRONTEND_STREAM_WRITE_TIMEOUT,
   SHRPX_OPTID_FRONTEND_WRITE_TIMEOUT,
   SHRPX_OPTID_GROUPS,
-  SHRPX_OPTID_HEADER_FIELD_BUFFER,
   SHRPX_OPTID_HOST_REWRITE,
   SHRPX_OPTID_HTTP2_ALTSVC,
-  SHRPX_OPTID_HTTP2_BRIDGE,
-  SHRPX_OPTID_HTTP2_MAX_CONCURRENT_STREAMS,
   SHRPX_OPTID_HTTP2_NO_COOKIE_CRUMBLING,
   SHRPX_OPTID_HTTP2_PROXY,
   SHRPX_OPTID_IGNORE_PER_PATTERN_MRUBY_ERROR,
@@ -1273,28 +1181,19 @@ enum {
   SHRPX_OPTID_INSECURE,
   SHRPX_OPTID_LISTENER_DISABLE_TIMEOUT,
   SHRPX_OPTID_LOG_LEVEL,
-  SHRPX_OPTID_MAX_HEADER_FIELDS,
   SHRPX_OPTID_MAX_REQUEST_HEADER_FIELDS,
   SHRPX_OPTID_MAX_RESPONSE_HEADER_FIELDS,
   SHRPX_OPTID_MAX_WORKER_PROCESSES,
   SHRPX_OPTID_MRUBY_FILE,
   SHRPX_OPTID_NO_ADD_X_FORWARDED_PROTO,
-  SHRPX_OPTID_NO_HOST_REWRITE,
-  SHRPX_OPTID_NO_HTTP2_CIPHER_BLACK_LIST,
   SHRPX_OPTID_NO_HTTP2_CIPHER_BLOCK_LIST,
   SHRPX_OPTID_NO_KQUEUE,
   SHRPX_OPTID_NO_LOCATION_REWRITE,
-  SHRPX_OPTID_NO_OCSP,
   SHRPX_OPTID_NO_QUIC_BPF,
-  SHRPX_OPTID_NO_SERVER_PUSH,
   SHRPX_OPTID_NO_SERVER_REWRITE,
   SHRPX_OPTID_NO_STRIP_INCOMING_EARLY_DATA,
   SHRPX_OPTID_NO_STRIP_INCOMING_X_FORWARDED_PROTO,
-  SHRPX_OPTID_NO_VERIFY_OCSP,
   SHRPX_OPTID_NO_VIA,
-  SHRPX_OPTID_NPN_LIST,
-  SHRPX_OPTID_OCSP_STARTUP,
-  SHRPX_OPTID_OCSP_UPDATE_INTERVAL,
   SHRPX_OPTID_PADDING,
   SHRPX_OPTID_PID_FILE,
   SHRPX_OPTID_PRIVATE_KEY_FILE,
@@ -1313,8 +1212,6 @@ enum {
   SHRPX_OPTID_SERVER_NAME,
   SHRPX_OPTID_SINGLE_PROCESS,
   SHRPX_OPTID_SINGLE_THREAD,
-  SHRPX_OPTID_STREAM_READ_TIMEOUT,
-  SHRPX_OPTID_STREAM_WRITE_TIMEOUT,
   SHRPX_OPTID_STRIP_INCOMING_FORWARDED,
   SHRPX_OPTID_STRIP_INCOMING_X_FORWARDED_FOR,
   SHRPX_OPTID_SUBCERT,
@@ -1326,13 +1223,7 @@ enum {
   SHRPX_OPTID_TLS_MAX_PROTO_VERSION,
   SHRPX_OPTID_TLS_MIN_PROTO_VERSION,
   SHRPX_OPTID_TLS_NO_POSTPONE_EARLY_DATA,
-  SHRPX_OPTID_TLS_PROTO_LIST,
   SHRPX_OPTID_TLS_SCT_DIR,
-  SHRPX_OPTID_TLS_SESSION_CACHE_MEMCACHED,
-  SHRPX_OPTID_TLS_SESSION_CACHE_MEMCACHED_ADDRESS_FAMILY,
-  SHRPX_OPTID_TLS_SESSION_CACHE_MEMCACHED_CERT_FILE,
-  SHRPX_OPTID_TLS_SESSION_CACHE_MEMCACHED_PRIVATE_KEY_FILE,
-  SHRPX_OPTID_TLS_SESSION_CACHE_MEMCACHED_TLS,
   SHRPX_OPTID_TLS_TICKET_KEY_CIPHER,
   SHRPX_OPTID_TLS_TICKET_KEY_FILE,
   SHRPX_OPTID_TLS_TICKET_KEY_MEMCACHED,
@@ -1342,7 +1233,6 @@ enum {
   SHRPX_OPTID_TLS_TICKET_KEY_MEMCACHED_MAX_FAIL,
   SHRPX_OPTID_TLS_TICKET_KEY_MEMCACHED_MAX_RETRY,
   SHRPX_OPTID_TLS_TICKET_KEY_MEMCACHED_PRIVATE_KEY_FILE,
-  SHRPX_OPTID_TLS_TICKET_KEY_MEMCACHED_TLS,
   SHRPX_OPTID_TLS13_CIPHERS,
   SHRPX_OPTID_TLS13_CLIENT_CIPHERS,
   SHRPX_OPTID_USER,

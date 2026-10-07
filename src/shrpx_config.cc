@@ -1920,9 +1920,6 @@ int option_lookup_token(std::string_view name) {
       if (util::strieq("cacer"sv, name.substr(0, 5))) {
         return SHRPX_OPTID_CACERT;
       }
-      if (util::strieq("clien"sv, name.substr(0, 5))) {
-        return SHRPX_OPTID_CLIENT;
-      }
       break;
     }
     break;
@@ -1944,11 +1941,6 @@ int option_lookup_token(std::string_view name) {
       }
       if (util::strieq("paddin"sv, name.substr(0, 6))) {
         return SHRPX_OPTID_PADDING;
-      }
-      break;
-    case 'p':
-      if (util::strieq("no-ocs"sv, name.substr(0, 6))) {
-        return SHRPX_OPTID_NO_OCSP;
       }
       break;
     case 's':
@@ -1989,11 +1981,6 @@ int option_lookup_token(std::string_view name) {
     case 's':
       if (util::strieq("tls-ktl"sv, name.substr(0, 7))) {
         return SHRPX_OPTID_TLS_KTLS;
-      }
-      break;
-    case 't':
-      if (util::strieq("npn-lis"sv, name.substr(0, 7))) {
-        return SHRPX_OPTID_NPN_LIST;
       }
       break;
     }
@@ -2058,12 +2045,6 @@ int option_lookup_token(std::string_view name) {
       }
       break;
     case 's':
-      if (util::strieq("backend-tl"sv, name.substr(0, 10))) {
-        return SHRPX_OPTID_BACKEND_TLS;
-      }
-      if (util::strieq("ecdh-curve"sv, name.substr(0, 10))) {
-        return SHRPX_OPTID_ECDH_CURVES;
-      }
       if (util::strieq("psk-secret"sv, name.substr(0, 10))) {
         return SHRPX_OPTID_PSK_SECRETS;
       }
@@ -2085,16 +2066,6 @@ int option_lookup_token(std::string_view name) {
     break;
   case 12:
     switch (name[11]) {
-    case '4':
-      if (util::strieq("backend-ipv"sv, name.substr(0, 11))) {
-        return SHRPX_OPTID_BACKEND_IPV4;
-      }
-      break;
-    case '6':
-      if (util::strieq("backend-ipv"sv, name.substr(0, 11))) {
-        return SHRPX_OPTID_BACKEND_IPV6;
-      }
-      break;
     case 'c':
       if (util::strieq("http2-altsv"sv, name.substr(0, 11))) {
         return SHRPX_OPTID_HTTP2_ALTSVC;
@@ -2104,19 +2075,8 @@ int option_lookup_token(std::string_view name) {
       if (util::strieq("host-rewrit"sv, name.substr(0, 11))) {
         return SHRPX_OPTID_HOST_REWRITE;
       }
-      if (util::strieq("http2-bridg"sv, name.substr(0, 11))) {
-        return SHRPX_OPTID_HTTP2_BRIDGE;
-      }
-      break;
-    case 'p':
-      if (util::strieq("ocsp-startu"sv, name.substr(0, 11))) {
-        return SHRPX_OPTID_OCSP_STARTUP;
-      }
       break;
     case 'y':
-      if (util::strieq("client-prox"sv, name.substr(0, 11))) {
-        return SHRPX_OPTID_CLIENT_PROXY;
-      }
       if (util::strieq("forwarded-b"sv, name.substr(0, 11))) {
         return SHRPX_OPTID_FORWARDED_BY;
       }
@@ -2173,35 +2133,17 @@ int option_lookup_token(std::string_view name) {
         return SHRPX_OPTID_ACCESSLOG_FILE;
       }
       break;
-    case 'h':
-      if (util::strieq("no-server-pus"sv, name.substr(0, 13))) {
-        return SHRPX_OPTID_NO_SERVER_PUSH;
-      }
-      break;
     case 'k':
       if (util::strieq("rlimit-memloc"sv, name.substr(0, 13))) {
         return SHRPX_OPTID_RLIMIT_MEMLOCK;
       }
       break;
-    case 'p':
-      if (util::strieq("no-verify-ocs"sv, name.substr(0, 13))) {
-        return SHRPX_OPTID_NO_VERIFY_OCSP;
-      }
-      break;
     case 's':
-      if (util::strieq("backend-no-tl"sv, name.substr(0, 13))) {
-        return SHRPX_OPTID_BACKEND_NO_TLS;
-      }
       if (util::strieq("client-cipher"sv, name.substr(0, 13))) {
         return SHRPX_OPTID_CLIENT_CIPHERS;
       }
       if (util::strieq("single-proces"sv, name.substr(0, 13))) {
         return SHRPX_OPTID_SINGLE_PROCESS;
-      }
-      break;
-    case 't':
-      if (util::strieq("tls-proto-lis"sv, name.substr(0, 13))) {
-        return SHRPX_OPTID_TLS_PROTO_LIST;
       }
       break;
     }
@@ -2212,18 +2154,10 @@ int option_lookup_token(std::string_view name) {
       if (util::strieq("ech-config-fil"sv, name.substr(0, 14))) {
         return SHRPX_OPTID_ECH_CONFIG_FILE;
       }
-      if (util::strieq("no-host-rewrit"sv, name.substr(0, 14))) {
-        return SHRPX_OPTID_NO_HOST_REWRITE;
-      }
       break;
     case 'g':
       if (util::strieq("errorlog-syslo"sv, name.substr(0, 14))) {
         return SHRPX_OPTID_ERRORLOG_SYSLOG;
-      }
-      break;
-    case 's':
-      if (util::strieq("frontend-no-tl"sv, name.substr(0, 14))) {
-        return SHRPX_OPTID_FRONTEND_NO_TLS;
       }
       break;
     case 'y':
@@ -2269,14 +2203,6 @@ int option_lookup_token(std::string_view name) {
       }
       if (util::strieq("worker-write-rat"sv, name.substr(0, 16))) {
         return SHRPX_OPTID_WORKER_WRITE_RATE;
-      }
-      break;
-    case 's':
-      if (util::strieq("backend-http1-tl"sv, name.substr(0, 16))) {
-        return SHRPX_OPTID_BACKEND_HTTP1_TLS;
-      }
-      if (util::strieq("max-header-field"sv, name.substr(0, 16))) {
-        return SHRPX_OPTID_MAX_HEADER_FIELDS;
       }
       break;
     case 't':
@@ -2341,16 +2267,10 @@ int option_lookup_token(std::string_view name) {
       if (util::strieq("add-x-forwarded-fo"sv, name.substr(0, 18))) {
         return SHRPX_OPTID_ADD_X_FORWARDED_FOR;
       }
-      if (util::strieq("header-field-buffe"sv, name.substr(0, 18))) {
-        return SHRPX_OPTID_HEADER_FIELD_BUFFER;
-      }
       break;
     case 't':
       if (util::strieq("redirect-https-por"sv, name.substr(0, 18))) {
         return SHRPX_OPTID_REDIRECT_HTTPS_PORT;
-      }
-      if (util::strieq("stream-read-timeou"sv, name.substr(0, 18))) {
-        return SHRPX_OPTID_STREAM_READ_TIMEOUT;
       }
       break;
     }
@@ -2360,11 +2280,6 @@ int option_lookup_token(std::string_view name) {
     case 'g':
       if (util::strieq("frontend-frame-debu"sv, name.substr(0, 19))) {
         return SHRPX_OPTID_FRONTEND_FRAME_DEBUG;
-      }
-      break;
-    case 'l':
-      if (util::strieq("ocsp-update-interva"sv, name.substr(0, 19))) {
-        return SHRPX_OPTID_OCSP_UPDATE_INTERVAL;
       }
       break;
     case 's':
@@ -2379,9 +2294,6 @@ int option_lookup_token(std::string_view name) {
       if (util::strieq("backend-read-timeou"sv, name.substr(0, 19))) {
         return SHRPX_OPTID_BACKEND_READ_TIMEOUT;
       }
-      if (util::strieq("stream-write-timeou"sv, name.substr(0, 19))) {
-        return SHRPX_OPTID_STREAM_WRITE_TIMEOUT;
-      }
       if (util::strieq("verify-client-cacer"sv, name.substr(0, 19))) {
         return SHRPX_OPTID_VERIFY_CLIENT_CACERT;
       }
@@ -2395,22 +2307,12 @@ int option_lookup_token(std::string_view name) {
     break;
   case 21:
     switch (name[20]) {
-    case 'd':
-      if (util::strieq("backend-tls-sni-fiel"sv, name.substr(0, 20))) {
-        return SHRPX_OPTID_BACKEND_TLS_SNI_FIELD;
-      }
-      break;
     case 'e':
       if (util::strieq("ech-retry-config-fil"sv, name.substr(0, 20))) {
         return SHRPX_OPTID_ECH_RETRY_CONFIG_FILE;
       }
       if (util::strieq("quic-bpf-program-fil"sv, name.substr(0, 20))) {
         return SHRPX_OPTID_QUIC_BPF_PROGRAM_FILE;
-      }
-      break;
-    case 'l':
-      if (util::strieq("accept-proxy-protoco"sv, name.substr(0, 20))) {
-        return SHRPX_OPTID_ACCEPT_PROXY_PROTOCOL;
       }
       break;
     case 'n':
@@ -2434,9 +2336,6 @@ int option_lookup_token(std::string_view name) {
     case 't':
       if (util::strieq("backend-write-timeou"sv, name.substr(0, 20))) {
         return SHRPX_OPTID_BACKEND_WRITE_TIMEOUT;
-      }
-      if (util::strieq("frontend-read-timeou"sv, name.substr(0, 20))) {
-        return SHRPX_OPTID_FRONTEND_READ_TIMEOUT;
       }
       break;
     case 'y':
@@ -2521,11 +2420,6 @@ int option_lookup_token(std::string_view name) {
         return SHRPX_OPTID_TLS_TICKET_KEY_MEMCACHED;
       }
       break;
-    case 'e':
-      if (util::strieq("fetch-ocsp-response-fil"sv, name.substr(0, 23))) {
-        return SHRPX_OPTID_FETCH_OCSP_RESPONSE_FILE;
-      }
-      break;
     case 'o':
       if (util::strieq("no-add-x-forwarded-prot"sv, name.substr(0, 23))) {
         return SHRPX_OPTID_NO_ADD_X_FORWARDED_PROTO;
@@ -2557,9 +2451,6 @@ int option_lookup_token(std::string_view name) {
       }
       break;
     case 's':
-      if (util::strieq("backend-http2-window-bit"sv, name.substr(0, 24))) {
-        return SHRPX_OPTID_BACKEND_HTTP2_WINDOW_BITS;
-      }
       if (util::strieq("max-request-header-field"sv, name.substr(0, 24))) {
         return SHRPX_OPTID_MAX_REQUEST_HEADER_FIELDS;
       }
@@ -2587,9 +2478,6 @@ int option_lookup_token(std::string_view name) {
       }
       break;
     case 's':
-      if (util::strieq("frontend-http2-window-bit"sv, name.substr(0, 25))) {
-        return SHRPX_OPTID_FRONTEND_HTTP2_WINDOW_BITS;
-      }
       if (util::strieq("max-response-header-field"sv, name.substr(0, 25))) {
         return SHRPX_OPTID_MAX_RESPONSE_HEADER_FIELDS;
       }
@@ -2601,9 +2489,6 @@ int option_lookup_token(std::string_view name) {
       if (util::strieq("frontend-quic-idle-timeou"sv, name.substr(0, 25))) {
         return SHRPX_OPTID_FRONTEND_QUIC_IDLE_TIMEOUT;
       }
-      if (util::strieq("no-http2-cipher-black-lis"sv, name.substr(0, 25))) {
-        return SHRPX_OPTID_NO_HTTP2_CIPHER_BLACK_LIST;
-      }
       if (util::strieq("no-http2-cipher-block-lis"sv, name.substr(0, 25))) {
         return SHRPX_OPTID_NO_HTTP2_CIPHER_BLOCK_LIST;
       }
@@ -2612,11 +2497,6 @@ int option_lookup_token(std::string_view name) {
     break;
   case 27:
     switch (name[26]) {
-    case 'd':
-      if (util::strieq("tls-session-cache-memcache"sv, name.substr(0, 26))) {
-        return SHRPX_OPTID_TLS_SESSION_CACHE_MEMCACHED;
-      }
-      break;
     case 'n':
       if (util::strieq("frontend-quic-require-toke"sv, name.substr(0, 26))) {
         return SHRPX_OPTID_FRONTEND_QUIC_REQUIRE_TOKEN;
@@ -2639,14 +2519,8 @@ int option_lookup_token(std::string_view name) {
       if (util::strieq("frontend-http2-idle-timeou"sv, name.substr(0, 26))) {
         return SHRPX_OPTID_FRONTEND_HTTP2_IDLE_TIMEOUT;
       }
-      if (util::strieq("frontend-http2-read-timeou"sv, name.substr(0, 26))) {
-        return SHRPX_OPTID_FRONTEND_HTTP2_READ_TIMEOUT;
-      }
       if (util::strieq("frontend-http3-idle-timeou"sv, name.substr(0, 26))) {
         return SHRPX_OPTID_FRONTEND_HTTP3_IDLE_TIMEOUT;
-      }
-      if (util::strieq("frontend-http3-read-timeou"sv, name.substr(0, 26))) {
-        return SHRPX_OPTID_FRONTEND_HTTP3_READ_TIMEOUT;
       }
       if (util::strieq("frontend-keep-alive-timeou"sv, name.substr(0, 26))) {
         return SHRPX_OPTID_FRONTEND_KEEP_ALIVE_TIMEOUT;
@@ -2669,14 +2543,6 @@ int option_lookup_token(std::string_view name) {
     case 'r':
       if (util::strieq("response-header-field-buffe"sv, name.substr(0, 27))) {
         return SHRPX_OPTID_RESPONSE_HEADER_FIELD_BUFFER;
-      }
-      break;
-    case 's':
-      if (util::strieq("http2-max-concurrent-stream"sv, name.substr(0, 27))) {
-        return SHRPX_OPTID_HTTP2_MAX_CONCURRENT_STREAMS;
-      }
-      if (util::strieq("tls-ticket-key-memcached-tl"sv, name.substr(0, 27))) {
-        return SHRPX_OPTID_TLS_TICKET_KEY_MEMCACHED_TLS;
       }
       break;
     case 't':
@@ -2730,12 +2596,6 @@ int option_lookup_token(std::string_view name) {
     break;
   case 31:
     switch (name[30]) {
-    case 's':
-      if (util::strieq("tls-session-cache-memcached-tl"sv,
-                       name.substr(0, 30))) {
-        return SHRPX_OPTID_TLS_SESSION_CACHE_MEMCACHED_TLS;
-      }
-      break;
     case 't':
       if (util::strieq("frontend-http2-settings-timeou"sv,
                        name.substr(0, 30))) {
@@ -2771,10 +2631,6 @@ int option_lookup_token(std::string_view name) {
       }
       break;
     case 't':
-      if (util::strieq("client-no-http2-cipher-black-lis"sv,
-                       name.substr(0, 32))) {
-        return SHRPX_OPTID_CLIENT_NO_HTTP2_CIPHER_BLACK_LIST;
-      }
       if (util::strieq("client-no-http2-cipher-block-lis"sv,
                        name.substr(0, 32))) {
         return SHRPX_OPTID_CLIENT_NO_HTTP2_CIPHER_BLOCK_LIST;
@@ -2794,12 +2650,6 @@ int option_lookup_token(std::string_view name) {
       if (util::strieq("frontend-http2-dump-request-heade"sv,
                        name.substr(0, 33))) {
         return SHRPX_OPTID_FRONTEND_HTTP2_DUMP_REQUEST_HEADER;
-      }
-      break;
-    case 't':
-      if (util::strieq("backend-http1-connections-per-hos"sv,
-                       name.substr(0, 33))) {
-        return SHRPX_OPTID_BACKEND_HTTP1_CONNECTIONS_PER_HOST;
       }
       break;
     case 'y':
@@ -2856,17 +2706,7 @@ int option_lookup_token(std::string_view name) {
         return SHRPX_OPTID_BACKEND_HTTP2_CONNECTION_WINDOW_SIZE;
       }
       break;
-    case 'r':
-      if (util::strieq("backend-http2-connections-per-worke"sv,
-                       name.substr(0, 35))) {
-        return SHRPX_OPTID_BACKEND_HTTP2_CONNECTIONS_PER_WORKER;
-      }
-      break;
     case 's':
-      if (util::strieq("backend-http2-connection-window-bit"sv,
-                       name.substr(0, 35))) {
-        return SHRPX_OPTID_BACKEND_HTTP2_CONNECTION_WINDOW_BITS;
-      }
       if (util::strieq("backend-http2-max-concurrent-stream"sv,
                        name.substr(0, 35))) {
         return SHRPX_OPTID_BACKEND_HTTP2_MAX_CONCURRENT_STREAMS;
@@ -2885,16 +2725,8 @@ int option_lookup_token(std::string_view name) {
                        name.substr(0, 36))) {
         return SHRPX_OPTID_FRONTEND_HTTP3_CONNECTION_WINDOW_SIZE;
       }
-      if (util::strieq("tls-session-cache-memcached-cert-fil"sv,
-                       name.substr(0, 36))) {
-        return SHRPX_OPTID_TLS_SESSION_CACHE_MEMCACHED_CERT_FILE;
-      }
       break;
     case 's':
-      if (util::strieq("frontend-http2-connection-window-bit"sv,
-                       name.substr(0, 36))) {
-        return SHRPX_OPTID_FRONTEND_HTTP2_CONNECTION_WINDOW_BITS;
-      }
       if (util::strieq("frontend-http2-max-concurrent-stream"sv,
                        name.substr(0, 36))) {
         return SHRPX_OPTID_FRONTEND_HTTP2_MAX_CONCURRENT_STREAMS;
@@ -2902,16 +2734,6 @@ int option_lookup_token(std::string_view name) {
       if (util::strieq("frontend-http3-max-concurrent-stream"sv,
                        name.substr(0, 36))) {
         return SHRPX_OPTID_FRONTEND_HTTP3_MAX_CONCURRENT_STREAMS;
-      }
-      break;
-    }
-    break;
-  case 38:
-    switch (name[37]) {
-    case 'd':
-      if (util::strieq("backend-http1-connections-per-fronten"sv,
-                       name.substr(0, 37))) {
-        return SHRPX_OPTID_BACKEND_HTTP1_CONNECTIONS_PER_FRONTEND;
       }
       break;
     }
@@ -2962,26 +2784,6 @@ int option_lookup_token(std::string_view name) {
       if (util::strieq("tls-ticket-key-memcached-private-key-fil"sv,
                        name.substr(0, 40))) {
         return SHRPX_OPTID_TLS_TICKET_KEY_MEMCACHED_PRIVATE_KEY_FILE;
-      }
-      break;
-    }
-    break;
-  case 42:
-    switch (name[41]) {
-    case 'y':
-      if (util::strieq("tls-session-cache-memcached-address-famil"sv,
-                       name.substr(0, 41))) {
-        return SHRPX_OPTID_TLS_SESSION_CACHE_MEMCACHED_ADDRESS_FAMILY;
-      }
-      break;
-    }
-    break;
-  case 44:
-    switch (name[43]) {
-    case 'e':
-      if (util::strieq("tls-session-cache-memcached-private-key-fil"sv,
-                       name.substr(0, 43))) {
-        return SHRPX_OPTID_TLS_SESSION_CACHE_MEMCACHED_PRIVATE_KEY_FILE;
       }
       break;
     }
@@ -3169,16 +2971,6 @@ std::expected<void, Error> parse_config(
         return {};
       });
 #endif // !defined(NOTHREADS)
-  case SHRPX_OPTID_HTTP2_MAX_CONCURRENT_STREAMS:
-    Log{WARN} << opt << ": deprecated. Use "
-              << SHRPX_OPT_FRONTEND_HTTP2_MAX_CONCURRENT_STREAMS << " and "
-              << SHRPX_OPT_BACKEND_HTTP2_MAX_CONCURRENT_STREAMS << " instead.";
-
-    return parse_uint<size_t>(opt, optarg).transform([config](auto &&r) {
-      auto &http2conf = config->http2;
-      http2conf.upstream.max_concurrent_streams = r;
-      http2conf.downstream.max_concurrent_streams = r;
-    });
   case SHRPX_OPTID_LOG_LEVEL:
     return Log::get_severity_level_by_name(optarg)
       .transform([config](auto &&r) { config->logging.severity = r; })
@@ -3195,16 +2987,6 @@ std::expected<void, Error> parse_config(
     config->http2_proxy = util::strieq("yes"sv, optarg);
 
     return {};
-  case SHRPX_OPTID_HTTP2_BRIDGE:
-    Log{ERROR} << opt
-               << ": deprecated.  Use backend=<addr>,<port>;;proto=h2;tls";
-    return std::unexpected{Error::INVALID_CONFIG};
-  case SHRPX_OPTID_CLIENT_PROXY:
-    Log{ERROR}
-      << opt
-      << ": deprecated.  Use http2-proxy, frontend=<addr>,<port>;no-tls "
-         "and backend=<addr>,<port>;;proto=h2;tls";
-    return std::unexpected{Error::INVALID_CONFIG};
   case SHRPX_OPTID_ADD_X_FORWARDED_FOR:
     config->http.xff.add = util::strieq("yes"sv, optarg);
 
@@ -3217,17 +2999,10 @@ std::expected<void, Error> parse_config(
     config->http.no_via = util::strieq("yes"sv, optarg);
 
     return {};
-  case SHRPX_OPTID_FRONTEND_HTTP2_READ_TIMEOUT:
-    Log{WARN} << opt << ": deprecated.  Use frontend-http2-idle-timeout";
-    // fall through
   case SHRPX_OPTID_FRONTEND_HTTP2_IDLE_TIMEOUT:
     return parse_duration(opt, optarg).transform([config](auto &&r) {
       config->conn.upstream.timeout.http2_idle = r;
     });
-  case SHRPX_OPTID_FRONTEND_READ_TIMEOUT:
-    Log{WARN} << opt << ": deprecated.  Use frontend-header-timeout";
-
-    return {};
   case SHRPX_OPTID_FRONTEND_HEADER_TIMEOUT:
     return parse_duration(opt, optarg).transform([config](auto &&r) {
       config->http.timeout.header = r;
@@ -3247,24 +3022,6 @@ std::expected<void, Error> parse_config(
   case SHRPX_OPTID_BACKEND_CONNECT_TIMEOUT:
     return parse_duration(opt, optarg).transform([config](auto &&r) {
       config->conn.downstream->timeout.connect = r;
-    });
-  case SHRPX_OPTID_STREAM_READ_TIMEOUT:
-    Log{WARN} << opt
-              << ": deprecated.  Use --frontend-stream-read-timeout and "
-                 "--backend-stream-read-timeout";
-
-    return parse_duration(opt, optarg).transform([config](auto &&r) {
-      config->http.upstream.timeout.stream_read = r;
-      config->http.downstream.timeout.stream_read = r;
-    });
-  case SHRPX_OPTID_STREAM_WRITE_TIMEOUT:
-    Log{WARN} << opt
-              << ": deprecated.  Use --frontend-stream-write-timeout and "
-                 "--backend-stream-write-timeout";
-
-    return parse_duration(opt, optarg).transform([config](auto &&r) {
-      config->http.upstream.timeout.stream_write = r;
-      config->http.downstream.timeout.stream_write = r;
     });
   case SHRPX_OPTID_ACCESSLOG_FILE:
     config->logging.access.file = make_string_ref(config->balloc, optarg);
@@ -3294,81 +3051,6 @@ std::expected<void, Error> parse_config(
     return parse_duration(opt, optarg).transform([config](auto &&r) {
       config->conn.downstream->timeout.idle_read = r;
     });
-  case SHRPX_OPTID_FRONTEND_HTTP2_WINDOW_BITS:
-  case SHRPX_OPTID_BACKEND_HTTP2_WINDOW_BITS: {
-    Log{WARN} << opt << ": deprecated.  Use "
-              << (optid == SHRPX_OPTID_FRONTEND_HTTP2_WINDOW_BITS
-                    ? SHRPX_OPT_FRONTEND_HTTP2_WINDOW_SIZE
-                    : SHRPX_OPT_BACKEND_HTTP2_WINDOW_SIZE);
-    int32_t *resp;
-
-    if (optid == SHRPX_OPTID_FRONTEND_HTTP2_WINDOW_BITS) {
-      resp = &config->http2.upstream.window_size;
-    } else {
-      resp = &config->http2.downstream.window_size;
-    }
-
-    return parse_uint<uint32_t>(opt, optarg)
-      .and_then([resp, opt](auto &&r) -> std::expected<void, Error> {
-        if (r >= 31) {
-          Log{ERROR} << opt
-                     << ": specify the integer in the range [0, 30], inclusive";
-          return std::unexpected{Error::INVALID_CONFIG};
-        }
-
-        // Make 16 bits to the HTTP/2 default 64KiB - 1.  This is the
-        // same behaviour of previous code.
-        *resp = (1 << r) - 1;
-
-        return {};
-      });
-  }
-  case SHRPX_OPTID_FRONTEND_HTTP2_CONNECTION_WINDOW_BITS:
-  case SHRPX_OPTID_BACKEND_HTTP2_CONNECTION_WINDOW_BITS: {
-    Log{WARN} << opt << ": deprecated.  Use "
-              << (optid == SHRPX_OPTID_FRONTEND_HTTP2_CONNECTION_WINDOW_BITS
-                    ? SHRPX_OPT_FRONTEND_HTTP2_CONNECTION_WINDOW_SIZE
-                    : SHRPX_OPT_BACKEND_HTTP2_CONNECTION_WINDOW_SIZE);
-    int32_t *resp;
-
-    if (optid == SHRPX_OPTID_FRONTEND_HTTP2_CONNECTION_WINDOW_BITS) {
-      resp = &config->http2.upstream.connection_window_size;
-    } else {
-      resp = &config->http2.downstream.connection_window_size;
-    }
-
-    return parse_uint<uint32_t>(opt, optarg)
-      .and_then([resp, opt](auto &&r) -> std::expected<void, Error> {
-        if (r < 16 || r >= 31) {
-          Log{ERROR}
-            << opt << ": specify the integer in the range [16, 30], inclusive";
-          return std::unexpected{Error::INVALID_CONFIG};
-        }
-
-        *resp = (1 << r) - 1;
-
-        return {};
-      });
-  }
-  case SHRPX_OPTID_FRONTEND_NO_TLS:
-    Log{WARN} << opt << ": deprecated.  Use no-tls keyword in "
-              << SHRPX_OPT_FRONTEND;
-    return {};
-  case SHRPX_OPTID_BACKEND_NO_TLS:
-    Log{WARN} << opt
-              << ": deprecated.  backend connection is not encrypted by "
-                 "default.  See also "
-              << SHRPX_OPT_BACKEND_TLS;
-    return {};
-  case SHRPX_OPTID_BACKEND_TLS_SNI_FIELD:
-    Log{WARN} << opt
-              << ": deprecated.  Use sni keyword in --backend option.  "
-                 "For now, all sni values of all backends are "
-                 "overridden by the given value "
-              << optarg;
-    config->tls.backend_sni_name = make_string_ref(config->balloc, optarg);
-
-    return {};
   case SHRPX_OPTID_PID_FILE:
     config->pid_file = make_string_ref(config->balloc, optarg);
 
@@ -3485,31 +3167,12 @@ std::expected<void, Error> parse_config(
     config->tls.tls13_ciphers = make_string_ref(config->balloc, optarg);
 
     return {};
-  case SHRPX_OPTID_CLIENT:
-    Log{ERROR} << opt
-               << ": deprecated.  Use frontend=<addr>,<port>;no-tls, "
-                  "backend=<addr>,<port>;;proto=h2;tls";
-    return std::unexpected{Error::INVALID_CONFIG};
   case SHRPX_OPTID_INSECURE:
     config->tls.insecure = util::strieq("yes"sv, optarg);
 
     return {};
   case SHRPX_OPTID_CACERT:
     config->tls.cacert = make_string_ref(config->balloc, optarg);
-
-    return {};
-  case SHRPX_OPTID_BACKEND_IPV4:
-    Log{WARN} << opt
-              << ": deprecated.  Use backend-address-family=IPv4 instead.";
-
-    config->conn.downstream->family = AF_INET;
-
-    return {};
-  case SHRPX_OPTID_BACKEND_IPV6:
-    Log{WARN} << opt
-              << ": deprecated.  Use backend-address-family=IPv6 instead.";
-
-    config->conn.downstream->family = AF_INET6;
 
     return {};
   case SHRPX_OPTID_BACKEND_HTTP_PROXY_URI: {
@@ -3578,13 +3241,6 @@ std::expected<void, Error> parse_config(
   case SHRPX_OPTID_WORKER_WRITE_BURST:
     Log{WARN} << opt << ": not implemented yet";
     return {};
-  case SHRPX_OPTID_TLS_PROTO_LIST:
-    Log{WARN} << opt
-              << ": deprecated.  Use tls-min-proto-version and "
-                 "tls-max-proto-version instead.";
-    config->tls.tls_proto_list = util::split_str(config->balloc, optarg, ',');
-
-    return {};
   case SHRPX_OPTID_VERIFY_CLIENT:
     config->tls.client_verify.enabled = util::strieq("yes"sv, optarg);
 
@@ -3650,17 +3306,6 @@ std::expected<void, Error> parse_config(
     config->http.no_location_rewrite = util::strieq("yes"sv, optarg);
 
     return {};
-  case SHRPX_OPTID_NO_HOST_REWRITE:
-    Log{WARN} << SHRPX_OPT_NO_HOST_REWRITE
-              << ": deprecated.  :authority and host header fields are NOT "
-                 "altered by default.  To rewrite these headers, use "
-                 "--host-rewrite option.";
-
-    return {};
-  case SHRPX_OPTID_BACKEND_HTTP1_CONNECTIONS_PER_HOST:
-    Log{WARN} << opt
-              << ": deprecated.  Use backend-connections-per-host instead.";
-  // fall through
   case SHRPX_OPTID_BACKEND_CONNECTIONS_PER_HOST:
     return parse_uint<size_t>(opt, optarg)
       .and_then([config, opt](auto &&r) -> std::expected<void, Error> {
@@ -3674,10 +3319,6 @@ std::expected<void, Error> parse_config(
 
         return {};
       });
-  case SHRPX_OPTID_BACKEND_HTTP1_CONNECTIONS_PER_FRONTEND:
-    Log{WARN} << opt << ": deprecated.  Use "
-              << SHRPX_OPT_BACKEND_CONNECTIONS_PER_FRONTEND << " instead.";
-  // fall through
   case SHRPX_OPTID_BACKEND_CONNECTIONS_PER_FRONTEND:
     return parse_uint<size_t>(opt, optarg).transform([config](auto &&r) {
       config->conn.downstream->connections_per_frontend = r;
@@ -3712,32 +3353,10 @@ std::expected<void, Error> parse_config(
 
         return {};
       });
-  case SHRPX_OPTID_NO_SERVER_PUSH:
-    Log{WARN} << opt << ": deprecated.  It has no effect.";
-    return {};
-  case SHRPX_OPTID_BACKEND_HTTP2_CONNECTIONS_PER_WORKER:
-    Log{WARN} << opt << ": deprecated.";
-    return {};
-  case SHRPX_OPTID_FETCH_OCSP_RESPONSE_FILE:
-    Log{WARN} << opt << ": deprecated.  It has no effect";
-    return {};
-  case SHRPX_OPTID_OCSP_UPDATE_INTERVAL:
-    Log{WARN} << opt << ": deprecated.  It has no effect";
-    return {};
-  case SHRPX_OPTID_NO_OCSP:
-    Log{WARN} << opt << ": deprecated.  It has no effect";
-    return {};
-  case SHRPX_OPTID_HEADER_FIELD_BUFFER:
-    Log{WARN} << opt
-              << ": deprecated.  Use request-header-field-buffer instead.";
-  // fall through
   case SHRPX_OPTID_REQUEST_HEADER_FIELD_BUFFER:
     return parse_uint_with_unit<size_t>(opt, optarg)
       .transform(
         [config](auto &&r) { config->http.request_header_field_buffer = r; });
-  case SHRPX_OPTID_MAX_HEADER_FIELDS:
-    Log{WARN} << opt << ": deprecated.  Use max-request-header-fields instead.";
-  // fall through
   case SHRPX_OPTID_MAX_REQUEST_HEADER_FIELDS:
     return parse_uint<size_t>(opt, optarg).transform([config](auto &&r) {
       config->http.max_request_header_fields = r;
@@ -3779,9 +3398,6 @@ std::expected<void, Error> parse_config(
   case SHRPX_OPTID_HOST_REWRITE:
     config->http.no_host_rewrite = !util::strieq("yes"sv, optarg);
 
-    return {};
-  case SHRPX_OPTID_TLS_SESSION_CACHE_MEMCACHED:
-    Log{WARN} << opt << ": deprecated.  It has no effect";
     return {};
   case SHRPX_OPTID_TLS_TICKET_KEY_MEMCACHED: {
     auto addr_end = std::ranges::find(optarg, ';');
@@ -3845,12 +3461,6 @@ std::expected<void, Error> parse_config(
     Log{WARN} << opt
               << ": ignored because mruby support is disabled at build time.";
 #endif // !defined(HAVE_MRUBY)
-    return {};
-  case SHRPX_OPTID_ACCEPT_PROXY_PROTOCOL:
-    Log{WARN} << opt << ": deprecated.  Use proxyproto keyword in "
-              << SHRPX_OPT_FRONTEND << " instead.";
-    config->conn.upstream.accept_proxy_protocol = util::strieq("yes"sv, optarg);
-
     return {};
   case SHRPX_OPTID_ADD_FORWARDED: {
     auto &fwdconf = config->http.forwarded;
@@ -3917,30 +3527,8 @@ std::expected<void, Error> parse_config(
 
     return {};
   }
-  case SHRPX_OPTID_NO_HTTP2_CIPHER_BLACK_LIST:
-    Log{WARN} << opt << ": deprecated.  Use "
-              << SHRPX_OPT_NO_HTTP2_CIPHER_BLOCK_LIST << " instead.";
-    // fall through
   case SHRPX_OPTID_NO_HTTP2_CIPHER_BLOCK_LIST:
     config->tls.no_http2_cipher_block_list = util::strieq("yes"sv, optarg);
-    return {};
-  case SHRPX_OPTID_BACKEND_HTTP1_TLS:
-  case SHRPX_OPTID_BACKEND_TLS:
-    Log{WARN} << opt << ": deprecated.  Use tls keyword in "
-              << SHRPX_OPT_BACKEND << " instead.";
-    return {};
-  case SHRPX_OPTID_TLS_SESSION_CACHE_MEMCACHED_TLS:
-    Log{WARN} << opt << ": deprecated.  It has no effect";
-    return {};
-  case SHRPX_OPTID_TLS_SESSION_CACHE_MEMCACHED_CERT_FILE:
-    Log{WARN} << opt << ": deprecated.  It has no effect";
-    return {};
-  case SHRPX_OPTID_TLS_SESSION_CACHE_MEMCACHED_PRIVATE_KEY_FILE:
-    Log{WARN} << opt << ": deprecated.  It has no effect";
-    return {};
-  case SHRPX_OPTID_TLS_TICKET_KEY_MEMCACHED_TLS:
-    Log{WARN} << opt << ": deprecated.  Use tls keyword in "
-              << SHRPX_OPT_TLS_TICKET_KEY_MEMCACHED;
     return {};
   case SHRPX_OPTID_TLS_TICKET_KEY_MEMCACHED_CERT_FILE:
     config->tls.ticket.memcached.cert_file =
@@ -3956,9 +3544,6 @@ std::expected<void, Error> parse_config(
     return parse_address_family(opt, optarg).transform([config](auto &&r) {
       config->tls.ticket.memcached.family = r;
     });
-  case SHRPX_OPTID_TLS_SESSION_CACHE_MEMCACHED_ADDRESS_FAMILY:
-    Log{WARN} << opt << ": deprecated.  It has no effect";
-    return {};
   case SHRPX_OPTID_BACKEND_ADDRESS_FAMILY:
     return parse_address_family(opt, optarg).transform([config](auto &&r) {
       config->conn.downstream->family = r;
@@ -4055,10 +3640,6 @@ std::expected<void, Error> parse_config(
       .transform([config](auto &&r) {
         config->http2.downstream.decoder_dynamic_table_size = r;
       });
-  case SHRPX_OPTID_ECDH_CURVES:
-    Log{WARN} << opt << ": deprecated.  Use " << SHRPX_OPT_GROUPS
-              << " instead.";
-    // fall through
   case SHRPX_OPTID_GROUPS:
     config->tls.groups = make_string_ref(config->balloc, optarg);
     return {};
@@ -4115,10 +3696,6 @@ std::expected<void, Error> parse_config(
       << opt << ": ignored because underlying TLS library does not support PSK";
     return {};
 #endif // defined(OPENSSL_NO_PSK)
-  case SHRPX_OPTID_CLIENT_NO_HTTP2_CIPHER_BLACK_LIST:
-    Log{WARN} << opt << ": deprecated.  Use "
-              << SHRPX_OPT_CLIENT_NO_HTTP2_CIPHER_BLOCK_LIST << " instead.";
-    // fall through
   case SHRPX_OPTID_CLIENT_NO_HTTP2_CIPHER_BLOCK_LIST:
     config->tls.client.no_http2_cipher_block_list =
       util::strieq("yes"sv, optarg);
@@ -4170,12 +3747,6 @@ std::expected<void, Error> parse_config(
     config->http.xfp.strip_incoming = !util::strieq("yes"sv, optarg);
 
     return {};
-  case SHRPX_OPTID_OCSP_STARTUP:
-    Log{WARN} << opt << ": deprecated.  It has no effect";
-    return {};
-  case SHRPX_OPTID_NO_VERIFY_OCSP:
-    Log{WARN} << opt << ": deprecated.  It has no effect";
-    return {};
   case SHRPX_OPTID_VERIFY_CLIENT_TOLERATE_EXPIRED:
     config->tls.client_verify.tolerate_expired = util::strieq("yes"sv, optarg);
 
@@ -4211,9 +3782,6 @@ std::expected<void, Error> parse_config(
     return parse_altsvc(opt, optarg).transform([config](auto &&r) {
       config->http.http2_altsvcs.emplace_back(std::forward<decltype(r)>(r));
     });
-  case SHRPX_OPTID_FRONTEND_HTTP3_READ_TIMEOUT:
-    Log{WARN} << opt << ": deprecated.  Use frontend-http3-idle-timeout";
-    // fall through
   case SHRPX_OPTID_FRONTEND_HTTP3_IDLE_TIMEOUT:
 #ifdef ENABLE_HTTP3
     return parse_duration(opt, optarg).transform([config](auto &&r) {
@@ -4360,9 +3928,6 @@ std::expected<void, Error> parse_config(
   case SHRPX_OPTID_TLS_KTLS:
     config->tls.ktls = util::strieq("yes"sv, optarg);
     return {};
-  case SHRPX_OPTID_NPN_LIST:
-    Log{WARN} << opt << ": deprecated.  Use alpn-list instead.";
-    // fall through
   case SHRPX_OPTID_ALPN_LIST:
     config->tls.alpn_list = util::split_str(config->balloc, optarg, ',');
 
