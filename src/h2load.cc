@@ -2910,7 +2910,6 @@ int main(int argc, char **argv) {
       {"duration", required_argument, nullptr, 'D'},
       {"timing-script-file", required_argument, &flag, 3},
       {"base-uri", required_argument, nullptr, 'B'},
-      {"npn-list", required_argument, &flag, 4},
       {"rate-period", required_argument, &flag, 5},
       {"h1", no_argument, &flag, 6},
       {"header-table-size", required_argument, &flag, 7},
@@ -3282,11 +3281,6 @@ int main(int argc, char **argv) {
         // --ktls
         config.ktls = true;
         break;
-      case 4:
-        // npn-list option
-        std::println(stderr,
-                     "--npn-list: deprecated.  Use --alpn-list instead.");
-        // fall through
       case 19:
         // alpn-list option
         config.alpn_list =
