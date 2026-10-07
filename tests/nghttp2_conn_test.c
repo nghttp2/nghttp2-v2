@@ -4395,9 +4395,7 @@ void test_nghttp2_conn_recv_data(void) {
   assert_int(0, ==, rv);
   assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
               ==, conn->rx.frrd.state);
-  assert_size(1, ==, ud.recv_data.ncalled);
-  assert_int64(0x01, ==, ud.recv_data.stream_id);
-  assert_size(0, ==, ud.recv_data.datalen);
+  assert_size(0, ==, ud.recv_data.ncalled);
 
   nghttp2_hpack_encoder_free(&enc);
   nghttp2_conn_del(conn);

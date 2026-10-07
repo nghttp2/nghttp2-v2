@@ -705,7 +705,6 @@ static int conn_on_data(nghttp2_conn *conn, const nghttp2_frame_data *fr,
 static int conn_recv_data(nghttp2_conn *conn, nghttp2_context ctx,
                           const nghttp2_frame_data *fr) {
   nghttp2_stream *stream;
-  int rv;
 
   stream = nghttp2_conn_find_stream(conn, fr->hd.stream_id);
   if (!stream || (stream->flags & NGHTTP2_STREAM_FLAG_RST_STREAM)) {
@@ -717,17 +716,6 @@ static int conn_recv_data(nghttp2_conn *conn, nghttp2_context ctx,
 
     if (nghttp2_stream_require_strmq(stream)) {
       nghttp2_conn_strmq_push(conn, stream);
-    }
-  }
-
-  if ((fr->hd.flags & NGHTTP2_DATA_FLAG_END_STREAM) && fr->datalen == 0) {
-    rv = conn_call_recv_data(conn, stream, NULL, 0);
-    if (rv != 0) {
-      return rv;
-    }
-
-    if (stream->flags & NGHTTP2_STREAM_FLAG_RST_STREAM) {
-      return 0;
     }
   }
 
@@ -810,16 +798,7 @@ static int conn_recv_data_hd(nghttp2_conn *conn, nghttp2_context ctx,
 
   /* No need to validate flow control if the frame length is zero. */
 
-  if (fr->hd.flags & NGHTTP2_DATA_FLAG_END_STREAM) {
-    rv = conn_call_recv_data(conn, stream, NULL, 0);
-    if (rv != 0) {
-      return rv;
-    }
-
-    if (stream->flags & NGHTTP2_STREAM_FLAG_RST_STREAM) {
-      return 0;
-    }
-  } else {
+  if (!(fr->hd.flags & NGHTTP2_DATA_FLAG_END_STREAM)) {
     rv = conn_update_glitch_ratelim(conn, 1, ts);
     if (rv != 0) {
       return rv;
@@ -1810,9 +1789,12 @@ static int conn_read(nghttp2_conn *conn, nghttp2_context ctx,
 
             p += nread;
 
-            rv = conn_on_data(conn, &fr->data, fr->data.data, fr->data.datalen);
-            if (rv != 0) {
-              return nghttp2_conn_handle_error(conn, rv);
+            if (fr->data.datalen) {
+              rv =
+                conn_on_data(conn, &fr->data, fr->data.data, fr->data.datalen);
+              if (rv != 0) {
+                return nghttp2_conn_handle_error(conn, rv);
+              }
             }
 
             rv = conn_recv_data(conn, ctx, &fr->data);
