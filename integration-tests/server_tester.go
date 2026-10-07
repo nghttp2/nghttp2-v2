@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tatsuhiro-t/go-nghttp2"
+	"github.com/tatsuhiro-t/go-nghttp2/v2"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
 	"golang.org/x/net/websocket"
