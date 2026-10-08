@@ -1,6 +1,6 @@
 FROM debian:13 as build
 
-ARG NGHTTP2_BRANCH=master
+ARG NGHTTP2_BRANCH=main
 
 RUN <<EOF
 set -e
@@ -69,8 +69,8 @@ cd ..
 rm -rf libbpf
 
 git clone --recursive --shallow-submodules --depth 1 -b $NGHTTP2_BRANCH \
-    https://github.com/nghttp2/nghttp2
-cd nghttp2
+    https://github.com/nghttp2/nghttp2-v2
+cd nghttp2-v2
 autoreconf -i
 ./configure --disable-dependency-tracking --disable-examples \
     --disable-hpack-tools \
@@ -91,7 +91,7 @@ autoreconf -i
     PKG_CONFIG_PATH="/usr/local/lib64/pkgconfig"
 make -j$(nproc) install-strip
 cd ..
-rm -rf nghttp2
+rm -rf nghttp2-v2
 EOF
 
 FROM gcr.io/distroless/base-nossl-debian13
@@ -102,5 +102,5 @@ COPY --from=build --link \
     /usr/local/bin/nghttp \
     /usr/local/bin/nghttpd \
     /usr/local/bin/
-COPY --from=build --link /usr/local/lib/nghttp2/reuseport_kern.o \
-    /usr/local/lib/nghttp2/
+COPY --from=build --link /usr/local/lib/nghttp2-v2/reuseport_kern.o \
+    /usr/local/lib/nghttp2-v2/
