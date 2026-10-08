@@ -376,34 +376,6 @@ std::expected<void, Error> ClientHandler::upstream_write() {
   return {};
 }
 
-std::expected<void, Error> ClientHandler::upstream_http2_connhd_read() {
-  auto nread = std::min(left_connhd_len_, rb_.rleft());
-  if (memcmp(
-        &NGHTTP2_CLIENT_HTTP2_PREFACE[sizeof(NGHTTP2_CLIENT_HTTP2_PREFACE) - 1 -
-                                      left_connhd_len_],
-        rb_.pos(), nread) != 0) {
-    // There is no downgrade path here. Just drop the connection.
-    if (log_enabled(INFO)) {
-      Log{INFO, this} << "invalid client connection header";
-    }
-
-    return std::unexpected{Error::INTERNAL};
-  }
-
-  left_connhd_len_ -= nread;
-  rb_.drain(nread);
-  conn_.rlimit.startw();
-
-  if (left_connhd_len_ == 0) {
-    on_read_ = &ClientHandler::upstream_read;
-    // Run on_read to process data left in buffer since they are not
-    // notified further
-    return on_read();
-  }
-
-  return {};
-}
-
 std::expected<void, Error> ClientHandler::upstream_http1_connhd_read() {
   auto nread = std::min(left_connhd_len_, rb_.rleft());
   if (memcmp(
@@ -646,8 +618,6 @@ std::expected<void, Error> ClientHandler::validate_next_proto() {
   }
 
   if (util::check_h2_is_selected(proto)) {
-    on_read_ = &ClientHandler::upstream_http2_connhd_read;
-
     auto http2_upstream = std::make_unique<Http2Upstream>(this);
 
     upstream_ = std::move(http2_upstream);
@@ -1138,7 +1108,9 @@ MemchunkPool *ClientHandler::get_mcpool() { return worker_->get_mcpool(); }
 SSL *ClientHandler::get_ssl() const { return conn_.tls.ssl; }
 
 void ClientHandler::direct_http2_upgrade() {
-  upstream_ = std::make_unique<Http2Upstream>(this);
+  auto h2upstream = std::make_unique<Http2Upstream>(this);
+  h2upstream->read_client_http2_preface();
+  upstream_ = std::move(h2upstream);
   alpn_ = NGHTTP2_CLEARTEXT_PROTO_VERSION_ID;
   on_read_ = &ClientHandler::upstream_read;
   write_ = &ClientHandler::write_clear;

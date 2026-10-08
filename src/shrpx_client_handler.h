@@ -87,7 +87,6 @@ public:
 
   std::expected<void, Error> upstream_noop() { return {}; }
   std::expected<void, Error> upstream_read();
-  std::expected<void, Error> upstream_http2_connhd_read();
   std::expected<void, Error> upstream_http1_connhd_read();
   std::expected<void, Error> upstream_write();
 

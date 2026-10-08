@@ -129,6 +129,8 @@ public:
 
   std::expected<void, Error> redirect_to_https(Downstream *downstream);
 
+  void read_client_http2_preface();
+
 private:
   DefaultMemchunks wb_;
   std::unique_ptr<HttpsUpstream> pre_upstream_;

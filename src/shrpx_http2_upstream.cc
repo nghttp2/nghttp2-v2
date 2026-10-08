@@ -774,12 +774,6 @@ Http2Upstream::Http2Upstream(ClientHandler *handler)
 
   assert(rv == 0);
 
-  rv = nghttp2_conn_read(
-    conn_, reinterpret_cast<const uint8_t *>(NGHTTP2_CLIENT_HTTP2_PREFACE),
-    sizeof(NGHTTP2_CLIENT_HTTP2_PREFACE) - 1, util::timestamp());
-
-  assert(rv == 0);
-
   ev_timer_init(
     &http2_timer_,
     [](struct ev_loop *loop, ev_timer *w, int revents) {
@@ -838,7 +832,7 @@ std::expected<void, Error> Http2Upstream::on_read() {
     auto rv =
       nghttp2_conn_read(conn_, rb->pos(), rb->rleft(), util::timestamp());
     if (rv != 0) {
-      Log{ERROR, this} << "nghttp2_session_mem_recv2() returned error: "
+      Log{ERROR, this} << "nghttp2_conn_read() returned error: "
                        << nghttp2_strerror(static_cast<int>(rv));
 
       return std::unexpected{Error::HTTP2};
@@ -1855,5 +1849,13 @@ bool Http2Upstream::response_empty() const { return wb_.rleft() == 0; }
 DefaultMemchunks *Http2Upstream::get_response_buf() { return &wb_; }
 
 size_t Http2Upstream::get_max_buffer_size() const { return max_buffer_size_; }
+
+void Http2Upstream::read_client_http2_preface() {
+  auto rv = nghttp2_conn_read(
+    conn_, reinterpret_cast<const uint8_t *>(NGHTTP2_CLIENT_HTTP2_PREFACE),
+    sizeof(NGHTTP2_CLIENT_HTTP2_PREFACE) - 1, util::timestamp());
+
+  assert(rv == 0);
+}
 
 } // namespace shrpx
