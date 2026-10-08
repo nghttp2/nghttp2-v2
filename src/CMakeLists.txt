@@ -59,15 +59,15 @@ if(ENABLE_APP)
     network.cc
   )
 
-  # # nghttp client
-  # set(NGHTTP_SOURCES
-  #   ${HELPER_OBJECTS}
-  #   nghttp.cc
-  #   tls.cc
-  # )
-  # if(HAVE_LIBXML2)
-  #   list(APPEND NGHTTP_SOURCES HtmlParser.cc)
-  # endif()
+  # nghttp client
+  set(NGHTTP_SOURCES
+    ${HELPER_OBJECTS}
+    nghttp.cc
+    tls.cc
+  )
+  if(HAVE_LIBXML2)
+    list(APPEND NGHTTP_SOURCES HtmlParser.cc)
+  endif()
 
   # nghttpd
   set(NGHTTPD_SOURCES
@@ -225,9 +225,9 @@ if(ENABLE_APP)
     add_dependencies(check nghttpx-unittest)
   endif()
 
-  # add_executable(nghttp   ${NGHTTP_SOURCES}   $<TARGET_OBJECTS:llhttp>
-  #   $<TARGET_OBJECTS:urlparse>
-  # )
+  add_executable(nghttp   ${NGHTTP_SOURCES}   $<TARGET_OBJECTS:llhttp>
+    $<TARGET_OBJECTS:urlparse>
+  )
   add_executable(nghttpd  ${NGHTTPD_SOURCES}  $<TARGET_OBJECTS:llhttp>
     $<TARGET_OBJECTS:urlparse>
   )
