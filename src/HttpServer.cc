@@ -705,6 +705,10 @@ void Http2Handler::start_settings_timer() {
 }
 
 std::expected<void, Error> Http2Handler::fill_wb(nghttp2_tstamp ts) {
+  if (!tx_.data.empty()) {
+    return {};
+  }
+
   auto buf = std::span{txbuf_};
 
   auto nwrite = nghttp2_conn_write(conn_, buf.data(), buf.size(), ts);
@@ -756,14 +760,12 @@ std::expected<void, Error> Http2Handler::write_clear() {
   auto ts = util::timestamp();
 
   for (;;) {
-    if (tx_.data.empty()) {
-      if (auto rv = fill_wb(ts); !rv) {
-        return rv;
-      }
+    if (auto rv = fill_wb(ts); !rv) {
+      return rv;
+    }
 
-      if (tx_.data.empty()) {
-        break;
-      }
+    if (tx_.data.empty()) {
+      break;
     }
 
     ssize_t nwrite;
@@ -880,14 +882,12 @@ std::expected<void, Error> Http2Handler::write_tls() {
   ERR_clear_error();
 
   for (;;) {
-    if (tx_.data.empty()) {
-      if (auto rv = fill_wb(ts); !rv) {
-        return rv;
-      }
+    if (auto rv = fill_wb(ts); !rv) {
+      return rv;
+    }
 
-      if (tx_.data.empty()) {
-        break;
-      }
+    if (tx_.data.empty()) {
+      break;
     }
 
     auto nwrite =
