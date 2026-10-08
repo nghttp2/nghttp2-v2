@@ -107,6 +107,16 @@ extern "C" {
 #define NGHTTP2_INITIAL_WINDOW_SIZE ((size_t)((1U << 16) - 1))
 
 /**
+ * @macro
+ *
+ * :macro:`NGHTTP2_MAX_EXTRA_SETTINGS` is the maximum number of extra
+ * SETTINGS entries that can be specified in
+ * :member:`nghttp2_settings.extra_settings` and
+ * :member:`nghttp2_settings.extra_settingslen`.
+ */
+#define NGHTTP2_MAX_EXTRA_SETTINGS 16
+
+/**
  * @macrosection
  *
  * nghttp2 library error codes
@@ -959,6 +969,23 @@ typedef void (*nghttp2_log_write)(void *user_data, char *msg, size_t len);
 /**
  * @struct
  *
+ * :type:`nghttp2_settings_entry` contains the SETTINGS ID and its
+ * value.
+ */
+typedef struct nghttp2_settings_entry {
+  /**
+   * :member:`id` is the SETTINGS ID.
+   */
+  uint16_t id;
+  /**
+   * :member:`value` is the SETTINGS value.
+   */
+  uint32_t value;
+} nghttp2_settings_entry;
+
+/**
+ * @struct
+ *
  * :type:`nghttp2_settings` defines HTTP/2 connection settings.
  */
 typedef struct nghttp2_settings {
@@ -1028,6 +1055,26 @@ typedef struct nghttp2_settings {
    * field.
    */
   uint8_t enable_connect_protocol;
+  /**
+   * :member:`extra_settings` points to the array that contains the
+   * extra SETTINGS entries to be sent to the remote endpoint.  The
+   * number of elements is specified by :member:`extra_settingslen`.
+   * The maximum number of elements is
+   * :macro:`NGHTTP2_MAX_EXTRA_SETTINGS`.  The excess elements are
+   * discarded.  The library does not perform any validations and just
+   * sends them as is.  Therefore, the application must be cautious
+   * not to specify SETTINGS that are handled by the library.  It is
+   * best to use this field for the experimental and testing purposes
+   * only.  When :type:`nghttp2_settings` is passed to
+   * `nghttp2_conn_server_new` or `nghttp2_conn_client_new`, they make
+   * a copy of all elements pointed by this field.
+   */
+  const nghttp2_settings_entry *extra_settings;
+  /**
+   * :member:`extra_settingslen` specifies the number of elements
+   * contained in :member:`extra_settings`.
+   */
+  size_t extra_settingslen;
   /**
    * :member:`glitch_ratelim_burst` is the maximum number of tokens
    * available to "glitch" rate limiter.  It is clamped to UINT64_MAX
@@ -1124,6 +1171,22 @@ typedef struct nghttp2_ping_data {
    */
   uint8_t data[8];
 } nghttp2_ping_data;
+
+/**
+ * @functypedef
+ *
+ * :type:`nghttp2_recv_settings_entry` is a callback function which is
+ * invoked when each SETTINGS entry is received.  |ent| contains the
+ * received SETTINGS entry.
+ *
+ * The implementation of this callback must return 0 if it succeeds.
+ * Returning :macro:`NGHTTP2_ERR_CALLBACK_FAILURE` will return to the
+ * caller immediately.  Any values other than 0 is treated as
+ * :macro:`NGHTTP2_ERR_CALLBACK_FAILURE`.
+ */
+typedef int (*nghttp2_recv_settings_entry)(nghttp2_conn *conn,
+                                           const nghttp2_settings_entry *ent,
+                                           void *conn_user_data);
 
 /**
  * @functypedef
@@ -1392,6 +1455,11 @@ typedef struct nghttp2_callbacks {
    * specified.
    */
   nghttp2_rand rand;
+  /**
+   * :member:`recv_settings_entry` is a callback function which is
+   * invoked when SETTINGS entry is received from the remote endpoint.
+   */
+  nghttp2_recv_settings_entry recv_settings_entry;
   /**
    * :member:`recv_settings` is a callback function which is invoked
    * when SETTINGS frame is received from the remote endpoint.

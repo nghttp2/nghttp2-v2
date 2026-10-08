@@ -110,11 +110,6 @@ typedef struct nghttp2_frame_rst_stream {
 /* https://datatracker.ietf.org/doc/html/rfc9218 */
 #define NGHTTP2_SETTINGS_NO_RFC7540_PRIORITIES 0x09U
 
-typedef struct nghttp2_settings_entry {
-  uint16_t id;
-  uint32_t value;
-} nghttp2_settings_entry;
-
 typedef struct nghttp2_frame_settings {
   nghttp2_frame_hd hd;
   /* iv and niv are only used when sending the frame. */
@@ -302,7 +297,7 @@ size_t nghttp2_frame_encode_priority_update_payloadlen(
   const nghttp2_frame_priority_update *fr);
 
 typedef struct nghttp2_frd {
-  nghttp2_settings_entry iv[8];
+  nghttp2_settings_entry iv[32];
 } nghttp2_frd;
 
 void nghttp2_frd_init(nghttp2_frd *frd);

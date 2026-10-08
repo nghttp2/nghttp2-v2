@@ -85,6 +85,7 @@ static const MunitTest tests[] = {
   munit_void_test(test_nghttp2_conn_get_settings),
   munit_void_test(test_nghttp2_conn_get_headers_field_blocklen),
   munit_void_test(test_nghttp2_conn_get_remote_settings),
+  munit_void_test(test_nghttp2_conn_extra_settings),
   munit_test_end(),
 };
 
@@ -156,6 +157,12 @@ typedef struct conn_options {
 } conn_options;
 
 typedef struct userdata {
+  struct {
+    size_t ncalled;
+    const nghttp2_settings_entry *expect_iv;
+    size_t expect_ivlen;
+    size_t expect_offset;
+  } recv_settings_entry;
   struct {
     size_t ncalled;
     nghttp2_proto_settings settings;
@@ -233,6 +240,27 @@ typedef struct userdata {
 } userdata;
 
 static void genrand(uint8_t *dest, size_t destlen) { memset(dest, 0, destlen); }
+
+static int recv_settings_entry(nghttp2_conn *conn,
+                               const nghttp2_settings_entry *ent,
+                               void *conn_user_data) {
+  userdata *ud = conn_user_data;
+  const nghttp2_settings_entry *iv;
+  (void)conn;
+
+  ++ud->recv_settings_entry.ncalled;
+
+  assert_size(ud->recv_settings_entry.expect_ivlen, >,
+              ud->recv_settings_entry.expect_offset);
+
+  iv =
+    &ud->recv_settings_entry.expect_iv[ud->recv_settings_entry.expect_offset++];
+
+  assert_uint16(iv->id, ==, ent->id);
+  assert_uint32(iv->value, ==, ent->value);
+
+  return 0;
+}
 
 static int recv_settings(nghttp2_conn *conn,
                          const nghttp2_proto_settings *settings,
@@ -5020,6 +5048,7 @@ void test_nghttp2_conn_recv_settings(void) {
   /* Receive non-empty SETTINGS */
   server_default_callbacks(&callbacks);
   callbacks.recv_settings = recv_settings;
+  callbacks.recv_settings_entry = recv_settings_entry;
 
   opts = (conn_options){
     .callbacks = &callbacks,
@@ -5084,6 +5113,8 @@ void test_nghttp2_conn_recv_settings(void) {
   assert_int(0, ==, rv);
 
   ud = (userdata){0};
+  ud.recv_settings_entry.expect_iv = iv;
+  ud.recv_settings_entry.expect_ivlen = 9;
   rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
 
   assert_int(0, ==, rv);
@@ -5093,6 +5124,7 @@ void test_nghttp2_conn_recv_settings(void) {
   assert_size(INT32_MAX, ==, ud.recv_settings.settings.initial_max_stream_data);
   assert_size(UINT32_MAX, ==, ud.recv_settings.settings.max_field_section_size);
   assert_uint8(1, ==, ud.recv_settings.settings.enable_connect_protocol);
+  assert_size(9, ==, ud.recv_settings_entry.ncalled);
 
   nghttp2_conn_del(conn);
 
@@ -15919,6 +15951,75 @@ void test_nghttp2_conn_get_remote_settings(void) {
   remote_settings = nghttp2_conn_get_remote_settings(conn);
 
   assert_size(10, ==, remote_settings->max_concurrent_streams);
+
+  nghttp2_conn_del(conn);
+}
+
+void test_nghttp2_conn_extra_settings(void) {
+  nghttp2_settings_entry extra_settings[NGHTTP2_MAX_EXTRA_SETTINGS + 1];
+  nghttp2_conn *conn;
+  nghttp2_settings settings;
+  uint8_t outbuf[16384];
+  nghttp2_buf obuf;
+  nghttp2_tstamp ts = 0;
+  nghttp2_frame fr;
+  nghttp2_frd frd;
+  nghttp2_ssize nwrite;
+  conn_options opts;
+  size_t i;
+  int rv;
+
+  nghttp2_buf_wrap_init(&obuf, outbuf, sizeof(outbuf));
+  nghttp2_frd_init(&frd);
+
+  for (i = 0; i < nghttp2_arraylen(extra_settings); ++i) {
+    extra_settings[i] = (nghttp2_settings_entry){
+      .id = 0x8000U + (uint16_t)i,
+      .value = (uint32_t)i,
+    };
+  }
+
+  server_default_settings(&settings);
+  settings.extra_settings = extra_settings;
+  settings.extra_settingslen = nghttp2_arraylen(extra_settings);
+
+  opts = (conn_options){
+    .settings = &settings,
+  };
+
+  setup_default_server_with_options(&conn, opts);
+
+  assert_size(NGHTTP2_MAX_EXTRA_SETTINGS, ==, conn->settings.extra_settingslen);
+
+  nwrite = nghttp2_conn_write(conn, obuf.last, nghttp2_buf_left(&obuf), ++ts);
+
+  assert_ptrdiff(0, <, nwrite);
+
+  obuf.last += nwrite;
+
+  rv = nghttp2_frd_decode_buf(&frd, &fr, &obuf);
+
+  assert_int(0, ==, rv);
+  assert_uint8(NGHTTP2_FRAME_SETTINGS, ==, fr.meta.hd.type);
+
+  for (i = 0; i < NGHTTP2_MAX_EXTRA_SETTINGS; ++i) {
+    assert_uint16(extra_settings[i].id, ==, fr.settings.iv[i].id);
+    assert_uint32(extra_settings[i].value, ==, fr.settings.iv[i].value);
+  }
+
+  assert_uint16(NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, ==,
+                fr.settings.iv[i].id);
+  assert_uint32(100, ==, fr.settings.iv[i].value);
+
+  ++i;
+
+  assert_uint16(NGHTTP2_SETTINGS_NO_RFC7540_PRIORITIES, ==,
+                fr.settings.iv[i].id);
+  assert_uint32(1, ==, fr.settings.iv[i].value);
+
+  ++i;
+
+  assert_size(i, ==, fr.settings.niv);
 
   nghttp2_conn_del(conn);
 }

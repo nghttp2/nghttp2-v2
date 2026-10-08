@@ -219,6 +219,27 @@ static int conn_call_stream_close(nghttp2_conn *conn, nghttp2_context ctx,
   return 0;
 }
 
+static int conn_call_recv_settings_entry(nghttp2_conn *conn, uint16_t id,
+                                         uint32_t value) {
+  int rv;
+
+  if (!conn->callbacks.recv_settings_entry) {
+    return 0;
+  }
+
+  rv = conn->callbacks.recv_settings_entry(conn,
+                                           &(nghttp2_settings_entry){
+                                             .id = id,
+                                             .value = value,
+                                           },
+                                           conn->user_data);
+  if (rv != 0) {
+    return NGHTTP2_ERR_CALLBACK_FAILURE;
+  }
+
+  return 0;
+}
+
 static int conn_call_recv_settings(nghttp2_conn *conn,
                                    const nghttp2_proto_settings *settings) {
   int rv;
@@ -347,10 +368,12 @@ static int conn_update_glitch_ratelim(nghttp2_conn *conn, uint64_t tokens,
 static int conn_new(nghttp2_conn **pconn, const nghttp2_callbacks *callbacks,
                     const nghttp2_settings *settings, const nghttp2_mem *mem,
                     void *user_data, int server) {
-  void *ptr;
+  uint8_t *ptr;
   nghttp2_conn *conn;
   char *logbuf;
   uint64_t seed;
+  nghttp2_settings_entry *extra_settings;
+  size_t extra_settingslen;
   size_t i;
 
   assert(callbacks);
@@ -364,13 +387,30 @@ static int conn_new(nghttp2_conn **pconn, const nghttp2_callbacks *callbacks,
     mem = nghttp2_mem_default();
   }
 
-  ptr = nghttp2_mem_calloc(mem, 1, sizeof(*conn) + NGHTTP2_LOG_BUFLEN);
+  extra_settingslen =
+    nghttp2_min(NGHTTP2_MAX_EXTRA_SETTINGS, settings->extra_settingslen);
+
+  ptr = nghttp2_mem_calloc(mem, 1,
+                           sizeof(*conn) +
+                             sizeof(*extra_settings) * extra_settingslen +
+                             NGHTTP2_LOG_BUFLEN);
   if (!ptr) {
     return NGHTTP2_ERR_NOMEM;
   }
 
-  conn = ptr;
-  logbuf = (char *)ptr + sizeof(*conn);
+  conn = (nghttp2_conn *)(void *)ptr;
+  ptr += sizeof(*conn);
+
+  if (extra_settingslen) {
+    extra_settings = (nghttp2_settings_entry *)(void *)ptr;
+    ptr += sizeof(*extra_settings) * extra_settingslen;
+    memcpy(extra_settings, settings->extra_settings,
+           sizeof(*extra_settings) * extra_settingslen);
+  } else {
+    extra_settings = NULL;
+  }
+
+  logbuf = (char *)ptr;
 
   conn->mem = mem;
   conn->server = server;
@@ -382,6 +422,9 @@ static int conn_new(nghttp2_conn **pconn, const nghttp2_callbacks *callbacks,
   } else {
     conn->settings.max_concurrent_streams_remote = 0;
   }
+
+  conn->settings.extra_settings = extra_settings;
+  conn->settings.extra_settingslen = extra_settingslen;
 
   settings = &conn->settings;
   conn->user_data = user_data;
@@ -1351,6 +1394,12 @@ static int conn_recv_settings_entry(nghttp2_conn *conn,
                                     nghttp2_frame_settings *fr, uint16_t id,
                                     uint32_t value) {
   nghttp2_proto_settings *settings = fr->settings;
+  int rv;
+
+  rv = conn_call_recv_settings_entry(conn, id, value);
+  if (rv != 0) {
+    return rv;
+  }
 
   switch (id) {
   case NGHTTP2_SETTINGS_HEADER_TABLE_SIZE:
@@ -3079,16 +3128,33 @@ int nghttp2_conn_write_stream_flow_controlled(nghttp2_conn *conn,
 int nghttp2_conn_write_settings(nghttp2_conn *conn, nghttp2_buf *dest,
                                 nghttp2_tstamp ts) {
   const nghttp2_settings *settings = &conn->settings;
-  nghttp2_settings_entry iv[5];
-  size_t niv = 2;
+  nghttp2_settings_entry rawiv[5];
+  nghttp2_settings_entry *iv;
+  size_t niv;
   nghttp2_frame_settings fr;
   int rv;
 
-  iv[0] = (nghttp2_settings_entry){
+  if (conn->settings.extra_settingslen) {
+    iv = nghttp2_mem_malloc(
+      conn->mem, sizeof(nghttp2_settings_entry) *
+                   (nghttp2_arraylen(rawiv) + settings->extra_settingslen));
+    if (!iv) {
+      return NGHTTP2_ERR_NOMEM;
+    }
+
+    memcpy(iv, settings->extra_settings,
+           sizeof(nghttp2_settings_entry) * settings->extra_settingslen);
+    niv = settings->extra_settingslen;
+  } else {
+    iv = rawiv;
+    niv = 0;
+  }
+
+  iv[niv++] = (nghttp2_settings_entry){
     .id = NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS,
     .value = (uint32_t)settings->max_concurrent_streams_remote,
   };
-  iv[1] = (nghttp2_settings_entry){
+  iv[niv++] = (nghttp2_settings_entry){
     .id = NGHTTP2_SETTINGS_NO_RFC7540_PRIORITIES,
     .value = 1,
   };
@@ -3127,7 +3193,7 @@ int nghttp2_conn_write_settings(nghttp2_conn *conn, nghttp2_buf *dest,
 
   rv = nghttp2_frame_encode_settings(dest, &fr);
   if (rv != 0) {
-    return rv;
+    goto fin;
   }
 
   nghttp2_log_tx_settings(&conn->log, &fr);
@@ -3139,7 +3205,12 @@ int nghttp2_conn_write_settings(nghttp2_conn *conn, nghttp2_buf *dest,
     conn->tx.settings.ack_expiry = ts + conn->settings.settings_timeout;
   }
 
-  return 0;
+fin:
+  if (iv != rawiv) {
+    nghttp2_mem_free(conn->mem, iv);
+  }
+
+  return rv;
 }
 
 int nghttp2_conn_write_settings_ack(nghttp2_conn *conn, nghttp2_buf *dest) {
