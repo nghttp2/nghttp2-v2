@@ -16,7 +16,7 @@ make distclean
 rm -f checksums.txt
 
 VERSION=`echo -n $TAG | sed -E 's|^v([0-9]+\.[0-9]+\.[0-9]+(-[^.]+(\.[0-9]+)?)?)$|\1|'`
-for f in nghttp2-$VERSION.tar.bz2 nghttp2-$VERSION.tar.gz nghttp2-$VERSION.tar.xz; do
+for f in nghttp2-v2-$VERSION.tar.bz2 nghttp2-v2-$VERSION.tar.gz nghttp2-v2-$VERSION.tar.xz; do
     sha256sum $f >> checksums.txt
     echo -n "$GPG_PASSPHRASE" | gpg --batch --passphrase-fd 0 --pinentry-mode loopback --armor --detach-sign $f
 done
