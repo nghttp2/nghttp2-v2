@@ -143,7 +143,6 @@ private:
   size_t max_buffer_size_{SHRPX_HTTP2_MAX_BUFFER_SIZE};
   // The number of requests seen so far.
   size_t num_requests_{};
-  bool flow_control_{true};
 };
 
 } // namespace shrpx

@@ -1608,22 +1608,18 @@ Http2Upstream::on_downstream_body_complete(Downstream *downstream) {
   return {};
 }
 
-bool Http2Upstream::get_flow_control() const { return flow_control_; }
-
 void Http2Upstream::pause_read(IOCtrlReason reason) {}
 
 std::expected<void, Error> Http2Upstream::resume_read(IOCtrlReason reason,
                                                       Downstream *downstream,
                                                       size_t consumed) {
-  if (get_flow_control()) {
-    if (auto rv = consume(downstream->get_stream_id(), consumed); !rv) {
-      return rv;
-    }
-
-    auto &req = downstream->request();
-
-    req.consume(consumed);
+  if (auto rv = consume(downstream->get_stream_id(), consumed); !rv) {
+    return rv;
   }
+
+  auto &req = downstream->request();
+
+  req.consume(consumed);
 
   handler_->signal_write();
   return {};
