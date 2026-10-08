@@ -38,7 +38,7 @@ typedef struct nghttp2_hpack_huffman_sym {
   uint32_t code;
 } nghttp2_hpack_huffman_sym;
 
-extern const nghttp2_hpack_huffman_sym huffman_sym_table[];
+extern const nghttp2_hpack_huffman_sym hpack_huffman_sym_table[];
 
 size_t nghttp2_hpack_huffman_encode_count(const uint8_t *src, size_t len);
 

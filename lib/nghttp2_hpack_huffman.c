@@ -35,7 +35,7 @@ size_t nghttp2_hpack_huffman_encode_count(const uint8_t *src, size_t len) {
   size_t nbits = 0;
 
   for (i = 0; i < len; ++i) {
-    nbits += huffman_sym_table[src[i]].nbits;
+    nbits += hpack_huffman_sym_table[src[i]].nbits;
   }
   /* pad the prefix of EOS (256) */
   return (nbits + 7) / 8;
@@ -50,7 +50,7 @@ uint8_t *nghttp2_hpack_huffman_encode(uint8_t *dest, const uint8_t *src,
   uint32_t x;
 
   for (; src != end;) {
-    sym = &huffman_sym_table[*src++];
+    sym = &hpack_huffman_sym_table[*src++];
     code |= (uint64_t)sym->code << (32 - nbits);
     nbits += sym->nbits;
     if (nbits < 32) {
