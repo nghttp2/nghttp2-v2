@@ -53,12 +53,8 @@
 
 #include <ev.h>
 
-#define NGHTTP2_NO_SSIZE_T
-#include <nghttp2/nghttp2.h>
+#include <nghttp2v2/nghttp2.h>
 
-#include "llhttp.h"
-
-#include "memchunk.h"
 #include "http2.h"
 #include "nghttp2_gzip.h"
 #include "template.h"
@@ -69,24 +65,19 @@ namespace nghttp2 {
 class HtmlParser;
 
 struct Config {
-  Config();
-  ~Config();
+  Config() noexcept = default;
 
   Headers headers;
   Headers trailer;
-  std::vector<nghttp2_extpri> extpris;
+  std::vector<nghttp2_pri> pris;
   std::string certfile;
   std::string keyfile;
   std::string datafile;
   std::string harfile;
   std::string scheme_override;
   std::string host_override;
-  nghttp2_option *http2_option;
   int64_t header_table_size{-1};
-  int64_t min_header_table_size{std::numeric_limits<uint32_t>::max()};
   int64_t encoder_header_table_size{-1};
-  size_t padding{};
-  size_t max_concurrent_streams{100};
   size_t peer_max_concurrent_streams{100};
   int multiply{1};
   // milliseconds
@@ -99,11 +90,9 @@ struct Config {
   bool remote_name{};
   bool get_assets{};
   bool stat{};
-  bool upgrade{};
   bool continuation{};
   bool no_content_length{};
   bool hexdump{};
-  bool no_push{};
   bool expect_continue{};
   bool verify_peer{true};
   bool ktls{};
@@ -145,8 +134,8 @@ struct ContinueTimer {
 struct Request {
   // For pushed request, |uri| is empty and |u| is zero-cleared.
   Request(const std::string &uri, const urlparse_url &u,
-          const nghttp2_data_provider2 *data_prd, int64_t data_length,
-          const nghttp2_extpri &extpri, int level = 0);
+          const nghttp2_data_reader *dr, int64_t data_length,
+          const nghttp2_pri &pri, int level = 0);
   ~Request();
 
   void init_inflater();
@@ -181,7 +170,7 @@ struct Request {
   // URI without fragment
   std::string uri;
   urlparse_url u;
-  nghttp2_extpri extpri;
+  nghttp2_pri pri;
   RequestTiming timing;
   int64_t data_length;
   int64_t data_offset{};
@@ -189,18 +178,21 @@ struct Request {
   int64_t response_len{};
   nghttp2_gzip *inflater{};
   std::unique_ptr<HtmlParser> html_parser;
-  const nghttp2_data_provider2 *data_prd;
+  const nghttp2_data_reader *dr;
   size_t header_buffer_size{};
-  int32_t stream_id{-1};
+  int64_t stream_id{-1};
   int status{};
   // Recursion level: 0: first entity, 1: entity linked from first entity
   int level;
   http2::HeaderIndex res_hdidx;
   // used for incoming PUSH_PROMISE
   http2::HeaderIndex req_hdidx;
-  bool expect_final_response{};
+  bool expect_final_response{true};
   // only assigned if this request is using Expect/Continue
   std::unique_ptr<ContinueTimer> continue_timer;
+  // unblock_continue gets true when Expect/Continue handshake is done
+  // or timed out.
+  bool unblock_continue{};
 };
 
 struct SessionTiming {
@@ -221,11 +213,9 @@ struct SessionTiming {
 enum class ClientState { IDLE, CONNECTED };
 
 struct HttpClient {
-  HttpClient(const nghttp2_session_callbacks *callbacks, struct ev_loop *loop,
-             SSL_CTX *ssl_ctx);
+  HttpClient(struct ev_loop *loop, SSL_CTX *ssl_ctx);
   ~HttpClient();
 
-  bool need_upgrade() const;
   std::expected<void, Error> resolve_host(const std::string &host,
                                           uint16_t port);
   std::expected<void, Error> initiate_connection();
@@ -242,22 +232,19 @@ struct HttpClient {
   std::expected<void, Error> do_read();
   std::expected<void, Error> do_write();
 
-  std::expected<void, Error> on_upgrade_connect();
-  std::expected<void, Error> on_upgrade_read(std::span<const uint8_t> data);
   std::expected<void, Error> on_read(std::span<const uint8_t> data);
   std::expected<void, Error> on_write();
 
   std::expected<void, Error> connection_made();
   void connect_fail();
   void request_done(Request *req);
-
+  void reset_http2_timer();
   void signal_write();
 
   bool all_requests_processed() const;
   void update_hostport();
-  bool add_request(const std::string &uri,
-                   const nghttp2_data_provider2 *data_prd, int64_t data_length,
-                   const nghttp2_extpri &extpri, int level = 0);
+  bool add_request(const std::string &uri, const nghttp2_data_reader *dr,
+                   int64_t data_length, const nghttp2_pri &pri, int level = 0);
 
   void record_start_time();
   void record_domain_lookup_end_time();
@@ -267,8 +254,6 @@ struct HttpClient {
   void output_har(FILE *outfile);
 #endif // defined(HAVE_JANSSON)
 
-  MemchunkPool mcpool;
-  DefaultMemchunks wb;
   std::vector<std::unique_ptr<Request>> reqvec;
   // Insert path already added in reqvec to prevent multiple request
   // for 1 resource.
@@ -276,21 +261,18 @@ struct HttpClient {
   std::string scheme;
   std::string host;
   std::string hostport;
-  // Used for parse the HTTP upgrade response from server
-  std::unique_ptr<llhttp_t> htp;
   SessionTiming timing;
   ev_io wev;
   ev_io rev;
   ev_timer wt;
   ev_timer rt;
-  ev_timer settings_timer;
+  ev_timer http2_timer;
   std::function<std::expected<void, Error>(HttpClient &)> readfn, writefn;
   std::function<std::expected<void, Error>(HttpClient &,
                                            std::span<const uint8_t>)>
     on_readfn;
   std::function<std::expected<void, Error>(HttpClient &)> on_writefn;
-  nghttp2_session *session{};
-  const nghttp2_session_callbacks *callbacks;
+  nghttp2_conn *conn{};
   struct ev_loop *loop;
   SSL_CTX *ssl_ctx;
   SSL *ssl{};
@@ -302,17 +284,12 @@ struct HttpClient {
   // The number of requests that local endpoint received END_STREAM
   // from peer.
   size_t success{};
-  // The length of settings_payload
-  size_t settings_payloadlen{};
   ClientState state{ClientState::IDLE};
-  // The HTTP status code of the response message of HTTP Upgrade.
-  unsigned int upgrade_response_status_code{};
   int fd{-1};
-  // true if the response message of HTTP Upgrade request is fully
-  // received. It is not relevant the upgrade succeeds, or not.
-  bool upgrade_response_complete{};
-  // SETTINGS payload sent as token68 in HTTP Upgrade
-  std::array<uint8_t, 128> settings_payload;
+  struct {
+    std::span<const uint8_t> data;
+  } tx{};
+  std::array<uint8_t, 16_k> txbuf;
 };
 
 } // namespace nghttp2

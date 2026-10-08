@@ -89,7 +89,7 @@ LDADD = $(top_builddir)/lib/libnghttp2v2.la \
 
 if ENABLE_APP
 
-bin_PROGRAMS += nghttpd
+bin_PROGRAMS += nghttp nghttpd
 
 HELPER_OBJECTS = util.cc \
 	http2.cc timegm.c app_helper.cc nghttp2_gzip.c network.cc
@@ -98,8 +98,16 @@ HELPER_HFILES = util.h \
 	nghttp2_gzip.h network.h errors.h template.h allocator.h memchunk.h \
 	base64.h buffer.h
 
+HTML_PARSER_OBJECTS =
+HTML_PARSER_HFILES = HtmlParser.h
+
 if HAVE_LIBXML2
+HTML_PARSER_OBJECTS += HtmlParser.cc
 endif # HAVE_LIBXML2
+
+nghttp_SOURCES = ${HELPER_OBJECTS} ${HELPER_HFILES} nghttp.cc nghttp.h \
+	${HTML_PARSER_OBJECTS} ${HTML_PARSER_HFILES} \
+	tls.cc tls.h ssl_compat.h
 
 nghttpd_SOURCES = ${HELPER_OBJECTS} ${HELPER_HFILES} nghttpd.cc \
 	tls.cc tls.h ssl_compat.h \

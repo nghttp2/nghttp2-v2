@@ -69,6 +69,8 @@ void print_http_request_headers(int64_t stream_id,
 void print_http_response_headers(int64_t stream_id,
                                  std::span<const nghttp2_nv> nva);
 
+void print_http_trailers(int64_t stream_id, std::span<const nghttp2_nv> nva);
+
 void print_http_settings(const nghttp2_proto_settings *settings);
 
 void print_stream_close(int64_t stream_id, std::optional<uint32_t> error_code);

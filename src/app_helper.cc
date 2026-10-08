@@ -145,6 +145,13 @@ void print_http_response_headers(int64_t stream_id,
   }
 }
 
+void print_http_trailers(int64_t stream_id, std::span<const nghttp2_nv> nva) {
+  std::println(outfile, "http: stream {:#x} submit trailers", stream_id);
+  for (auto &nv : nva) {
+    print_header(nv);
+  }
+}
+
 void print_http_settings(const nghttp2_proto_settings *settings) {
   std::println(
     outfile, R"(http: remote settings

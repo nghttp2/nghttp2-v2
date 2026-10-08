@@ -164,6 +164,7 @@ void Http2Session::on_connect() {
 
   util::secure_random(reinterpret_cast<uint8_t *>(&settings.conn_id),
                       sizeof(settings.conn_id));
+  settings.initial_ts = util::timestamp();
   settings.hpack_encoder_max_dtable_capacity =
     config->encoder_header_table_size;
   settings.initial_max_stream_data = (1 << config->window_bits) - 1;

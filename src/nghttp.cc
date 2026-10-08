@@ -36,6 +36,7 @@
 #endif // defined(HAVE_NETINET_IN_H)
 #include <netinet/tcp.h>
 #include <getopt.h>
+#include <sys/mman.h>
 
 #include <cassert>
 #include <cstdio>
@@ -73,16 +74,6 @@
 
 namespace nghttp2 {
 
-Config::Config() {
-  nghttp2_option_new(&http2_option);
-  nghttp2_option_set_peer_max_concurrent_streams(
-    http2_option, static_cast<uint32_t>(peer_max_concurrent_streams));
-  nghttp2_option_set_builtin_recv_extension_type(http2_option, NGHTTP2_ALTSVC);
-  nghttp2_option_set_builtin_recv_extension_type(http2_option, NGHTTP2_ORIGIN);
-}
-
-Config::~Config() { nghttp2_option_del(http2_option); }
-
 namespace {
 Config config;
 } // namespace
@@ -90,7 +81,7 @@ Config config;
 namespace {
 void print_protocol_nego_error() {
   std::println(stderr, "[ERROR] HTTP/2 protocol was not selected. (nghttp2 "
-                       "expects " NGHTTP2_PROTO_VERSION_ID ")");
+                       "expects h2)");
 }
 } // namespace
 
@@ -104,14 +95,9 @@ std::string strip_fragment(const char *raw_uri) {
 } // namespace
 
 Request::Request(const std::string &uri, const urlparse_url &u,
-                 const nghttp2_data_provider2 *data_prd, int64_t data_length,
-                 const nghttp2_extpri &extpri, int level)
-  : uri(uri),
-    u(u),
-    extpri(extpri),
-    data_length(data_length),
-    data_prd(data_prd),
-    level(level) {
+                 const nghttp2_data_reader *dr, int64_t data_length,
+                 const nghttp2_pri &pri, int level)
+  : uri{uri}, u{u}, pri{pri}, data_length{data_length}, dr{dr}, level{level} {
   http2::init_hdidx(res_hdidx);
   http2::init_hdidx(req_hdidx);
 }
@@ -231,7 +217,7 @@ std::string decode_host(std::string_view host) {
 } // namespace
 
 namespace {
-nghttp2_extpri resolve_pri(int res_type) {
+nghttp2_pri resolve_pri(int res_type) {
   switch (res_type) {
   case REQ_CSS:
   case REQ_JS:
@@ -244,12 +230,12 @@ nghttp2_extpri resolve_pri(int res_type) {
     };
   case REQ_IMG:
     return {
-      .urgency = NGHTTP2_EXTPRI_DEFAULT_URGENCY,
+      .urgency = NGHTTP2_DEFAULT_URGENCY,
       .inc = 1,
     };
   default:
     return {
-      .urgency = NGHTTP2_EXTPRI_DEFAULT_URGENCY,
+      .urgency = NGHTTP2_DEFAULT_URGENCY,
     };
   }
 }
@@ -280,6 +266,12 @@ Headers::value_type *Request::get_req_header(int32_t token) {
   return &req_nva[static_cast<size_t>(idx)];
 }
 
+namespace {
+std::chrono::steady_clock::time_point get_time() {
+  return std::chrono::steady_clock::now();
+}
+} // namespace
+
 void Request::record_request_start_time() {
   timing.state = RequestState::ON_REQUEST;
   timing.request_start_time = get_time();
@@ -295,28 +287,20 @@ void Request::record_response_end_time() {
   timing.response_end_time = get_time();
 }
 
-namespace {
-void continue_timeout_cb(struct ev_loop *loop, ev_timer *w, int revents) {
-  auto client = static_cast<HttpClient *>(ev_userdata(loop));
-  auto req = static_cast<Request *>(w->data);
-  int error;
-
-  error = nghttp2_submit_data2(client->session, NGHTTP2_FLAG_END_STREAM,
-                               req->stream_id, req->data_prd);
-
-  if (error) {
-    std::println(stderr, "[ERROR] nghttp2_submit_data2() returned error: {}",
-                 nghttp2_strerror(error));
-    nghttp2_submit_rst_stream(client->session, NGHTTP2_FLAG_NONE,
-                              req->stream_id, NGHTTP2_INTERNAL_ERROR);
-  }
-
-  client->signal_write();
-}
-} // namespace
-
 ContinueTimer::ContinueTimer(struct ev_loop *loop, Request *req) : loop(loop) {
-  ev_timer_init(&timer, continue_timeout_cb, 1., 0.);
+  ev_timer_init(
+    &timer,
+    [](struct ev_loop *loop, ev_timer *w, int revents) {
+      auto client = static_cast<HttpClient *>(ev_userdata(loop));
+      auto req = static_cast<Request *>(w->data);
+
+      req->unblock_continue = true;
+      req->continue_timer->stop();
+      nghttp2_conn_resume_stream(client->conn, req->stream_id);
+
+      client->signal_write();
+    },
+    1., 0.);
   timer.data = req;
 }
 
@@ -327,52 +311,29 @@ void ContinueTimer::start() { ev_timer_start(loop, &timer); }
 void ContinueTimer::stop() { ev_timer_stop(loop, &timer); }
 
 void ContinueTimer::dispatch_continue() {
-  // Only dispatch the timeout callback if it hasn't already been called.
+  // Only dispatch the timeout callback if it hasn't already been
+  // called.
   if (ev_is_active(&timer)) {
     ev_feed_event(loop, &timer, 0);
   }
 }
 
 namespace {
-int htp_msg_begincb(llhttp_t *htp) {
-  if (config.verbose) {
-    print_timer();
-    std::println(" HTTP Upgrade response");
-  }
-  return 0;
-}
-} // namespace
-
-namespace {
-int htp_msg_completecb(llhttp_t *htp) {
-  auto client = static_cast<HttpClient *>(htp->data);
-  client->upgrade_response_status_code = htp->status_code;
-  client->upgrade_response_complete = true;
-  return 0;
-}
-} // namespace
-
-constexpr llhttp_settings_t htp_hooks = {
-  .on_message_begin = htp_msg_begincb,
-  .on_message_complete = htp_msg_completecb,
-};
-
-namespace {
 std::expected<void, Error>
 submit_request(HttpClient *client, const Headers &headers, Request *req) {
   auto scheme = util::get_uri_field(req->uri.c_str(), req->u, URLPARSE_SCHEMA);
-  auto build_headers = Headers{{":method", req->data_prd ? "POST" : "GET"},
+  auto build_headers = Headers{{":method", req->dr ? "POST" : "GET"},
                                {":path", req->make_reqpath()},
                                {":scheme", std::string{scheme}},
                                {":authority", client->hostport},
-                               {"priority", http2::encode_extpri(req->extpri)},
+                               {"priority", http2::encode_extpri(req->pri)},
                                {"accept", "*/*"},
                                {"accept-encoding", "gzip, deflate"},
                                {"user-agent", "nghttp2/" NGHTTP2_VERSION}};
-  bool expect_continue = false;
+  auto expect_continue = false;
 
   if (config.continuation) {
-    for (size_t i = 0; i < 6; ++i) {
+    for (auto i = 0UZ; i < 6; ++i) {
       build_headers.emplace_back("continuation-test-" + util::utos(i + 1),
                                  std::string(4_k, '-'));
     }
@@ -380,7 +341,7 @@ submit_request(HttpClient *client, const Headers &headers, Request *req) {
 
   auto num_initial_headers = build_headers.size();
 
-  if (req->data_prd) {
+  if (req->dr) {
     if (!config.no_content_length) {
       build_headers.emplace_back("content-length",
                                  util::utos(as_unsigned(req->data_length)));
@@ -403,7 +364,7 @@ submit_request(HttpClient *client, const Headers &headers, Request *req) {
       continue;
     }
 
-    build_headers.emplace_back(kv.name, kv.value, kv.no_index);
+    build_headers.emplace_back(kv.name, kv.value, kv.never_index);
   }
 
   std::ranges::stable_partition(
@@ -413,8 +374,8 @@ submit_request(HttpClient *client, const Headers &headers, Request *req) {
   nva.reserve(build_headers.size());
 
   for (auto &kv : build_headers) {
-    nva.push_back(
-      http2::make_field_nv(kv.name, kv.value, http2::no_index(kv.no_index)));
+    nva.push_back(http2::make_field_nv(kv.name, kv.value,
+                                       http2::never_index(kv.never_index)));
   }
 
   auto method = http2::get_header(build_headers, ":method"sv);
@@ -425,38 +386,54 @@ submit_request(HttpClient *client, const Headers &headers, Request *req) {
   std::string trailer_names;
   if (!config.trailer.empty()) {
     trailer_names = config.trailer[0].name;
+
     for (size_t i = 1; i < config.trailer.size(); ++i) {
       trailer_names += ", ";
       trailer_names += config.trailer[i].name;
     }
+
     nva.push_back(http2::make_field_v("trailer"sv, trailer_names));
   }
 
-  int32_t stream_id;
+  static constexpr auto continue_dr = nghttp2_data_reader{
+    .read_data = [](nghttp2_conn *conn, int64_t stream_id, nghttp2_vec *vec,
+                    size_t veccnt, uint32_t *pflags, void *conn_user_data,
+                    void *stream_user_data) -> nghttp2_ssize {
+      auto req = static_cast<Request *>(stream_user_data);
 
-  if (expect_continue) {
-    stream_id = nghttp2_submit_headers(client->session, 0, -1, nullptr,
-                                       nva.data(), nva.size(), req);
-  } else {
-    stream_id = nghttp2_submit_request2(client->session, nullptr, nva.data(),
-                                        nva.size(), req->data_prd, req);
-  }
+      if (!req->unblock_continue) {
+        return NGHTTP2_ERR_WOULDBLOCK;
+      }
 
+      return req->dr->read_data(conn, stream_id, vec, veccnt, pflags,
+                                conn_user_data, stream_user_data);
+    },
+  };
+
+  auto stream_id =
+    nghttp2_conn_submit_request(client->conn, nva.data(), nva.size(),
+                                expect_continue ? &continue_dr : req->dr, req);
   if (stream_id < 0) {
-    std::println(stderr, "[ERROR] nghttp2_submit_{}() returned error: {}",
-                 expect_continue ? "headers" : "request2",
-                 nghttp2_strerror(stream_id));
+    std::println(stderr,
+                 "[ERROR] nghttp2_conn_submit_request() returned error: {}",
+                 nghttp2_strerror(static_cast<int>(stream_id)));
+
     return std::unexpected{Error::HTTP2};
   }
 
+  if (config.verbose) {
+    print_http_request_headers(stream_id, nva);
+  }
+
   req->stream_id = stream_id;
+  req->record_request_start_time();
   client->request_done(req);
 
   req->req_nva = std::move(build_headers);
 
   if (expect_continue) {
-    auto timer = std::make_unique<ContinueTimer>(client->loop, req);
-    req->continue_timer = std::move(timer);
+    req->continue_timer = std::make_unique<ContinueTimer>(client->loop, req);
+    req->continue_timer->start();
   }
 
   return {};
@@ -495,20 +472,8 @@ void timeoutcb(struct ev_loop *loop, ev_timer *w, int revents) {
 }
 } // namespace
 
-namespace {
-void settings_timeout_cb(struct ev_loop *loop, ev_timer *w, int revents) {
-  auto client = static_cast<HttpClient *>(w->data);
-  ev_timer_stop(loop, w);
-
-  nghttp2_session_terminate_session(client->session, NGHTTP2_SETTINGS_TIMEOUT);
-
-  client->signal_write();
-}
-} // namespace
-
-HttpClient::HttpClient(const nghttp2_session_callbacks *callbacks,
-                       struct ev_loop *loop, SSL_CTX *ssl_ctx)
-  : wb(&mcpool), callbacks(callbacks), loop(loop), ssl_ctx(ssl_ctx) {
+HttpClient::HttpClient(struct ev_loop *loop, SSL_CTX *ssl_ctx)
+  : loop(loop), ssl_ctx(ssl_ctx) {
   ev_io_init(&wev, writecb, 0, EV_WRITE);
   ev_io_init(&rev, readcb, 0, EV_READ);
 
@@ -521,9 +486,25 @@ HttpClient::HttpClient(const nghttp2_session_callbacks *callbacks,
   wt.data = this;
   rt.data = this;
 
-  ev_timer_init(&settings_timer, settings_timeout_cb, 0., 10.);
+  ev_timer_init(
+    &http2_timer,
+    [](struct ev_loop *loop, ev_timer *w, int revents) {
+      auto client = static_cast<HttpClient *>(w->data);
 
-  settings_timer.data = this;
+      if (auto rv = nghttp2_conn_handle_expiry(client->conn, util::timestamp());
+          rv != 0) {
+        std::println(stderr,
+                     "[ERROR] nghttp2_conn_handle_expiry() returned error: {}",
+                     nghttp2_strerror(rv));
+
+        nghttp2_conn_terminate(client->conn,
+                               nghttp2_err_infer_http2_error_code(rv));
+      }
+
+      client->signal_write();
+    },
+    0., 0.);
+  http2_timer.data = this;
 }
 
 HttpClient::~HttpClient() {
@@ -534,10 +515,6 @@ HttpClient::~HttpClient() {
     addrs = nullptr;
     next_addr = nullptr;
   }
-}
-
-bool HttpClient::need_upgrade() const {
-  return config.upgrade && scheme == "http";
 }
 
 std::expected<void, Error> HttpClient::resolve_host(const std::string &host,
@@ -629,13 +606,8 @@ std::expected<void, Error> HttpClient::initiate_connection() {
 
   writefn = &HttpClient::connected;
 
-  if (need_upgrade()) {
-    on_readfn = &HttpClient::on_upgrade_read;
-    on_writefn = &HttpClient::on_upgrade_connect;
-  } else {
-    on_readfn = &HttpClient::on_read;
-    on_writefn = &HttpClient::on_write;
-  }
+  on_readfn = &HttpClient::on_read;
+  on_writefn = &HttpClient::on_write;
 
   ev_io_set(&rev, fd, EV_READ);
   ev_io_set(&wev, fd, EV_WRITE);
@@ -656,16 +628,15 @@ void HttpClient::disconnect() {
     }
   }
 
-  ev_timer_stop(loop, &settings_timer);
-
+  ev_timer_stop(loop, &http2_timer);
   ev_timer_stop(loop, &rt);
   ev_timer_stop(loop, &wt);
 
   ev_io_stop(loop, &rev);
   ev_io_stop(loop, &wev);
 
-  nghttp2_session_del(session);
-  session = nullptr;
+  nghttp2_conn_del(conn);
+  conn = nullptr;
 
   if (ssl) {
     SSL_set_shutdown(ssl, SSL_get_shutdown(ssl) | SSL_RECEIVED_SHUTDOWN);
@@ -685,8 +656,7 @@ void HttpClient::disconnect() {
 std::expected<void, Error> HttpClient::read_clear() {
   ev_timer_again(loop, &rt);
 
-  std::array<uint8_t, 8_k> rawbuf;
-  auto buf = std::span<uint8_t>{rawbuf};
+  std::array<uint8_t, 16_k> buf;
 
   for (;;) {
     ssize_t nread;
@@ -703,7 +673,8 @@ std::expected<void, Error> HttpClient::read_clear() {
       return std::unexpected{Error::RECV_EOF};
     }
 
-    if (auto rv = on_readfn(*this, buf.first(as_unsigned(nread))); !rv) {
+    if (auto rv = on_readfn(*this, std::span{buf}.first(as_unsigned(nread)));
+        !rv) {
       return rv;
     }
   }
@@ -714,22 +685,17 @@ std::expected<void, Error> HttpClient::read_clear() {
 std::expected<void, Error> HttpClient::write_clear() {
   ev_timer_again(loop, &rt);
 
-  std::array<struct iovec, 2> iovbuf;
-
   for (;;) {
     if (auto rv = on_writefn(*this); !rv) {
       return rv;
     }
 
-    auto iov = wb.riovec(iovbuf);
-
-    if (iov.empty()) {
+    if (tx.data.empty()) {
       break;
     }
 
     ssize_t nwrite;
-    while ((nwrite = writev(fd, iov.data(), static_cast<int>(iov.size()))) ==
-             -1 &&
+    while ((nwrite = write(fd, tx.data.data(), tx.data.size())) == -1 &&
            errno == EINTR)
       ;
     if (nwrite == -1) {
@@ -741,7 +707,7 @@ std::expected<void, Error> HttpClient::write_clear() {
       return std::unexpected{Error::SYSCALL};
     }
 
-    wb.drain(as_unsigned(nwrite));
+    tx.data = tx.data.subspan(as_unsigned(nwrite));
   }
 
   ev_io_stop(loop, &wev);
@@ -771,8 +737,7 @@ std::expected<void, Error> HttpClient::connected() {
   }
 
   if (config.verbose) {
-    print_timer();
-    std::println(" Connected");
+    std::println("Connected");
   }
 
   state = ClientState::CONNECTED;
@@ -795,213 +760,327 @@ std::expected<void, Error> HttpClient::connected() {
   readfn = &HttpClient::read_clear;
   writefn = &HttpClient::write_clear;
 
-  if (need_upgrade()) {
-    htp = std::make_unique<llhttp_t>();
-    llhttp_init(htp.get(), HTTP_RESPONSE, &htp_hooks);
-    htp->data = this;
-
-    return do_write();
-  }
-
   return connection_made();
 }
 
-namespace {
-size_t populate_settings(nghttp2_settings_entry *iv) {
-  size_t niv = 3;
-
-  iv[0].settings_id = NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS;
-  iv[0].value = static_cast<uint32_t>(config.max_concurrent_streams);
-
-  iv[1].settings_id = NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE;
-  if (config.window_bits != -1) {
-    iv[1].value = (1 << config.window_bits) - 1;
-  } else {
-    iv[1].value = NGHTTP2_INITIAL_WINDOW_SIZE;
+std::expected<void, Error> HttpClient::do_read() { return readfn(*this); }
+std::expected<void, Error> HttpClient::do_write() {
+  auto rv = writefn(*this);
+  if (!rv) {
+    return rv;
   }
 
-  iv[2].settings_id = NGHTTP2_SETTINGS_NO_RFC7540_PRIORITIES;
-  iv[2].value = 1;
-
-  if (config.header_table_size >= 0) {
-    if (config.min_header_table_size < config.header_table_size) {
-      iv[niv].settings_id = NGHTTP2_SETTINGS_HEADER_TABLE_SIZE;
-      iv[niv].value = static_cast<uint32_t>(config.min_header_table_size);
-      ++niv;
-    }
-
-    iv[niv].settings_id = NGHTTP2_SETTINGS_HEADER_TABLE_SIZE;
-    iv[niv].value = static_cast<uint32_t>(config.header_table_size);
-    ++niv;
-  }
-
-  if (config.no_push) {
-    iv[niv].settings_id = NGHTTP2_SETTINGS_ENABLE_PUSH;
-    iv[niv].value = 0;
-    ++niv;
-  }
-
-  return niv;
-}
-} // namespace
-
-std::expected<void, Error> HttpClient::on_upgrade_connect() {
-  nghttp2_ssize rv;
-  record_connect_end_time();
-  assert(!reqvec.empty());
-  std::array<nghttp2_settings_entry, 16> iv;
-  size_t niv = populate_settings(iv.data());
-  assert(settings_payload.size() >= 8 * niv);
-  rv = nghttp2_pack_settings_payload2(settings_payload.data(),
-                                      settings_payload.size(), iv.data(), niv);
-  if (rv < 0) {
-    return std::unexpected{Error::HTTP2};
-  }
-  settings_payloadlen = as_unsigned(rv);
-  auto token68 =
-    base64::encode(std::span{settings_payload.data(), settings_payloadlen});
-  util::to_token68(token68);
-
-  std::string req;
-  if (reqvec[0]->data_prd) {
-    // If the request contains upload data, use OPTIONS * to upgrade
-    req = "OPTIONS *";
-  } else {
-    auto meth = std::ranges::find_if(
-      config.headers, [](const auto &kv) { return ":method"sv == kv.name; });
-
-    if (meth == std::ranges::end(config.headers)) {
-      req = "GET ";
-      reqvec[0]->method = "GET";
-    } else {
-      req = (*meth).value;
-      req += ' ';
-      reqvec[0]->method = (*meth).value;
-    }
-    req += reqvec[0]->make_reqpath();
-  }
-
-  auto headers = Headers{{"host", hostport},
-                         {"connection", "Upgrade, HTTP2-Settings"},
-                         {"upgrade", NGHTTP2_CLEARTEXT_PROTO_VERSION_ID},
-                         {"http2-settings", std::move(token68)},
-                         {"accept", "*/*"},
-                         {"user-agent", "nghttp2/" NGHTTP2_VERSION}};
-  auto initial_headerslen = headers.size();
-
-  if (!reqvec[0]->data_prd) {
-    headers.emplace_back("priority", http2::encode_extpri(reqvec[0]->extpri));
-    ++initial_headerslen;
-  }
-
-  for (auto &kv : config.headers) {
-    size_t i;
-    if (kv.name.empty() || kv.name[0] == ':') {
-      continue;
-    }
-    for (i = 0; i < initial_headerslen; ++i) {
-      if (kv.name == headers[i].name) {
-        headers[i].value = kv.value;
-        break;
-      }
-    }
-    if (i < initial_headerslen) {
-      continue;
-    }
-    headers.emplace_back(kv.name, kv.value, kv.no_index);
-  }
-
-  req += " HTTP/1.1\r\n";
-
-  for (auto &kv : headers) {
-    req += kv.name;
-    req += ": ";
-    req += kv.value;
-    req += "\r\n";
-  }
-  req += "\r\n";
-
-  wb.append(req);
-
-  if (config.verbose) {
-    print_timer();
-    std::println(" HTTP Upgrade request\n{}", req);
-  }
-
-  if (!reqvec[0]->data_prd) {
-    // record request time if this is a part of real request.
-    reqvec[0]->record_request_start_time();
-    reqvec[0]->req_nva = std::move(headers);
-  }
-
-  on_writefn = &HttpClient::noop;
-
-  signal_write();
+  reset_http2_timer();
 
   return {};
 }
 
-std::expected<void, Error>
-HttpClient::on_upgrade_read(std::span<const uint8_t> data) {
-  auto htperr = llhttp_execute(
-    htp.get(), reinterpret_cast<const char *>(data.data()), data.size());
-  auto nread = htperr == HPE_OK
-                 ? data.size()
-                 : static_cast<size_t>(reinterpret_cast<const uint8_t *>(
-                                         llhttp_get_error_pos(htp.get())) -
-                                       data.data());
-
-  if (config.verbose) {
-    fwrite(data.data(), 1, nread, stdout);
+void HttpClient::reset_http2_timer() {
+  if (!conn) {
+    return;
   }
 
-  if (htperr != HPE_OK && htperr != HPE_PAUSED_UPGRADE) {
-    std::println(
-      stderr, "[ERROR] Failed to parse HTTP Upgrade response header: ({}) {}",
-      llhttp_errno_name(htperr), llhttp_get_error_reason(htp.get()));
-    return std::unexpected{Error::HTTP1};
+  auto expiry = nghttp2_conn_get_expiry(conn);
+  if (expiry == UINT64_MAX) {
+    if (ev_is_active(&http2_timer)) {
+      ev_timer_stop(loop, &http2_timer);
+    }
+
+    return;
   }
 
-  if (!upgrade_response_complete) {
-    return {};
+  auto now = util::timestamp();
+
+  if (expiry <= now) {
+    ev_feed_event(loop, &http2_timer, EV_TIMER);
+
+    return;
   }
 
-  if (config.verbose) {
-    std::println("");
-  }
+  auto t = static_cast<ev_tstamp>(expiry - now) / NGHTTP2_SECONDS;
 
-  if (upgrade_response_status_code != 101) {
-    std::println(stderr, "[ERROR] HTTP Upgrade failed");
-
-    return std::unexpected{Error::INTERNAL};
-  }
-
-  if (config.verbose) {
-    print_timer();
-    std::println(" HTTP Upgrade success");
-  }
-
-  on_readfn = &HttpClient::on_read;
-  on_writefn = &HttpClient::on_write;
-
-  if (auto rv = connection_made(); !rv) {
-    return rv;
-  }
-
-  // Read remaining data in the buffer because it is not notified
-  // callback anymore.
-  return on_readfn(*this, data.subspan(nread));
+  http2_timer.repeat = t;
+  ev_timer_again(loop, &http2_timer);
 }
 
-std::expected<void, Error> HttpClient::do_read() { return readfn(*this); }
-std::expected<void, Error> HttpClient::do_write() { return writefn(*this); }
+namespace {
+void check_response_header(nghttp2_conn *conn, Request *req) {
+  auto gzip = false;
+  auto status_hd = req->get_res_header(NGHTTP2_HPACK_TOKEN__STATUS);
+
+  assert(status_hd);
+
+  // libnghttp2 guarantees that http2::parse_http_status_code
+  // succeeds.
+  auto status = *http2::parse_http_status_code(status_hd->value);
+  req->status = status;
+
+  for (auto &nv : req->res_nva) {
+    if ("content-encoding" == nv.name) {
+      gzip =
+        util::strieq("gzip"sv, nv.value) || util::strieq("deflate"sv, nv.value);
+      continue;
+    }
+  }
+
+  if (req->status / 100 == 1) {
+    if (req->continue_timer && (req->status == 100)) {
+      req->continue_timer->dispatch_continue();
+    }
+
+    req->status = 0;
+    req->res_nva.clear();
+    http2::init_hdidx(req->res_hdidx);
+    return;
+  } else if (req->continue_timer) {
+    // A final response stops any pending Expect/Continue handshake.
+    req->continue_timer->stop();
+  }
+
+  req->expect_final_response = false;
+
+  if (gzip) {
+    if (!req->inflater) {
+      req->init_inflater();
+    }
+  }
+  if (config.get_assets && req->level == 0) {
+    if (!req->html_parser) {
+      req->init_html_parser();
+    }
+  }
+}
+} // namespace
+
+namespace {
+HttpClient *get_client(void *user_data) {
+  return static_cast<HttpClient *>(user_data);
+}
+} // namespace
+
+namespace {
+int begin_headers(nghttp2_conn *conn, int64_t stream_id, void *conn_user_data,
+                  void *stream_user_data) {
+  auto req = static_cast<Request *>(stream_user_data);
+  if (!req) {
+    return 0;
+  }
+
+  if (config.verbose) {
+    print_http_begin_response_headers(stream_id);
+  }
+
+  req->record_response_start_time();
+
+  return 0;
+}
+} // namespace
+
+namespace {
+int recv_header(nghttp2_conn *conn, int64_t stream_id, int32_t token,
+                nghttp2_rcbuf *name, nghttp2_rcbuf *value, uint8_t flags,
+                void *conn_user_data, void *stream_user_data) {
+  auto req = static_cast<Request *>(stream_user_data);
+  if (!req) {
+    return 0;
+  }
+
+  if (config.verbose) {
+    print_http_header(stream_id, name, value, flags);
+  }
+
+  auto namebuf = nghttp2_rcbuf_get_buf(name);
+  auto valuebuf = nghttp2_rcbuf_get_buf(value);
+
+  if (req->header_buffer_size + namebuf.len + valuebuf.len > 64_k) {
+    nghttp2_conn_shutdown_stream(conn, 0x00, stream_id, NGHTTP2_INTERNAL_ERROR);
+    return 0;
+  }
+
+  req->header_buffer_size += namebuf.len + valuebuf.len;
+
+  auto nameref = as_string_view(namebuf.base, namebuf.len);
+  auto valueref = as_string_view(valuebuf.base, valuebuf.len);
+
+  http2::index_header(req->res_hdidx, token, req->res_nva.size());
+  http2::add_header(req->res_nva, nameref, valueref,
+                    flags & NGHTTP2_NV_FLAG_NEVER_INDEX, token);
+
+  return 0;
+}
+} // namespace
+
+namespace {
+int end_headers(nghttp2_conn *conn, int64_t stream_id, int fin,
+                void *conn_user_data, void *stream_user_data) {
+  auto req = static_cast<Request *>(stream_user_data);
+  if (!req) {
+    return 0;
+  }
+
+  if (config.verbose) {
+    print_http_end_headers(stream_id);
+  }
+
+  if (req->expect_final_response) {
+    check_response_header(conn, req);
+  }
+
+  return 0;
+}
+} // namespace
+
+namespace {
+void update_html_parser(HttpClient *client, Request *req,
+                        std::span<const uint8_t> data, int fin) {
+  if (!req->html_parser) {
+    return;
+  }
+  (void)req->update_html_parser(data, fin);
+
+  auto scheme = req->get_real_scheme();
+  auto host = req->get_real_host();
+  auto port = req->get_real_port();
+
+  for (auto &p : req->html_parser->get_links()) {
+    auto uri = strip_fragment(p.first.c_str());
+    auto res_type = p.second;
+
+    urlparse_url u;
+    if (urlparse_parse_url(uri.c_str(), uri.size(), 0, &u) != 0) {
+      continue;
+    }
+
+    if (!util::fieldeq(uri.c_str(), u, URLPARSE_SCHEMA, scheme) ||
+        !util::fieldeq(uri.c_str(), u, URLPARSE_HOST, host)) {
+      continue;
+    }
+
+    auto link_port = util::has_uri_field(u, URLPARSE_PORT) ? u.port
+                     : scheme == "https"sv                 ? 443
+                                                           : 80;
+
+    if (port != link_port) {
+      continue;
+    }
+
+    // No POST data for assets
+    auto pri = resolve_pri(res_type);
+
+    if (client->add_request(uri, nullptr, 0, pri, req->level + 1)) {
+      (void)submit_request(client, config.headers, client->reqvec.back().get());
+    }
+  }
+  req->html_parser->clear_links();
+}
+} // namespace
+
+namespace {
+int recv_data(nghttp2_conn *conn, int64_t stream_id, const uint8_t *data,
+              size_t datalen, void *conn_user_data, void *stream_user_data) {
+  auto client = get_client(conn_user_data);
+  auto req = static_cast<Request *>(stream_user_data);
+  if (!req) {
+    return 0;
+  }
+
+  if (auto rv = nghttp2_conn_extend_max_stream_offset(conn, stream_id, datalen);
+      rv != 0 && nghttp2_err_is_fatal(rv)) {
+    return NGHTTP2_ERR_CALLBACK_FAILURE;
+  }
+
+  if (auto rv = nghttp2_conn_extend_max_offset(conn, datalen);
+      rv != 0 && nghttp2_err_is_fatal(rv)) {
+    return NGHTTP2_ERR_CALLBACK_FAILURE;
+  }
+
+  req->response_len += datalen;
+
+  auto chunk = std::span{data, datalen};
+
+  if (req->inflater) {
+    constexpr size_t MAX_OUTLEN = 4_k;
+    std::array<uint8_t, MAX_OUTLEN> rawout;
+
+    while (!chunk.empty()) {
+      auto out = std::span<uint8_t>{rawout};
+      auto outlen = out.size();
+      auto tlen = chunk.size();
+      auto rv = nghttp2_gzip_inflate(req->inflater, out.data(), &outlen,
+                                     chunk.data(), &tlen);
+      if (rv != 0) {
+        nghttp2_conn_shutdown_stream(conn, 0x00, stream_id,
+                                     NGHTTP2_INTERNAL_ERROR);
+        break;
+      }
+
+      out = out.first(outlen);
+
+      if (!config.null_out) {
+        fwrite(out.data(), 1, out.size(), stdout);
+      }
+
+      update_html_parser(client, req, out, 0);
+      chunk = chunk.subspan(tlen);
+    }
+
+    return 0;
+  }
+
+  if (!config.null_out) {
+    fwrite(chunk.data(), 1, chunk.size(), stdout);
+  }
+
+  update_html_parser(client, req, chunk, 0);
+
+  return 0;
+}
+} // namespace
+
+namespace {
+int remote_end_stream(nghttp2_conn *conn, int64_t stream_id,
+                      void *conn_user_data, void *stream_user_data) {
+  auto client = get_client(conn_user_data);
+  auto req = static_cast<Request *>(stream_user_data);
+  if (!req) {
+    return 0;
+  }
+
+  req->record_response_end_time();
+  ++client->success;
+
+  return 0;
+}
+} // namespace
+
+namespace {
+int stream_close(nghttp2_conn *conn, uint32_t flags, int64_t stream_id,
+                 uint32_t error_code, void *conn_user_data,
+                 void *stream_user_data) {
+  auto client = get_client(conn_user_data);
+  auto req = static_cast<Request *>(stream_user_data);
+  if (!req) {
+    return 0;
+  }
+
+  // If this request is using Expect/Continue, stop its ContinueTimer.
+  if (req->continue_timer) {
+    req->continue_timer->stop();
+  }
+
+  update_html_parser(client, req, {}, 1);
+  ++client->complete;
+
+  if (client->all_requests_processed()) {
+    nghttp2_conn_terminate(conn, NGHTTP2_NO_ERROR);
+  }
+
+  return 0;
+}
+} // namespace
 
 std::expected<void, Error> HttpClient::connection_made() {
-  int rv;
-
-  if (!need_upgrade()) {
-    record_connect_end_time();
-  }
+  record_connect_end_time();
 
   if (ssl) {
     // Check ALPN result
@@ -1024,64 +1103,54 @@ std::expected<void, Error> HttpClient::connection_made() {
     }
   }
 
-  rv =
-    nghttp2_session_client_new2(&session, callbacks, this, config.http2_option);
+  static constexpr auto callbacks = nghttp2_callbacks{
+    .rand = util::secure_random,
+    .stream_close = stream_close,
+    .begin_headers = begin_headers,
+    .recv_header = recv_header,
+    .end_headers = end_headers,
+    .recv_data = recv_data,
+    .remote_end_stream = remote_end_stream,
+  };
 
-  if (rv != 0) {
-    return std::unexpected{Error::HTTP2};
-  }
-  if (need_upgrade()) {
-    // Adjust stream user-data depending on the existence of upload
-    // data
-    Request *stream_user_data = nullptr;
-    if (!reqvec[0]->data_prd) {
-      stream_user_data = reqvec[0].get();
-    }
-    // If HEAD is used, that is only when user specified it with -H
-    // option.
-    auto head_request = stream_user_data && stream_user_data->method == "HEAD";
-    rv = nghttp2_session_upgrade2(session, settings_payload.data(),
-                                  settings_payloadlen, head_request,
-                                  stream_user_data);
-    if (rv != 0) {
-      std::println(stderr,
-                   "[ERROR] nghttp2_session_upgrade() returned error: {}",
-                   nghttp2_strerror(rv));
-      return std::unexpected{Error::HTTP2};
-    }
-    if (stream_user_data) {
-      stream_user_data->stream_id = 1;
-      request_done(stream_user_data);
-    }
-  }
-  // If upgrade succeeds, the SETTINGS value sent with
-  // HTTP2-Settings header field has already been submitted to
-  // session object.
-  if (!need_upgrade()) {
-    std::array<nghttp2_settings_entry, 16> iv;
-    auto niv = populate_settings(iv.data());
-    rv = nghttp2_submit_settings(session, NGHTTP2_FLAG_NONE, iv.data(), niv);
-    if (rv != 0) {
-      return std::unexpected{Error::HTTP2};
-    }
+  nghttp2_settings settings;
+  nghttp2_settings_default(&settings);
+
+  if (config.verbose) {
+    settings.log_write = log_write;
   }
 
-  ev_timer_again(loop, &settings_timer);
+  util::secure_random(reinterpret_cast<uint8_t *>(&settings.conn_id),
+                      sizeof(settings.conn_id));
+  settings.initial_ts = util::timestamp();
+  settings.max_concurrent_streams_local = config.peer_max_concurrent_streams;
+
+  if (config.window_bits != -1) {
+    settings.initial_max_stream_data = (1UZ << config.window_bits) - 1;
+  }
 
   if (config.connection_window_bits != -1) {
-    int32_t window_size = (1 << config.connection_window_bits) - 1;
-    rv = nghttp2_session_set_local_window_size(session, NGHTTP2_FLAG_NONE, 0,
-                                               window_size);
-    if (rv != 0) {
-      return std::unexpected{Error::HTTP2};
-    }
+    settings.initial_max_data = (1UZ << config.connection_window_bits) - 1;
   }
-  // Adjust first request depending on the existence of the upload
-  // data
-  for (auto i =
-         std::ranges::begin(reqvec) + (need_upgrade() && !reqvec[0]->data_prd);
-       i != std::ranges::end(reqvec); ++i) {
-    if (auto rv = submit_request(this, config.headers, (*i).get()); !rv) {
+
+  if (config.header_table_size != -1) {
+    settings.hpack_max_dtable_capacity =
+      static_cast<size_t>(config.header_table_size);
+  }
+
+  if (config.encoder_header_table_size != -1) {
+    settings.hpack_encoder_max_dtable_capacity =
+      static_cast<size_t>(config.encoder_header_table_size);
+  }
+
+  if (auto rv =
+        nghttp2_conn_client_new(&conn, &callbacks, &settings, nullptr, this);
+      rv != 0) {
+    return std::unexpected{Error::HTTP2};
+  }
+
+  for (auto &req : reqvec) {
+    if (auto rv = submit_request(this, config.headers, req.get()); !rv) {
       return rv;
     }
   }
@@ -1096,19 +1165,13 @@ std::expected<void, Error> HttpClient::on_read(std::span<const uint8_t> data) {
     (void)util::hexdump(stdout, data.data(), data.size());
   }
 
-  auto rv = nghttp2_session_mem_recv2(session, data.data(), data.size());
-  if (rv < 0) {
-    std::println(stderr,
-                 "[ERROR] nghttp2_session_mem_recv2() returned error: {}",
-                 nghttp2_strerror(static_cast<int>(rv)));
+  auto rv =
+    nghttp2_conn_read(conn, data.data(), data.size(), util::timestamp());
+  if (rv != 0) {
+    std::println(stderr, "[ERROR] nghttp2_conn_read() returned error: {}",
+                 nghttp2_strerror(rv));
+
     return std::unexpected{Error::HTTP2};
-  }
-
-  assert(static_cast<size_t>(rv) == data.size());
-
-  if (nghttp2_session_want_read(session) == 0 &&
-      nghttp2_session_want_write(session) == 0 && wb.rleft() == 0) {
-    return std::unexpected{Error::DONE};
   }
 
   signal_write();
@@ -1117,30 +1180,24 @@ std::expected<void, Error> HttpClient::on_read(std::span<const uint8_t> data) {
 }
 
 std::expected<void, Error> HttpClient::on_write() {
-  for (;;) {
-    if (wb.rleft() >= 16384) {
-      return {};
-    }
-
-    const uint8_t *data;
-    auto len = nghttp2_session_mem_send2(session, &data);
-    if (len < 0) {
-      std::println(stderr, "[ERROR] nghttp2_session_send2() returned error: {}",
-                   nghttp2_strerror(static_cast<int>(len)));
-      return std::unexpected{Error::HTTP2};
-    }
-
-    if (len == 0) {
-      break;
-    }
-
-    wb.append(data, as_unsigned(len));
+  if (!tx.data.empty()) {
+    return {};
   }
 
-  if (nghttp2_session_want_read(session) == 0 &&
-      nghttp2_session_want_write(session) == 0 && wb.rleft() == 0) {
-    return std::unexpected{Error::DONE};
+  auto nwrite =
+    nghttp2_conn_write(conn, txbuf.data(), txbuf.size(), util::timestamp());
+  if (nwrite < 0) {
+    if (nwrite == NGHTTP2_ERR_CLOSING) {
+      return std::unexpected{Error::DONE};
+    }
+
+    std::println(stderr, "[ERROR] nghttp2_conn_write() returned error: {}",
+                 nghttp2_strerror(static_cast<int>(nwrite)));
+
+    return std::unexpected{Error::HTTP2};
   }
+
+  tx.data = std::span{txbuf}.first(as_unsigned(nwrite));
 
   return {};
 }
@@ -1190,12 +1247,10 @@ std::expected<void, Error> HttpClient::read_tls() {
 
   ERR_clear_error();
 
-  std::array<uint8_t, 8_k> rawbuf;
-  auto buf = std::span<uint8_t>{rawbuf};
+  std::array<uint8_t, 16_k> buf;
 
   for (;;) {
     auto nread = SSL_read(ssl, buf.data(), static_cast<int>(buf.size()));
-
     if (nread <= 0) {
       auto err = SSL_get_error(ssl, nread);
       switch (err) {
@@ -1208,7 +1263,8 @@ std::expected<void, Error> HttpClient::read_tls() {
       }
     }
 
-    if (auto rv = on_readfn(*this, buf.first(static_cast<size_t>(nread)));
+    if (auto rv =
+          on_readfn(*this, std::span{buf}.first(static_cast<size_t>(nread)));
         !rv) {
       return rv;
     }
@@ -1225,14 +1281,12 @@ std::expected<void, Error> HttpClient::write_tls() {
       return rv;
     }
 
-    auto data = wb.peek();
-
-    if (data.empty()) {
+    if (tx.data.empty()) {
       break;
     }
 
-    auto nwrite = SSL_write(ssl, data.data(), static_cast<int>(data.size()));
-
+    auto nwrite =
+      SSL_write(ssl, tx.data.data(), static_cast<int>(tx.data.size()));
     if (nwrite <= 0) {
       auto err = SSL_get_error(ssl, nwrite);
       switch (err) {
@@ -1247,7 +1301,7 @@ std::expected<void, Error> HttpClient::write_tls() {
       }
     }
 
-    wb.drain(static_cast<size_t>(nwrite));
+    tx.data = tx.data.subspan(as_unsigned(nwrite));
   }
 
   ev_io_stop(loop, &wev);
@@ -1291,9 +1345,8 @@ void HttpClient::update_hostport() {
 }
 
 bool HttpClient::add_request(const std::string &uri,
-                             const nghttp2_data_provider2 *data_prd,
-                             int64_t data_length, const nghttp2_extpri &extpri,
-                             int level) {
+                             const nghttp2_data_reader *dr, int64_t data_length,
+                             const nghttp2_pri &pri, int level) {
   urlparse_url u;
   if (urlparse_parse_url(uri.c_str(), uri.size(), 0, &u) != 0) {
     return false;
@@ -1307,7 +1360,7 @@ bool HttpClient::add_request(const std::string &uri,
   }
 
   reqvec.push_back(
-    std::make_unique<Request>(uri, u, data_prd, data_length, extpri, level));
+    std::make_unique<Request>(uri, u, dr, data_length, pri, level));
   return true;
 }
 
@@ -1509,519 +1562,6 @@ void HttpClient::output_har(FILE *outfile) {
 }
 #endif // defined(HAVE_JANSSON)
 
-namespace {
-void update_html_parser(HttpClient *client, Request *req,
-                        std::span<const uint8_t> data, int fin) {
-  if (!req->html_parser) {
-    return;
-  }
-  (void)req->update_html_parser(data, fin);
-
-  auto scheme = req->get_real_scheme();
-  auto host = req->get_real_host();
-  auto port = req->get_real_port();
-
-  for (auto &p : req->html_parser->get_links()) {
-    auto uri = strip_fragment(p.first.c_str());
-    auto res_type = p.second;
-
-    urlparse_url u;
-    if (urlparse_parse_url(uri.c_str(), uri.size(), 0, &u) != 0) {
-      continue;
-    }
-
-    if (!util::fieldeq(uri.c_str(), u, URLPARSE_SCHEMA, scheme) ||
-        !util::fieldeq(uri.c_str(), u, URLPARSE_HOST, host)) {
-      continue;
-    }
-
-    auto link_port = util::has_uri_field(u, URLPARSE_PORT) ? u.port
-                     : scheme == "https"sv                 ? 443
-                                                           : 80;
-
-    if (port != link_port) {
-      continue;
-    }
-
-    // No POST data for assets
-    auto extpri = resolve_pri(res_type);
-
-    if (client->add_request(uri, nullptr, 0, extpri, req->level + 1)) {
-      (void)submit_request(client, config.headers, client->reqvec.back().get());
-    }
-  }
-  req->html_parser->clear_links();
-}
-} // namespace
-
-namespace {
-HttpClient *get_client(void *user_data) {
-  return static_cast<HttpClient *>(user_data);
-}
-} // namespace
-
-namespace {
-int on_data_chunk_recv_callback(nghttp2_session *session, uint8_t flags,
-                                int32_t stream_id, const uint8_t *data,
-                                size_t len, void *user_data) {
-  auto client = get_client(user_data);
-  auto req = static_cast<Request *>(
-    nghttp2_session_get_stream_user_data(session, stream_id));
-
-  if (!req) {
-    return 0;
-  }
-
-  if (config.verbose >= 2) {
-    verbose_on_data_chunk_recv_callback(session, flags, stream_id, data, len,
-                                        user_data);
-  }
-
-  req->response_len += len;
-
-  auto chunk = std::span{data, len};
-
-  if (req->inflater) {
-    constexpr size_t MAX_OUTLEN = 4_k;
-    std::array<uint8_t, MAX_OUTLEN> rawout;
-
-    while (!chunk.empty()) {
-      auto out = std::span<uint8_t>{rawout};
-      size_t outlen = out.size();
-      auto tlen = chunk.size();
-      int rv = nghttp2_gzip_inflate(req->inflater, out.data(), &outlen,
-                                    chunk.data(), &tlen);
-      if (rv != 0) {
-        nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE, stream_id,
-                                  NGHTTP2_INTERNAL_ERROR);
-        break;
-      }
-
-      out = out.first(outlen);
-
-      if (!config.null_out) {
-        fwrite(out.data(), 1, out.size(), stdout);
-      }
-
-      update_html_parser(client, req, out, 0);
-      chunk = chunk.subspan(tlen);
-    }
-
-    return 0;
-  }
-
-  if (!config.null_out) {
-    fwrite(chunk.data(), 1, chunk.size(), stdout);
-  }
-
-  update_html_parser(client, req, chunk, 0);
-
-  return 0;
-}
-} // namespace
-
-namespace {
-nghttp2_ssize select_padding_callback(nghttp2_session *session,
-                                      const nghttp2_frame *frame,
-                                      size_t max_payload, void *user_data) {
-  return as_signed(std::min(max_payload, frame->hd.length + config.padding));
-}
-} // namespace
-
-namespace {
-void check_response_header(nghttp2_session *session, Request *req) {
-  bool gzip = false;
-
-  req->expect_final_response = false;
-
-  auto status_hd = req->get_res_header(http2::HD__STATUS);
-
-  if (!status_hd) {
-    nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE, req->stream_id,
-                              NGHTTP2_PROTOCOL_ERROR);
-    return;
-  }
-
-  // libnghttp2 guarantees that http2::parse_http_status_code
-  // succeeds.
-  auto status = *http2::parse_http_status_code(status_hd->value);
-  req->status = status;
-
-  for (auto &nv : req->res_nva) {
-    if ("content-encoding" == nv.name) {
-      gzip =
-        util::strieq("gzip"sv, nv.value) || util::strieq("deflate"sv, nv.value);
-      continue;
-    }
-  }
-
-  if (req->status / 100 == 1) {
-    if (req->continue_timer && (req->status == 100)) {
-      // If the request is waiting for a 100 Continue, complete the handshake.
-      req->continue_timer->dispatch_continue();
-    }
-
-    req->expect_final_response = true;
-    req->status = 0;
-    req->res_nva.clear();
-    http2::init_hdidx(req->res_hdidx);
-    return;
-  } else if (req->continue_timer) {
-    // A final response stops any pending Expect/Continue handshake.
-    req->continue_timer->stop();
-  }
-
-  if (gzip) {
-    if (!req->inflater) {
-      req->init_inflater();
-    }
-  }
-  if (config.get_assets && req->level == 0) {
-    if (!req->html_parser) {
-      req->init_html_parser();
-    }
-  }
-}
-} // namespace
-
-namespace {
-int on_begin_headers_callback(nghttp2_session *session,
-                              const nghttp2_frame *frame, void *user_data) {
-  auto client = get_client(user_data);
-  switch (frame->hd.type) {
-  case NGHTTP2_HEADERS: {
-    auto req = static_cast<Request *>(
-      nghttp2_session_get_stream_user_data(session, frame->hd.stream_id));
-    if (!req) {
-      break;
-    }
-
-    switch (frame->headers.cat) {
-    case NGHTTP2_HCAT_RESPONSE:
-    case NGHTTP2_HCAT_PUSH_RESPONSE:
-      req->record_response_start_time();
-      break;
-    default:
-      break;
-    }
-
-    break;
-  }
-  case NGHTTP2_PUSH_PROMISE: {
-    auto stream_id = frame->push_promise.promised_stream_id;
-    nghttp2_extpri extpri{
-      .urgency = NGHTTP2_EXTPRI_DEFAULT_URGENCY,
-    };
-
-    auto req =
-      std::make_unique<Request>("", urlparse_url{}, nullptr, 0, extpri);
-    req->stream_id = stream_id;
-
-    nghttp2_session_set_stream_user_data(session, stream_id, req.get());
-
-    client->request_done(req.get());
-    req->record_request_start_time();
-    client->reqvec.push_back(std::move(req));
-
-    break;
-  }
-  }
-  return 0;
-}
-} // namespace
-
-namespace {
-int on_header_callback(nghttp2_session *session, const nghttp2_frame *frame,
-                       const uint8_t *name, size_t namelen,
-                       const uint8_t *value, size_t valuelen, uint8_t flags,
-                       void *user_data) {
-  if (config.verbose) {
-    verbose_on_header_callback(session, frame, name, namelen, value, valuelen,
-                               flags, user_data);
-  }
-
-  switch (frame->hd.type) {
-  case NGHTTP2_HEADERS: {
-    auto req = static_cast<Request *>(
-      nghttp2_session_get_stream_user_data(session, frame->hd.stream_id));
-
-    if (!req) {
-      break;
-    }
-
-    /* ignore trailer header */
-    if (frame->headers.cat == NGHTTP2_HCAT_HEADERS &&
-        !req->expect_final_response) {
-      break;
-    }
-
-    if (req->header_buffer_size + namelen + valuelen > 64_k) {
-      nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE, frame->hd.stream_id,
-                                NGHTTP2_INTERNAL_ERROR);
-      return 0;
-    }
-
-    req->header_buffer_size += namelen + valuelen;
-
-    auto nameref = as_string_view(name, namelen);
-    auto valueref = as_string_view(value, valuelen);
-    auto token = http2::lookup_token(nameref);
-
-    http2::index_header(req->res_hdidx, token, req->res_nva.size());
-    http2::add_header(req->res_nva, nameref, valueref,
-                      flags & NGHTTP2_NV_FLAG_NO_INDEX, token);
-    break;
-  }
-  case NGHTTP2_PUSH_PROMISE: {
-    auto req = static_cast<Request *>(nghttp2_session_get_stream_user_data(
-      session, frame->push_promise.promised_stream_id));
-
-    if (!req) {
-      break;
-    }
-
-    if (req->header_buffer_size + namelen + valuelen > 64_k) {
-      nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE,
-                                frame->push_promise.promised_stream_id,
-                                NGHTTP2_INTERNAL_ERROR);
-      return 0;
-    }
-
-    req->header_buffer_size += namelen + valuelen;
-
-    auto nameref = as_string_view(name, namelen);
-    auto valueref = as_string_view(value, valuelen);
-    auto token = http2::lookup_token(nameref);
-
-    http2::index_header(req->req_hdidx, token, req->req_nva.size());
-    http2::add_header(req->req_nva, nameref, valueref,
-                      flags & NGHTTP2_NV_FLAG_NO_INDEX, token);
-    break;
-  }
-  }
-  return 0;
-}
-} // namespace
-
-namespace {
-int on_frame_recv_callback2(nghttp2_session *session,
-                            const nghttp2_frame *frame, void *user_data) {
-  int rv = 0;
-
-  if (config.verbose) {
-    verbose_on_frame_recv_callback(session, frame, user_data);
-  }
-
-  auto client = get_client(user_data);
-  switch (frame->hd.type) {
-  case NGHTTP2_DATA: {
-    auto req = static_cast<Request *>(
-      nghttp2_session_get_stream_user_data(session, frame->hd.stream_id));
-    if (!req) {
-      return 0;
-      ;
-    }
-
-    if (frame->hd.flags & NGHTTP2_FLAG_END_STREAM) {
-      req->record_response_end_time();
-      ++client->success;
-    }
-
-    break;
-  }
-  case NGHTTP2_HEADERS: {
-    auto req = static_cast<Request *>(
-      nghttp2_session_get_stream_user_data(session, frame->hd.stream_id));
-    // If this is the HTTP Upgrade with OPTIONS method to avoid POST,
-    // req is nullptr.
-    if (!req) {
-      return 0;
-      ;
-    }
-
-    switch (frame->headers.cat) {
-    case NGHTTP2_HCAT_RESPONSE:
-    case NGHTTP2_HCAT_PUSH_RESPONSE:
-      check_response_header(session, req);
-      break;
-    case NGHTTP2_HCAT_HEADERS:
-      if (req->expect_final_response) {
-        check_response_header(session, req);
-        break;
-      }
-      if ((frame->hd.flags & NGHTTP2_FLAG_END_STREAM) == 0) {
-        nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE,
-                                  frame->hd.stream_id, NGHTTP2_PROTOCOL_ERROR);
-        return 0;
-      }
-      break;
-    default:
-      assert(0);
-    }
-
-    if (frame->hd.flags & NGHTTP2_FLAG_END_STREAM) {
-      req->record_response_end_time();
-      ++client->success;
-    }
-
-    break;
-  }
-  case NGHTTP2_SETTINGS:
-    if ((frame->hd.flags & NGHTTP2_FLAG_ACK) == 0) {
-      break;
-    }
-    ev_timer_stop(client->loop, &client->settings_timer);
-    break;
-  case NGHTTP2_PUSH_PROMISE: {
-    auto req = static_cast<Request *>(nghttp2_session_get_stream_user_data(
-      session, frame->push_promise.promised_stream_id));
-    if (!req) {
-      break;
-    }
-
-    // Reset for response header field reception
-    req->header_buffer_size = 0;
-
-    auto scheme = req->get_req_header(http2::HD__SCHEME);
-    auto authority = req->get_req_header(http2::HD__AUTHORITY);
-    auto path = req->get_req_header(http2::HD__PATH);
-
-    if (!authority) {
-      authority = req->get_req_header(http2::HD_HOST);
-    }
-
-    // libnghttp2 guarantees :scheme, :method, :path and (:authority |
-    // host) exist and non-empty.
-    if (path->value[0] != '/') {
-      nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE,
-                                frame->push_promise.promised_stream_id,
-                                NGHTTP2_PROTOCOL_ERROR);
-      break;
-    }
-    std::string uri = scheme->value;
-    uri += "://";
-    uri += authority->value;
-    uri += path->value;
-    urlparse_url u;
-    if (urlparse_parse_url(uri.c_str(), uri.size(), 0, &u) != 0) {
-      nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE,
-                                frame->push_promise.promised_stream_id,
-                                NGHTTP2_PROTOCOL_ERROR);
-      break;
-    }
-    req->uri = uri;
-    req->u = u;
-
-    if (client->path_cache.contains(uri)) {
-      nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE,
-                                frame->push_promise.promised_stream_id,
-                                NGHTTP2_CANCEL);
-      break;
-    }
-
-    if (config.multiply == 1) {
-      client->path_cache.emplace(std::move(uri));
-    }
-
-    break;
-  }
-  }
-  return rv;
-}
-} // namespace
-
-namespace {
-int before_frame_send_callback(nghttp2_session *session,
-                               const nghttp2_frame *frame, void *user_data) {
-  if (frame->hd.type != NGHTTP2_HEADERS ||
-      frame->headers.cat != NGHTTP2_HCAT_REQUEST) {
-    return 0;
-  }
-  auto req = static_cast<Request *>(
-    nghttp2_session_get_stream_user_data(session, frame->hd.stream_id));
-  assert(req);
-  req->record_request_start_time();
-  return 0;
-}
-
-} // namespace
-
-namespace {
-int on_frame_send_callback(nghttp2_session *session, const nghttp2_frame *frame,
-                           void *user_data) {
-  if (config.verbose) {
-    verbose_on_frame_send_callback(session, frame, user_data);
-  }
-
-  if (frame->hd.type != NGHTTP2_HEADERS ||
-      frame->headers.cat != NGHTTP2_HCAT_REQUEST) {
-    return 0;
-  }
-
-  auto req = static_cast<Request *>(
-    nghttp2_session_get_stream_user_data(session, frame->hd.stream_id));
-  if (!req) {
-    return 0;
-  }
-
-  // If this request is using Expect/Continue, start its ContinueTimer.
-  if (req->continue_timer) {
-    req->continue_timer->start();
-  }
-
-  return 0;
-}
-} // namespace
-
-namespace {
-int on_frame_not_send_callback(nghttp2_session *session,
-                               const nghttp2_frame *frame, int lib_error_code,
-                               void *user_data) {
-  if (frame->hd.type != NGHTTP2_HEADERS ||
-      frame->headers.cat != NGHTTP2_HCAT_REQUEST) {
-    return 0;
-  }
-
-  auto req = static_cast<Request *>(
-    nghttp2_session_get_stream_user_data(session, frame->hd.stream_id));
-  if (!req) {
-    return 0;
-  }
-
-  std::println(stderr, "[ERROR] request {} failed: {}", req->uri,
-               nghttp2_strerror(lib_error_code));
-
-  return 0;
-}
-} // namespace
-
-namespace {
-int on_stream_close_callback(nghttp2_session *session, int32_t stream_id,
-                             uint32_t error_code, void *user_data) {
-  auto client = get_client(user_data);
-  auto req = static_cast<Request *>(
-    nghttp2_session_get_stream_user_data(session, stream_id));
-
-  if (!req) {
-    return 0;
-  }
-
-  // If this request is using Expect/Continue, stop its ContinueTimer.
-  if (req->continue_timer) {
-    req->continue_timer->stop();
-  }
-
-  update_html_parser(client, req, {}, 1);
-  ++client->complete;
-
-  if (client->all_requests_processed()) {
-    nghttp2_session_terminate_session(session, NGHTTP2_NO_ERROR);
-  }
-
-  return 0;
-}
-} // namespace
-
 struct RequestResult {
   std::chrono::microseconds time;
 };
@@ -2051,8 +1591,7 @@ Request timing:
   responseEnd: the  time  when  last  byte of  response  was  received
                relative to connectEnd
  requestStart: the time  just before  first byte  of request  was sent
-               relative  to connectEnd.   If  '*' is  shown, this  was
-               pushed by server.
+               relative  to connectEnd.
       process: responseEnd - requestStart
          code: HTTP status code
          size: number  of  bytes  received as  response  body  without
@@ -2073,10 +1612,9 @@ id  responseEnd requestStart  process code size request path)");
       req->timing.request_start_time - base);
     auto total = std::chrono::duration_cast<std::chrono::microseconds>(
       req->timing.response_end_time - req->timing.request_start_time);
-    auto pushed = req->stream_id % 2 == 0;
 
-    std::println("{:3} {:>11} {}{:>11} {:>8} {:4} {:>4} {}", req->stream_id,
-                 "+" + util::format_duration(response_end), pushed ? "*" : " ",
+    std::println("{:3} {:>11}  {:>11} {:>8} {:4} {:>4} {}", req->stream_id,
+                 "+" + util::format_duration(response_end),
                  "+" + util::format_duration(request_start),
                  util::format_duration(total), req->status,
                  util::utos_unit(as_unsigned(req->response_len)),
@@ -2089,9 +1627,8 @@ namespace {
 std::expected<void, Error> communicate(
   const std::string &scheme, const std::string &host, uint16_t port,
   std::vector<
-    std::tuple<std::string, nghttp2_data_provider2 *, int64_t, nghttp2_extpri>>
-    requests,
-  const nghttp2_session_callbacks *callbacks) {
+    std::tuple<std::string, const nghttp2_data_reader *, int64_t, nghttp2_pri>>
+    requests) {
   auto loop = EV_DEFAULT;
   SSL_CTX *ssl_ctx = nullptr;
 
@@ -2192,7 +1729,7 @@ std::expected<void, Error> communicate(
     }
   }
   {
-    HttpClient client{callbacks, loop, ssl_ctx};
+    HttpClient client{loop, ssl_ctx};
 
     for (auto &req : requests) {
       for (int i = 0; i < config.multiply; ++i) {
@@ -2258,157 +1795,100 @@ std::expected<void, Error> communicate(
 } // namespace
 
 namespace {
-nghttp2_ssize file_read_callback(nghttp2_session *session, int32_t stream_id,
-                                 uint8_t *buf, size_t length,
-                                 uint32_t *data_flags,
-                                 nghttp2_data_source *source, void *user_data) {
-  int rv;
-  auto req = static_cast<Request *>(
-    nghttp2_session_get_stream_user_data(session, stream_id));
-  assert(req);
-  int fd = source->fd;
-  ssize_t nread;
+void *data_map;
+size_t data_maplen;
+} // namespace
 
-  while ((nread = pread(fd, buf, length, req->data_offset)) == -1 &&
-         errno == EINTR)
-    ;
+namespace {
+nghttp2_ssize file_read_data(nghttp2_conn *conn, int64_t stream_id,
+                             nghttp2_vec *vec, size_t veccnt, uint32_t *pflags,
+                             void *conn_user_data, void *stream_user_data) {
+  auto client = get_client(conn_user_data);
 
-  if (nread == -1) {
-    return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
-  }
+  if (!config.trailer.empty()) {
+    std::vector<nghttp2_nv> nva;
+    nva.reserve(config.trailer.size());
 
-  req->data_offset += nread;
-
-  if (req->data_offset == req->data_length) {
-    *data_flags |= NGHTTP2_DATA_FLAG_EOF;
-    if (!config.trailer.empty()) {
-      std::vector<nghttp2_nv> nva;
-      nva.reserve(config.trailer.size());
-      for (auto &kv : config.trailer) {
-        nva.push_back(http2::make_field_nv(kv.name, kv.value,
-                                           http2::no_index(kv.no_index)));
-      }
-      rv = nghttp2_submit_trailer(session, stream_id, nva.data(), nva.size());
-      if (rv != 0) {
-        if (nghttp2_is_fatal(rv)) {
-          return NGHTTP2_ERR_CALLBACK_FAILURE;
-        }
-      } else {
-        *data_flags |= NGHTTP2_DATA_FLAG_NO_END_STREAM;
-      }
+    for (auto &kv : config.trailer) {
+      nva.push_back(http2::make_field_nv(kv.name, kv.value,
+                                         http2::never_index(kv.never_index)));
     }
 
-    return static_cast<nghttp2_ssize>(nread);
+    if (auto rv = nghttp2_conn_submit_trailers(client->conn, stream_id,
+                                               nva.data(), nva.size());
+        rv != 0) {
+      std::println(stderr,
+                   "[ERROR] nghttp2_conn_submit_trailers() returned error: {}",
+                   nghttp2_strerror(rv));
+
+      return NGHTTP2_ERR_CALLBACK_FAILURE;
+    }
+
+    if (config.verbose) {
+      print_http_trailers(stream_id, nva);
+    }
   }
 
-  if (req->data_offset > req->data_length || nread == 0) {
-    return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
-  }
+  *pflags = NGHTTP2_READ_DATA_FLAG_EOF;
+  vec[0] = {
+    .base = reinterpret_cast<uint8_t *>(data_map),
+    .len = data_maplen,
+  };
 
-  return static_cast<nghttp2_ssize>(nread);
+  return 1;
 }
 } // namespace
 
 namespace {
 int run(char **uris, int n) {
-  nghttp2_session_callbacks *callbacks;
-
-  nghttp2_session_callbacks_new(&callbacks);
-  auto cbsdel =
-    defer([callbacks] { nghttp2_session_callbacks_del(callbacks); });
-
-  nghttp2_session_callbacks_set_on_stream_close_callback(
-    callbacks, on_stream_close_callback);
-
-  nghttp2_session_callbacks_set_on_frame_recv_callback(callbacks,
-                                                       on_frame_recv_callback2);
-
-  if (config.verbose) {
-    nghttp2_session_callbacks_set_on_invalid_frame_recv_callback(
-      callbacks, verbose_on_invalid_frame_recv_callback);
-
-    nghttp2_session_callbacks_set_error_callback2(callbacks,
-                                                  verbose_error_callback);
-  }
-
-  nghttp2_session_callbacks_set_on_data_chunk_recv_callback(
-    callbacks, on_data_chunk_recv_callback);
-
-  nghttp2_session_callbacks_set_on_begin_headers_callback(
-    callbacks, on_begin_headers_callback);
-
-  nghttp2_session_callbacks_set_on_header_callback(callbacks,
-                                                   on_header_callback);
-
-  nghttp2_session_callbacks_set_before_frame_send_callback(
-    callbacks, before_frame_send_callback);
-
-  nghttp2_session_callbacks_set_on_frame_send_callback(callbacks,
-                                                       on_frame_send_callback);
-
-  nghttp2_session_callbacks_set_on_frame_not_send_callback(
-    callbacks, on_frame_not_send_callback);
-
-  if (config.padding) {
-    nghttp2_session_callbacks_set_select_padding_callback2(
-      callbacks, select_padding_callback);
-  }
-
-  nghttp2_session_callbacks_set_rand_callback(callbacks, util::secure_random);
-
   std::string prev_scheme;
   std::string prev_host;
   uint16_t prev_port = 0;
   int failures = 0;
   int data_fd = -1;
-  nghttp2_data_provider2 data_prd;
-  struct stat data_stat{};
+  static constexpr auto dr = nghttp2_data_reader{
+    .read_data = file_read_data,
+  };
+  struct stat data_stat;
 
   if (!config.datafile.empty()) {
     if (config.datafile == "-") {
-      if (fstat(0, &data_stat) == 0 &&
-          (data_stat.st_mode & S_IFMT) == S_IFREG) {
-        // use STDIN if it is a regular file
-        data_fd = 0;
-      } else {
-        // copy the contents of STDIN to a temporary file
-        char tempfn[] = "/tmp/nghttp.temp.XXXXXX";
-        data_fd = mkstemp(tempfn);
-        if (data_fd == -1) {
+      // copy the contents of STDIN to a temporary file
+      char tempfn[] = "/tmp/nghttp.temp.XXXXXX";
+      data_fd = mkstemp(tempfn);
+      if (data_fd == -1) {
+        std::println(stderr,
+                     "[ERROR] Could not create a temporary file in /tmp");
+        return 1;
+      }
+      if (unlink(tempfn) != 0) {
+        std::println(stderr, "[WARNING] failed to unlink temporary file: {}",
+                     tempfn);
+      }
+      while (1) {
+        std::array<char, 1_k> buf;
+        ssize_t rret, wret;
+        while ((rret = read(0, buf.data(), buf.size())) == -1 && errno == EINTR)
+          ;
+        if (rret == 0)
+          break;
+        if (rret == -1) {
+          std::println(stderr, "[ERROR] I/O error while reading from STDIN");
+          return 1;
+        }
+        while ((wret = write(data_fd, buf.data(), as_unsigned(rret))) == -1 &&
+               errno == EINTR)
+          ;
+        if (wret != rret) {
           std::println(stderr,
-                       "[ERROR] Could not create a temporary file in /tmp");
+                       "[ERROR] I/O error while writing to temporary file");
           return 1;
         }
-        if (unlink(tempfn) != 0) {
-          std::println(stderr, "[WARNING] failed to unlink temporary file: {}",
-                       tempfn);
-        }
-        while (1) {
-          std::array<char, 1_k> buf;
-          ssize_t rret, wret;
-          while ((rret = read(0, buf.data(), buf.size())) == -1 &&
-                 errno == EINTR)
-            ;
-          if (rret == 0)
-            break;
-          if (rret == -1) {
-            std::println(stderr, "[ERROR] I/O error while reading from STDIN");
-            return 1;
-          }
-          while ((wret = write(data_fd, buf.data(), as_unsigned(rret))) == -1 &&
-                 errno == EINTR)
-            ;
-          if (wret != rret) {
-            std::println(stderr,
-                         "[ERROR] I/O error while writing to temporary file");
-            return 1;
-          }
-        }
-        if (fstat(data_fd, &data_stat) == -1) {
-          close(data_fd);
-          std::println(stderr, "[ERROR] Could not stat temporary file");
-          return 1;
-        }
+      }
+      if (fstat(data_fd, &data_stat) == -1) {
+        close(data_fd);
+        std::println(stderr, "[ERROR] Could not stat temporary file");
+        return 1;
       }
     } else {
       data_fd = open(config.datafile.c_str(), O_RDONLY | O_BINARY);
@@ -2422,25 +1902,32 @@ int run(char **uris, int n) {
         return 1;
       }
     }
-    data_prd.source.fd = data_fd;
-    data_prd.read_callback = file_read_callback;
+
+    data_map = mmap(nullptr, static_cast<size_t>(data_stat.st_size), PROT_READ,
+                    MAP_SHARED, data_fd, 0);
+    if (data_map == MAP_FAILED) {
+      std::println(stderr, "[ERROR] Could not map file");
+      return 1;
+    }
+
+    data_maplen = static_cast<size_t>(data_stat.st_size);
   }
   std::vector<
-    std::tuple<std::string, nghttp2_data_provider2 *, int64_t, nghttp2_extpri>>
+    std::tuple<std::string, const nghttp2_data_reader *, int64_t, nghttp2_pri>>
     requests;
 
-  size_t next_extpri_idx = 0;
+  auto next_pri_idx = 0UZ;
 
   for (int i = 0; i < n; ++i) {
     urlparse_url u;
     auto uri = strip_fragment(uris[i]);
     if (urlparse_parse_url(uri.c_str(), uri.size(), 0, &u) != 0) {
-      ++next_extpri_idx;
+      ++next_pri_idx;
       std::println(stderr, "[ERROR] Could not parse URI {}", uri);
       continue;
     }
     if (!util::has_uri_field(u, URLPARSE_SCHEMA)) {
-      ++next_extpri_idx;
+      ++next_pri_idx;
       std::println(stderr, "[ERROR] URI {} does not have scheme part", uri);
       continue;
     }
@@ -2451,8 +1938,8 @@ int run(char **uris, int n) {
     if (!util::fieldeq(uri.c_str(), u, URLPARSE_SCHEMA, prev_scheme.c_str()) ||
         host != prev_host || port != prev_port) {
       if (!requests.empty()) {
-        if (!communicate(prev_scheme, prev_host, prev_port, std::move(requests),
-                         callbacks)) {
+        if (!communicate(prev_scheme, prev_host, prev_port,
+                         std::move(requests))) {
           ++failures;
         }
         requests.clear();
@@ -2461,15 +1948,21 @@ int run(char **uris, int n) {
       prev_host = std::move(host);
       prev_port = port;
     }
-    requests.emplace_back(uri, data_fd == -1 ? nullptr : &data_prd,
-                          data_stat.st_size, config.extpris[next_extpri_idx++]);
+    requests.emplace_back(uri, data_fd == -1 ? nullptr : &dr, data_stat.st_size,
+                          config.pris[next_pri_idx++]);
   }
   if (!requests.empty()) {
-    if (!communicate(prev_scheme, prev_host, prev_port, std::move(requests),
-                     callbacks)) {
+    if (!communicate(prev_scheme, prev_host, prev_port, std::move(requests))) {
       ++failures;
     }
   }
+
+  if (data_fd != -1) {
+    munmap(data_map, data_maplen);
+    data_map = nullptr;
+    data_maplen = 0;
+  }
+
   return failures;
 }
 } // namespace
@@ -2538,10 +2031,6 @@ Options:
   -m, --multiply=<N>
               Request each URI <N> times.  By default, same URI is not
               requested twice.  This option disables it too.
-  -u, --upgrade
-              Perform HTTP Upgrade for HTTP/2.  This option is ignored
-              if the request URI has https scheme.  If -d is used, the
-              HTTP upgrade request is performed with OPTIONS method.
   --extpri=<PRI>
               Sets RFC 9218 priority of  given URI.  <PRI> must be the
               wire format  of priority  header field  (e.g., "u=3,i").
@@ -2556,24 +2045,15 @@ Options:
               remote endpoint as if it  is received in SETTINGS frame.
               Default: 100
   -c, --header-table-size=<SIZE>
-              Specify decoder  header table  size.  If this  option is
-              used  multiple times,  and the  minimum value  among the
-              given values except  for last one is  strictly less than
-              the last  value, that minimum  value is set  in SETTINGS
-              frame  payload  before  the   last  value,  to  simulate
-              multiple header table size change.
+              Specify decoder header table size.
   --encoder-header-table-size=<SIZE>
               Specify encoder header table size.  The decoder (server)
               specifies  the maximum  dynamic table  size it  accepts.
               Then the negotiated dynamic table size is the minimum of
               this option value and the value which server specified.
-  -b, --padding=<N>
-              Add at  most <N>  bytes to a  frame payload  as padding.
-              Specify 0 to disable padding.
   -r, --har=<PATH>
               Output HTTP  transactions <PATH> in HAR  format.  If '-'
               is given, data is written to stdout.
-  --color     Force colored log output.
   --continuation
               Send large header to test CONTINUATION.
   --no-content-length
@@ -2581,10 +2061,6 @@ Options:
   --hexdump   Display the  incoming traffic in  hexadecimal (Canonical
               hex+ASCII display).  If SSL/TLS  is used, decrypted data
               are used.
-  --no-push   Disable server push.
-  --max-concurrent-streams=<N>
-              The  number of  concurrent  pushed  streams this  client
-              accepts.
   --expect-continue
               Perform an Expect/Continue handshake:  wait to send DATA
               (up to  a short  timeout)  until the server sends  a 100
@@ -2611,7 +2087,6 @@ Options:
 } // namespace
 
 int main(int argc, char **argv) {
-  bool color = false;
   while (1) {
     static int flag = 0;
     constexpr static option long_options[] = {
@@ -2627,24 +2102,19 @@ int main(int argc, char **argv) {
       {"header", required_argument, nullptr, 'H'},
       {"data", required_argument, nullptr, 'd'},
       {"multiply", required_argument, nullptr, 'm'},
-      {"upgrade", no_argument, nullptr, 'u'},
       {"weight", required_argument, nullptr, 'p'},
       {"peer-max-concurrent-streams", required_argument, nullptr, 'M'},
       {"header-table-size", required_argument, nullptr, 'c'},
-      {"padding", required_argument, nullptr, 'b'},
       {"har", required_argument, nullptr, 'r'},
       {"no-verify-peer", no_argument, nullptr, 'y'},
       {"cert", required_argument, &flag, 1},
       {"key", required_argument, &flag, 2},
-      {"color", no_argument, &flag, 3},
       {"continuation", no_argument, &flag, 4},
       {"version", no_argument, &flag, 5},
       {"no-content-length", no_argument, &flag, 6},
       {"no-dep", no_argument, &flag, 7},
       {"trailer", required_argument, &flag, 9},
       {"hexdump", no_argument, &flag, 10},
-      {"no-push", no_argument, &flag, 11},
-      {"max-concurrent-streams", required_argument, &flag, 12},
       {"expect-continue", no_argument, &flag, 13},
       {"encoder-header-table-size", required_argument, &flag, 14},
       {"ktls", no_argument, &flag, 15},
@@ -2652,9 +2122,8 @@ int main(int argc, char **argv) {
       {"extpri", required_argument, &flag, 17},
       {nullptr, 0, nullptr, 0}};
     int option_index = 0;
-    int c =
-      getopt_long(argc, argv, "M:Oab:c:d:m:np:r:hH:vst:uw:yW:", long_options,
-                  &option_index);
+    int c = getopt_long(argc, argv, "M:Oac:d:m:np:r:hH:vst:w:yW:", long_options,
+                        &option_index);
     if (c == -1) {
       break;
     }
@@ -2675,15 +2144,6 @@ int main(int argc, char **argv) {
     case 'h':
       print_help(std::cout);
       exit(EXIT_SUCCESS);
-    case 'b': {
-      auto n = util::parse_uint(optarg);
-      if (!n) {
-        std::println(stderr, "-b: Bad option value: {}", optarg);
-        exit(EXIT_FAILURE);
-      }
-      config.padding = static_cast<size_t>(*n);
-      break;
-    }
     case 'n':
       config.null_out = true;
       break;
@@ -2710,9 +2170,6 @@ int main(int argc, char **argv) {
       config.timeout = *d;
       break;
     }
-    case 'u':
-      config.upgrade = true;
-      break;
     case 'w':
     case 'W': {
       auto n = util::parse_uint(optarg);
@@ -2788,8 +2245,6 @@ int main(int argc, char **argv) {
         exit(EXIT_FAILURE);
       }
       config.header_table_size = static_cast<int64_t>(*n);
-      config.min_header_table_size =
-        std::min(config.min_header_table_size, config.header_table_size);
       break;
     }
     case 'y':
@@ -2807,10 +2262,6 @@ int main(int argc, char **argv) {
       case 2:
         // key option
         config.keyfile = optarg;
-        break;
-      case 3:
-        // color option
-        color = true;
         break;
       case 4:
         // continuation option
@@ -2856,21 +2307,6 @@ int main(int argc, char **argv) {
         // hexdump option
         config.hexdump = true;
         break;
-      case 11:
-        // no-push option
-        config.no_push = true;
-        break;
-      case 12: {
-        // max-concurrent-streams option
-        auto n = util::parse_uint(optarg);
-        if (!n) {
-          std::println(stderr, "--max-concurrent-streams: Bad option value: {}",
-                       optarg);
-          exit(EXIT_FAILURE);
-        }
-        config.max_concurrent_streams = static_cast<size_t>(*n);
-        break;
-      }
       case 13:
         // expect-continue option
         config.expect_continue = true;
@@ -2905,18 +2341,18 @@ int main(int argc, char **argv) {
         break;
       case 17: {
         // extpri option
-        nghttp2_extpri pri{
-          .urgency = NGHTTP2_EXTPRI_DEFAULT_URGENCY,
+        nghttp2_pri pri{
+          .urgency = NGHTTP2_DEFAULT_URGENCY,
         };
 
-        if (nghttp2_extpri_parse_priority(
+        if (nghttp2_pri_parse_priority(
               &pri, reinterpret_cast<const uint8_t *>(optarg),
               strlen(optarg)) != 0) {
           std::println(stderr, "--extpri: Bad option value: {}", optarg);
           exit(EXIT_FAILURE);
         }
 
-        config.extpris.emplace_back(std::move(pri));
+        config.pris.emplace_back(std::move(pri));
 
         break;
       }
@@ -2927,15 +2363,15 @@ int main(int argc, char **argv) {
     }
   }
 
-  nghttp2_extpri extpri_to_fill{
-    .urgency = NGHTTP2_EXTPRI_DEFAULT_URGENCY,
+  nghttp2_pri pri_to_fill{
+    .urgency = NGHTTP2_DEFAULT_URGENCY,
   };
 
-  if (!config.extpris.empty()) {
-    extpri_to_fill = config.extpris.back();
+  if (!config.pris.empty()) {
+    pri_to_fill = config.pris.back();
   }
-  config.extpris.insert(std::ranges::end(config.extpris),
-                        static_cast<size_t>(argc - optind), extpri_to_fill);
+  config.pris.insert(std::ranges::end(config.pris),
+                     static_cast<size_t>(argc - optind), pri_to_fill);
 
   // Find scheme overridden by extra header fields.
   auto scheme_it = std::ranges::find_if(
@@ -2968,22 +2404,10 @@ int main(int argc, char **argv) {
     }
   }
 
-  set_color_output(color || isatty(fileno(stdout)));
-
-  nghttp2_option_set_peer_max_concurrent_streams(
-    config.http2_option,
-    static_cast<uint32_t>(config.peer_max_concurrent_streams));
-
-  if (config.encoder_header_table_size != -1) {
-    nghttp2_option_set_max_deflate_dynamic_table_size(
-      config.http2_option,
-      static_cast<size_t>(config.encoder_header_table_size));
-  }
-
   struct sigaction act{};
   act.sa_handler = SIG_IGN;
   sigaction(SIGPIPE, &act, nullptr);
-  reset_timer();
+
   return run(argv + optind, argc - optind);
 }
 
