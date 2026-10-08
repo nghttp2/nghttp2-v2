@@ -251,8 +251,6 @@ public:
 
   bool get_allow_connect_proto() const;
 
-  using ReadBuf = Buffer<8_k>;
-
   Http2Session *dlnext{}, *dlprev{};
 
 private:
