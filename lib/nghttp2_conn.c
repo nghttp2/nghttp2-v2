@@ -3189,20 +3189,21 @@ int nghttp2_conn_write_connection_wide_frames(nghttp2_conn *conn,
   nghttp2_frame fr;
   int rv;
 
-  if (!conn->server && !(conn->flags & NGHTTP2_CONN_FLAG_HTTP2_PREFACE_SENT)) {
-    if (nghttp2_buf_left(dest) <
-        nghttp2_strlen_lit(NGHTTP2_CLIENT_HTTP2_PREFACE)) {
-      return 0;
+  if (!(conn->flags & NGHTTP2_CONN_FLAG_SETTINGS_SENT)) {
+    if (!conn->server &&
+        !(conn->flags & NGHTTP2_CONN_FLAG_HTTP2_PREFACE_SENT)) {
+      if (nghttp2_buf_left(dest) <
+          nghttp2_strlen_lit(NGHTTP2_CLIENT_HTTP2_PREFACE)) {
+        return 0;
+      }
+
+      dest->last =
+        nghttp2_cpymem(dest->last, NGHTTP2_CLIENT_HTTP2_PREFACE,
+                       nghttp2_strlen_lit(NGHTTP2_CLIENT_HTTP2_PREFACE));
+
+      conn->flags |= NGHTTP2_CONN_FLAG_HTTP2_PREFACE_SENT;
     }
 
-    dest->last =
-      nghttp2_cpymem(dest->last, NGHTTP2_CLIENT_HTTP2_PREFACE,
-                     nghttp2_strlen_lit(NGHTTP2_CLIENT_HTTP2_PREFACE));
-
-    conn->flags |= NGHTTP2_CONN_FLAG_HTTP2_PREFACE_SENT;
-  }
-
-  if (!(conn->flags & NGHTTP2_CONN_FLAG_SETTINGS_SENT)) {
     rv = nghttp2_conn_write_settings(conn, dest, ts);
     if (rv != 0) {
       return rv;
