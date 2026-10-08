@@ -699,6 +699,9 @@ std::expected<void, Error> LiveCheck::connection_made() {
 
   auto &downstreamconf = get_config()->http2.downstream;
 
+  util::secure_random(reinterpret_cast<uint8_t *>(&settings.conn_id),
+                      sizeof(settings.conn_id));
+  settings.initial_ts = util::timestamp();
   settings.settings_timeout = static_cast<nghttp2_duration>(
     std::chrono::floor<std::chrono::nanoseconds>(
       util::duration_from(downstreamconf.timeout.settings))

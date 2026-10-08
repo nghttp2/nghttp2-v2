@@ -1285,6 +1285,9 @@ std::expected<void, Error> Http2Session::connection_made() {
   nghttp2_settings settings;
   nghttp2_settings_default(&settings);
 
+  util::secure_random(reinterpret_cast<uint8_t *>(&settings.conn_id),
+                      sizeof(settings.conn_id));
+  settings.initial_ts = util::timestamp();
   settings.settings_timeout = static_cast<nghttp2_duration>(
     std::chrono::floor<std::chrono::nanoseconds>(
       util::duration_from(http2conf.downstream.timeout.settings))

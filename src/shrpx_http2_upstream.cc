@@ -739,6 +739,9 @@ Http2Upstream::Http2Upstream(ClientHandler *handler)
     settings.log_write = log_write;
   }
 
+  util::secure_random(reinterpret_cast<uint8_t *>(&settings.conn_id),
+                      sizeof(settings.conn_id));
+  settings.initial_ts = util::timestamp();
   settings.max_concurrent_streams_remote =
     http2conf.upstream.max_concurrent_streams;
 
