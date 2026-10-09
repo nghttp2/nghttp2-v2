@@ -103,14 +103,14 @@ func newServerTester(t *testing.T, opts options) *serverTester {
 	ts := httptest.NewUnstartedServer(opts.handler)
 
 	var (
-		args                                                                                        []string
-		backendTLS, dns, externalDNS, acceptProxyProtocol, redirectIfNotTLS, affinityCookie, alpnH1 bool
+		args                                                                                          []string
+		backendHTTP2, dns, externalDNS, acceptProxyProtocol, redirectIfNotTLS, affinityCookie, alpnH1 bool
 	)
 
 	for _, k := range opts.args {
 		switch k {
 		case "--backend-http2":
-			backendTLS = true
+			backendHTTP2 = true
 		case "--dns":
 			dns = true
 		case "--external-dns":
@@ -129,7 +129,7 @@ func newServerTester(t *testing.T, opts options) *serverTester {
 		}
 	}
 
-	if backendTLS {
+	if backendHTTP2 {
 		nghttp2.ConfigureServer(ts.Config, &nghttp2.Server{})
 		// According to httptest/server.go, we have to set
 		// NextProtos separately for ts.TLS.  NextProtos set
@@ -174,7 +174,7 @@ func newServerTester(t *testing.T, opts options) *serverTester {
 		args = append(args, "--backend-address-family=IPv4")
 	}
 
-	if backendTLS {
+	if backendHTTP2 {
 		b += ";proto=h2;tls"
 	}
 
