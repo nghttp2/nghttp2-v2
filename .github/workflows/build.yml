@@ -414,7 +414,7 @@ jobs:
 
         OPENSSL_CFLAGS="-I$PWD/include/"
         OPENSSL_LIBS="-L$PWD/build -lssl -lcrypto -pthread"
-        EXTRA_AUTOTOOLS_OPTS="$EXTRA_AUTOTOOLS_OPTS --without-neverbleed --without-jemalloc --disable-examples"
+        EXTRA_AUTOTOOLS_OPTS="$EXTRA_AUTOTOOLS_OPTS --without-neverbleed --without-jemalloc"
 
         echo 'OPENSSL_CFLAGS='"$OPENSSL_CFLAGS" >> $GITHUB_ENV
         echo 'OPENSSL_LIBS='"$OPENSSL_LIBS" >> $GITHUB_ENV
@@ -428,7 +428,7 @@ jobs:
 
         OPENSSL_CFLAGS="-I$PWD/include/"
         OPENSSL_LIBS="-L$PWD/build/ssl -lssl -L$PWD/build/crypto -lcrypto -pthread"
-        EXTRA_AUTOTOOLS_OPTS="$EXTRA_AUTOTOOLS_OPTS --without-neverbleed --without-jemalloc --disable-examples"
+        EXTRA_AUTOTOOLS_OPTS="$EXTRA_AUTOTOOLS_OPTS --without-neverbleed --without-jemalloc"
 
         echo 'OPENSSL_CFLAGS='"$OPENSSL_CFLAGS" >> $GITHUB_ENV
         echo 'OPENSSL_LIBS='"$OPENSSL_LIBS" >> $GITHUB_ENV
@@ -446,7 +446,7 @@ jobs:
       if: matrix.openssl == 'wolfssl'
       run: |
         EXTRA_AUTOTOOLS_OPTS="$EXTRA_AUTOTOOLS_OPTS --with-wolfssl --without-neverbleed"
-        EXTRA_CMAKE_OPTS="$EXTRA_CMAKE_OPTS -DWITH_WOLFSSL=1 -DWITH_NEVERBLEED=0 -DENABLE_EXAMPLES=0"
+        EXTRA_CMAKE_OPTS="$EXTRA_CMAKE_OPTS -DWITH_WOLFSSL=1 -DWITH_NEVERBLEED=0"
 
         echo 'EXTRA_AUTOTOOLS_OPTS='"$EXTRA_AUTOTOOLS_OPTS" >> $GITHUB_ENV
         echo 'EXTRA_CMAKE_OPTS='"$EXTRA_CMAKE_OPTS" >> $GITHUB_ENV

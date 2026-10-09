@@ -72,7 +72,7 @@ git clone --recursive --shallow-submodules --depth 1 -b $NGHTTP2_BRANCH \
     https://github.com/nghttp2/nghttp2-v2
 cd nghttp2-v2
 autoreconf -i
-./configure --disable-dependency-tracking --disable-examples \
+./configure --disable-dependency-tracking \
     --with-mruby \
     --enable-http3 --with-libbpf \
     --with-libbrotlienc --with-libbrotlidec \

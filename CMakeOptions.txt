@@ -5,10 +5,8 @@ option(ENABLE_DEBUG     "Turn on debug output")
 option(ENABLE_THREADS   "Turn on threading in apps" ON)
 option(ENABLE_APP       "Build applications (nghttp, nghttpd, nghttpx and h2load)"
   ${ENABLE_APP_DEFAULT})
-option(ENABLE_EXAMPLES  "Build examples"
-  ${ENABLE_EXAMPLES_DEFAULT})
 option(ENABLE_FAILMALLOC "Build failmalloc test program" ON)
-option(ENABLE_LIB_ONLY  "Build libnghttp2 only.  This is a short hand for -DENABLE_APP=0 -DENABLE_EXAMPLES=0")
+option(ENABLE_LIB_ONLY  "Build libnghttp2 only.  This is a short hand for -DENABLE_APP=0")
 option(BUILD_SHARED_LIBS "Build libnghttp2 as a shared library" ON)
 option(BUILD_STATIC_LIBS "Build libnghttp2 in static mode also" OFF)
 option(ENABLE_STATIC_CRT "Build libnghttp2 against the MS LIBCMT[d]")
