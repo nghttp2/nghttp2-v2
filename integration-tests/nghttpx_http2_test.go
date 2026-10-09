@@ -2687,7 +2687,7 @@ func TestH2H1GracefulShutdown(t *testing.T) {
 // multiple Content-Length response header fields are received.
 func TestH2H2MultipleResponseCL(t *testing.T) {
 	opts := options{
-		args: []string{"--http2-bridge"},
+		args: []string{"--backend-http2"},
 		handler: func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Add("content-length", "1")
 			w.Header().Add("content-length", "1")
@@ -2714,7 +2714,7 @@ func TestH2H2MultipleResponseCL(t *testing.T) {
 // number.
 func TestH2H2InvalidResponseCL(t *testing.T) {
 	opts := options{
-		args: []string{"--http2-bridge"},
+		args: []string{"--backend-http2"},
 		handler: func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Add("content-length", "")
 		},
@@ -2739,7 +2739,7 @@ func TestH2H2InvalidResponseCL(t *testing.T) {
 // // connection attempt to HTTP/2 backend failed.
 // func TestH2H2ConnectFailure(t *testing.T) {
 // 	opts := options{
-// 		args: []string{"--http2-bridge"},
+// 		args: []string{"--backend-http2"},
 // 	}
 // 	st := newServerTester(t, opts)
 // 	defer st.Close()
@@ -2762,7 +2762,7 @@ func TestH2H2InvalidResponseCL(t *testing.T) {
 // TestH2H2HostRewrite tests that server rewrites host header field
 func TestH2H2HostRewrite(t *testing.T) {
 	opts := options{
-		args: []string{"--http2-bridge", "--host-rewrite"},
+		args: []string{"--backend-http2", "--host-rewrite"},
 		handler: func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Add("request-host", r.Host)
 		},
@@ -2791,7 +2791,7 @@ func TestH2H2HostRewrite(t *testing.T) {
 // header field
 func TestH2H2NoHostRewrite(t *testing.T) {
 	opts := options{
-		args: []string{"--http2-bridge"},
+		args: []string{"--backend-http2"},
 		handler: func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Add("request-host", r.Host)
 		},
@@ -2821,7 +2821,7 @@ func TestH2H2NoHostRewrite(t *testing.T) {
 // connection is encrypted.
 func TestH2H2TLSXfp(t *testing.T) {
 	opts := options{
-		args: []string{"--http2-bridge"},
+		args: []string{"--backend-http2"},
 		handler: func(_ http.ResponseWriter, r *http.Request) {
 			if got, want := r.Header.Get("x-forwarded-proto"), "http"; got != want {
 				t.Errorf("x-forwarded-proto: want %v; got %v", want, got)
@@ -2850,7 +2850,7 @@ func TestH2H2TLSXfp(t *testing.T) {
 func TestH2H2AddXfp(t *testing.T) {
 	opts := options{
 		args: []string{
-			"--http2-bridge",
+			"--backend-http2",
 			"--no-strip-incoming-x-forwarded-proto",
 		},
 		handler: func(_ http.ResponseWriter, r *http.Request) {
@@ -2885,7 +2885,7 @@ func TestH2H2AddXfp(t *testing.T) {
 func TestH2H2NoAddXfp(t *testing.T) {
 	opts := options{
 		args: []string{
-			"--http2-bridge",
+			"--backend-http2",
 			"--no-add-x-forwarded-proto",
 			"--no-strip-incoming-x-forwarded-proto",
 		},
@@ -2920,7 +2920,7 @@ func TestH2H2NoAddXfp(t *testing.T) {
 // x-forwarded-proto header field.
 func TestH2H2StripXfp(t *testing.T) {
 	opts := options{
-		args: []string{"--http2-bridge"},
+		args: []string{"--backend-http2"},
 		handler: func(_ http.ResponseWriter, r *http.Request) {
 			xfp := r.Header.Get("X-Forwarded-Proto")
 			if got, want := xfp, "http"; got != want {
@@ -2952,7 +2952,7 @@ func TestH2H2StripXfp(t *testing.T) {
 // x-forwarded-proto header field, and does not add another.
 func TestH2H2StripNoAddXfp(t *testing.T) {
 	opts := options{
-		args: []string{"--http2-bridge", "--no-add-x-forwarded-proto"},
+		args: []string{"--backend-http2", "--no-add-x-forwarded-proto"},
 		handler: func(_ http.ResponseWriter, r *http.Request) {
 			if got, found := r.Header["X-Forwarded-Proto"]; found {
 				t.Errorf("X-Forwarded-Proto = %q; want nothing", got)
@@ -2983,7 +2983,7 @@ func TestH2H2StripNoAddXfp(t *testing.T) {
 // field when forwarding request to backend.
 func TestH2H2AddXff(t *testing.T) {
 	opts := options{
-		args: []string{"--http2-bridge", "--add-x-forwarded-for"},
+		args: []string{"--backend-http2", "--add-x-forwarded-for"},
 		handler: func(_ http.ResponseWriter, r *http.Request) {
 			xff := r.Header.Get("X-Forwarded-For")
 			want := "127.0.0.1"
@@ -3013,7 +3013,7 @@ func TestH2H2AddXff(t *testing.T) {
 // field to existing one when forwarding request to backend.
 func TestH2H2AddXff2(t *testing.T) {
 	opts := options{
-		args: []string{"--http2-bridge", "--add-x-forwarded-for"},
+		args: []string{"--backend-http2", "--add-x-forwarded-for"},
 		handler: func(_ http.ResponseWriter, r *http.Request) {
 			xff := r.Header.Get("X-Forwarded-For")
 			want := "host, 127.0.0.1"
@@ -3047,7 +3047,7 @@ func TestH2H2AddXff2(t *testing.T) {
 func TestH2H2StripXff(t *testing.T) {
 	opts := options{
 		args: []string{
-			"--http2-bridge",
+			"--backend-http2",
 			"--strip-incoming-x-forwarded-for",
 		},
 		handler: func(_ http.ResponseWriter, r *http.Request) {
@@ -3081,7 +3081,7 @@ func TestH2H2StripXff(t *testing.T) {
 func TestH2H2StripAddXff(t *testing.T) {
 	opts := options{
 		args: []string{
-			"--http2-bridge",
+			"--backend-http2",
 			"--strip-incoming-x-forwarded-for",
 			"--add-x-forwarded-for",
 		},
@@ -3118,7 +3118,7 @@ func TestH2H2StripAddXff(t *testing.T) {
 func TestH2H2AddForwarded(t *testing.T) {
 	opts := options{
 		args: []string{
-			"--http2-bridge",
+			"--backend-http2",
 			"--add-forwarded=by,for,host,proto",
 			"--forwarded-by=_alpha",
 		},
@@ -3154,7 +3154,7 @@ func TestH2H2AddForwarded(t *testing.T) {
 func TestH2H2AddForwardedMerge(t *testing.T) {
 	opts := options{
 		args: []string{
-			"--http2-bridge",
+			"--backend-http2",
 			"--add-forwarded=by,host,proto",
 			"--forwarded-by=_alpha",
 		},
@@ -3192,7 +3192,7 @@ func TestH2H2AddForwardedMerge(t *testing.T) {
 func TestH2H2AddForwardedStrip(t *testing.T) {
 	opts := options{
 		args: []string{
-			"--http2-bridge",
+			"--backend-http2",
 			"--strip-incoming-forwarded",
 			"--add-forwarded=by,host,proto",
 			"--forwarded-by=_alpha",
@@ -3229,7 +3229,7 @@ func TestH2H2AddForwardedStrip(t *testing.T) {
 // header field.
 func TestH2H2StripForwarded(t *testing.T) {
 	opts := options{
-		args: []string{"--http2-bridge", "--strip-incoming-forwarded"},
+		args: []string{"--backend-http2", "--strip-incoming-forwarded"},
 		handler: func(_ http.ResponseWriter, r *http.Request) {
 			if got, found := r.Header["Forwarded"]; found {
 				t.Errorf("Forwarded = %v; want nothing", got)
@@ -3262,7 +3262,7 @@ func TestH2H2StripForwarded(t *testing.T) {
 func TestH2H2ReqPhaseReturn(t *testing.T) {
 	opts := options{
 		args: []string{
-			"--http2-bridge",
+			"--backend-http2",
 			"--mruby-file=" + testDir + "/req-return.rb",
 		},
 		handler: func(http.ResponseWriter, *http.Request) {
@@ -3307,7 +3307,7 @@ func TestH2H2ReqPhaseReturn(t *testing.T) {
 func TestH2H2RespPhaseReturn(t *testing.T) {
 	opts := options{
 		args: []string{
-			"--http2-bridge",
+			"--backend-http2",
 			"--mruby-file=" + testDir + "/resp-return.rb",
 		},
 	}
@@ -3348,7 +3348,7 @@ func TestH2H2RespPhaseReturn(t *testing.T) {
 // with HTTP/2 backend works.
 func TestH2H2ExternalDNS(t *testing.T) {
 	opts := options{
-		args: []string{"--http2-bridge", "--external-dns"},
+		args: []string{"--backend-http2", "--external-dns"},
 	}
 
 	st := newServerTester(t, opts)
@@ -3370,7 +3370,7 @@ func TestH2H2ExternalDNS(t *testing.T) {
 // HTTP/2 backend works.
 func TestH2H2DNS(t *testing.T) {
 	opts := options{
-		args: []string{"--http2-bridge", "--dns"},
+		args: []string{"--backend-http2", "--dns"},
 	}
 
 	st := newServerTester(t, opts)
@@ -3392,7 +3392,7 @@ func TestH2H2DNS(t *testing.T) {
 // transfer-encoding is valid.
 func TestH2H2Code204(t *testing.T) {
 	opts := options{
-		args: []string{"--http2-bridge"},
+		args: []string{"--backend-http2"},
 		handler: func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusNoContent)
 		},

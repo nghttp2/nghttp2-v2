@@ -109,7 +109,7 @@ func newServerTester(t *testing.T, opts options) *serverTester {
 
 	for _, k := range opts.args {
 		switch k {
-		case "--http2-bridge":
+		case "--backend-http2":
 			backendTLS = true
 		case "--dns":
 			dns = true

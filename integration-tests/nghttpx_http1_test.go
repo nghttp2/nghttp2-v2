@@ -1243,7 +1243,7 @@ func TestH1H1AsteriskPrefix(t *testing.T) {
 // TestH1H2OPTIONSServerWide tests that server-wide OPTIONS request.
 func TestH1H2OPTIONS(t *testing.T) {
 	opts := options{
-		args: []string{"--http2-bridge"},
+		args: []string{"--backend-http2"},
 	}
 
 	st := newServerTester(t, opts)
@@ -1273,7 +1273,7 @@ func TestH1H2OPTIONS(t *testing.T) {
 // request in proxy request.
 func TestH1H2OPTIONSProxyServerWide(t *testing.T) {
 	opts := options{
-		args: []string{"--http2-bridge"},
+		args: []string{"--backend-http2"},
 	}
 
 	st := newServerTester(t, opts)
@@ -1303,7 +1303,7 @@ func TestH1H2OPTIONSProxyServerWide(t *testing.T) {
 // OPTIONS request.
 func TestH1H2BadMethodAsterisk(t *testing.T) {
 	opts := options{
-		args: []string{"--http2-bridge"},
+		args: []string{"--backend-http2"},
 	}
 
 	st := newServerTester(t, opts)
@@ -1333,7 +1333,7 @@ func TestH1H2BadMethodAsterisk(t *testing.T) {
 // request.
 func TestH1H2AsteriskPrefix(t *testing.T) {
 	opts := options{
-		args: []string{"--http2-bridge"},
+		args: []string{"--backend-http2"},
 	}
 
 	st := newServerTester(t, opts)
@@ -1363,7 +1363,7 @@ func TestH1H2AsteriskPrefix(t *testing.T) {
 // // connection attempt to HTTP/2 backend failed.
 // func TestH1H2ConnectFailure(t *testing.T) {
 // 	opts := options{
-// 		args: []string{"--http2-bridge"},
+// 		args: []string{"--backend-http2"},
 // 	}
 // 	st := newServerTester(t, opts)
 // 	defer st.Close()
@@ -1387,7 +1387,7 @@ func TestH1H2AsteriskPrefix(t *testing.T) {
 // header field for HTTP/2 backend.
 func TestH1H2NoHost(t *testing.T) {
 	opts := options{
-		args: []string{"--http2-bridge"},
+		args: []string{"--backend-http2"},
 		handler: func(http.ResponseWriter, *http.Request) {
 			t.Errorf("server should not forward bad request")
 		},
@@ -1417,7 +1417,7 @@ func TestH1H2NoHost(t *testing.T) {
 // without Host header field
 func TestH1H2HTTP10(t *testing.T) {
 	opts := options{
-		args: []string{"--http2-bridge"},
+		args: []string{"--backend-http2"},
 		handler: func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Add("request-host", r.Host)
 		},
@@ -1451,7 +1451,7 @@ func TestH1H2HTTP10(t *testing.T) {
 // used.
 func TestH1H2HTTP10NoHostRewrite(t *testing.T) {
 	opts := options{
-		args: []string{"--http2-bridge"},
+		args: []string{"--backend-http2"},
 		handler: func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Add("request-host", r.Host)
 		},
@@ -1486,7 +1486,7 @@ func TestH1H2HTTP10NoHostRewrite(t *testing.T) {
 // much effective now.
 func TestH1H2CrumbleCookie(t *testing.T) {
 	opts := options{
-		args: []string{"--http2-bridge"},
+		args: []string{"--backend-http2"},
 		handler: func(_ http.ResponseWriter, r *http.Request) {
 			if got, want := r.Header.Get("Cookie"), "alpha; bravo; charlie"; got != want {
 				t.Errorf("Cookie: %v; want %v", got, want)
@@ -1516,7 +1516,7 @@ func TestH1H2CrumbleCookie(t *testing.T) {
 // from backend server.
 func TestH1H2GenerateVia(t *testing.T) {
 	opts := options{
-		args: []string{"--http2-bridge"},
+		args: []string{"--backend-http2"},
 		handler: func(_ http.ResponseWriter, r *http.Request) {
 			if got, want := r.Header.Get("Via"), "1.1 nghttpx"; got != want {
 				t.Errorf("Via: %v; want %v", got, want)
@@ -1543,7 +1543,7 @@ func TestH1H2GenerateVia(t *testing.T) {
 // header field to and from backend server.
 func TestH1H2AppendVia(t *testing.T) {
 	opts := options{
-		args: []string{"--http2-bridge"},
+		args: []string{"--backend-http2"},
 		handler: func(w http.ResponseWriter, r *http.Request) {
 			if got, want := r.Header.Get("Via"), "foo, 1.1 nghttpx"; got != want {
 				t.Errorf("Via: %v; want %v", got, want)
@@ -1574,7 +1574,7 @@ func TestH1H2AppendVia(t *testing.T) {
 // header field to and from backend server.
 func TestH1H2NoVia(t *testing.T) {
 	opts := options{
-		args: []string{"--http2-bridge", "--no-via"},
+		args: []string{"--backend-http2", "--no-via"},
 		handler: func(w http.ResponseWriter, r *http.Request) {
 			if got, want := r.Header.Get("Via"), "foo"; got != want {
 				t.Errorf("Via: %v; want %v", got, want)
@@ -1606,7 +1606,7 @@ func TestH1H2NoVia(t *testing.T) {
 func TestH1H2ReqPhaseReturn(t *testing.T) {
 	opts := options{
 		args: []string{
-			"--http2-bridge",
+			"--backend-http2",
 			"--mruby-file=" + testDir + "/req-return.rb",
 		},
 		handler: func(http.ResponseWriter, *http.Request) {
@@ -1650,7 +1650,7 @@ func TestH1H2ReqPhaseReturn(t *testing.T) {
 func TestH1H2RespPhaseReturn(t *testing.T) {
 	opts := options{
 		args: []string{
-			"--http2-bridge",
+			"--backend-http2",
 			"--mruby-file=" + testDir + "/resp-return.rb",
 		},
 	}
@@ -1690,7 +1690,7 @@ func TestH1H2RespPhaseReturn(t *testing.T) {
 // backend server by stripping other encodings.
 func TestH1H2TE(t *testing.T) {
 	opts := options{
-		args: []string{"--http2-bridge"},
+		args: []string{"--backend-http2"},
 		handler: func(_ http.ResponseWriter, r *http.Request) {
 			if got, want := r.Header.Get("te"), "trailers"; got != want {
 				t.Errorf("te: %v; want %v", got, want)
@@ -2186,7 +2186,7 @@ func TestH1H1RequestHTTP10TransferEncoding(t *testing.T) {
 // bad request.
 func TestH1H2BadHost(t *testing.T) {
 	opts := options{
-		args: []string{"--http2-bridge"},
+		args: []string{"--backend-http2"},
 	}
 
 	st := newServerTester(t, opts)

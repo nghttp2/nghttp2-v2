@@ -267,7 +267,7 @@ func TestH3H1AffinityCookieTLS(t *testing.T) {
 func TestH3H2ReqPhaseReturn(t *testing.T) {
 	opts := options{
 		args: []string{
-			"--http2-bridge",
+			"--backend-http2",
 			"--mruby-file=" + testDir + "/req-return.rb",
 		},
 		handler: func(http.ResponseWriter, *http.Request) {
@@ -312,7 +312,7 @@ func TestH3H2ReqPhaseReturn(t *testing.T) {
 func TestH3H2RespPhaseReturn(t *testing.T) {
 	opts := options{
 		args: []string{
-			"--http2-bridge",
+			"--backend-http2",
 			"--mruby-file=" + testDir + "/resp-return.rb",
 		},
 		quic: true,
