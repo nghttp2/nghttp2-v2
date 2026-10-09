@@ -261,8 +261,10 @@ extern "C" {
  */
 #define NGHTTP2_ERR_STREAM_STATE -221
 /**
- * @macro :macro:`NGHTTP2_ERR_STOP_READING` indicates that the local
- * endpoint stops reading any input.
+ * @macro
+ *
+ * :macro:`NGHTTP2_ERR_STOP_READING` indicates that the local endpoint
+ * stops reading any input.
  */
 #define NGHTTP2_ERR_STOP_READING -222
 /**
@@ -812,12 +814,12 @@ typedef struct nghttp2_nv {
   const uint8_t *value;
   /**
    * :member:`namelen` is the length of the |name|, excluding
-   * terminating NULL.
+   * terminating ``NULL``.
    */
   size_t namelen;
   /**
    * :member:`valuelen` is the length of the |value|, excluding
-   * terminating NULL.
+   * terminating ``NULL``.
    */
   size_t valuelen;
   /**
@@ -1002,13 +1004,14 @@ typedef struct nghttp2_settings {
   nghttp2_tstamp initial_ts;
   /**
    * :member:`log_write` is the callback function when a single log
-   * message is emitted.  If this field is NULL, logging is disabled.
+   * message is emitted.  If this field is ``NULL``, logging is
+   * disabled.
    */
   nghttp2_log_write log_write;
   /**
    * :member:`settings_timeout` is the timeout before receiving
-   * SETTINGS frame with ACK flag set.  Setting UINT64_MAX disables
-   * timeout.
+   * SETTINGS frame with ACK flag set.  Setting ``UINT64_MAX``
+   * disables timeout.
    */
   nghttp2_duration settings_timeout;
   /**
@@ -1021,7 +1024,7 @@ typedef struct nghttp2_settings {
    * HPACK dynamic table capacity that the HPACK encoder is willing to
    * use.  The effective maximum dynamic table capacity is the minimum
    * of this field and the value of the received
-   * SETTINGS_HEADER_TABLE_SIZE.  If this field is set to 0, the
+   * ``SETTINGS_HEADER_TABLE_SIZE``.  If this field is set to 0, the
    * encoder does not use the dynamic table.
    */
   size_t hpack_encoder_max_dtable_capacity;
@@ -1077,12 +1080,12 @@ typedef struct nghttp2_settings {
   size_t extra_settingslen;
   /**
    * :member:`glitch_ratelim_burst` is the maximum number of tokens
-   * available to "glitch" rate limiter.  It is clamped to UINT64_MAX
-   * / NGHTTP2_SECONDS.  "glitch" is a suspicious activity from a remote
-   * endpoint.  If detected, certain amount of tokens are consumed.
-   * If no tokens are available to consume, the connection is closed.
-   * The rate of token generation is specified by
-   * :member:`glitch_ratelim_rate`.
+   * available to "glitch" rate limiter.  It is clamped to
+   * ``UINT64_MAX`` / :macro:`NGHTTP2_SECONDS`.  "glitch" is a
+   * suspicious activity from a remote endpoint.  If detected, certain
+   * amount of tokens are consumed.  If no tokens are available to
+   * consume, the connection is closed.  The rate of token generation
+   * is specified by :member:`glitch_ratelim_rate`.
    */
   uint64_t glitch_ratelim_burst;
   /**
@@ -1310,8 +1313,8 @@ typedef int (*nghttp2_write_stream_data_offset)(nghttp2_conn *conn,
  * invoked when an incoming HTTP field section is started on a stream
  * denoted by |stream_id|.  Each HTTP field is passed to application
  * by :type:`nghttp2_recv_field` callback.  And then
- * :type:`nghttp2_end_field` is called when a whole HTTP field section
- * is processed.
+ * :type:`nghttp2_end_fields` is called when a whole HTTP field
+ * section is processed.
  *
  * The implementation of this callback must return 0 if it succeeds.
  * Returning :macro:`NGHTTP2_ERR_CALLBACK_FAILURE` will return to the
@@ -1328,7 +1331,7 @@ typedef int (*nghttp2_begin_fields)(nghttp2_conn *conn, int64_t stream_id,
  * :type:`nghttp2_recv_field` is a callback function which is invoked
  * when an HTTP field is received on a stream denoted by |stream_id|.
  * |name| contains a field name, and |value| contains a field value.
- * |token| is one of token defined in :type:`nghttp2_qpack_token` or
+ * |token| is one of token defined in :type:`nghttp2_hpack_token` or
  * -1 if no token is defined for |name|.  |flags| is bitwise OR of
  * zero or more of :macro:`NGHTTP2_NV_FLAG_* <NGHTTP2_NV_FLAG_NONE>`.
  *
@@ -1604,7 +1607,7 @@ typedef struct nghttp2_callbacks {
  * The application should fill data and its length to |vec|.  It has
  * to return the number of the filled objects.  The application must
  * retain data until they are safe to free.  It is notified by
- * :type:`nghttp2_acked_stream_data` callback.
+ * :type:`nghttp2_write_stream_data_offset` callback.
  *
  * If this is the last data to send (or there is no data to send
  * because all data have been sent already), set
@@ -1615,9 +1618,8 @@ typedef struct nghttp2_callbacks {
  * call `nghttp2_conn_resume_stream`.
  *
  * If the callback returns 0 or the sum of length in |vec| is 0, and
- * |*pflags| does not have :macro:`NGHTTP2_READ_DATA_FLAG_EOF` not
- * set, it is treated as if :macro:`NGHTTP2_ERR_CALLBACK_FAILURE` is
- * returned.
+ * :macro:`NGHTTP2_READ_DATA_FLAG_EOF` is not set in |*pflags|, it is
+ * treated as if :macro:`NGHTTP2_ERR_CALLBACK_FAILURE` is returned.
  *
  * The callback should return the number of objects in |vec| that the
  * application filled if it succeeds, or
@@ -1647,10 +1649,10 @@ typedef struct nghttp2_data_reader {
  *
  * `nghttp2_conn_server_new` creates new :type:`nghttp2_conn` as a
  * server.  If it succeeds, it assigns the pointer to the object to
- * |*pconn|.  |callbacks| and |settings| must not be NULL, and the
+ * |*pconn|.  |callbacks| and |settings| must not be ``NULL``, and the
  * function makes a copy of each of them.  |user_data| is the
  * arbitrary pointer which is passed to the user-defined callback
- * functions.  |mem| is a memory allocator.  If |mem| is NULL, the
+ * functions.  |mem| is a memory allocator.  If |mem| is ``NULL``, the
  * memory allocator returned by `nghttp2_mem_default()` is used.
  *
  * Call `nghttp2_conn_del` to free memory allocated for |*pconn|.
@@ -1672,10 +1674,10 @@ NGHTTP2_EXTERN int nghttp2_conn_server_new(nghttp2_conn **pconn,
  *
  * `nghttp2_conn_client_new` creates new :type:`nghttp2_conn` as a
  * client.  If it succeeds, it assigns the pointer to the object to
- * |*pconn|.  |callbacks| and |settings| must not be NULL, and the
+ * |*pconn|.  |callbacks| and |settings| must not be ``NULL``, and the
  * function makes a copy of each of them.  |user_data| is the
  * arbitrary pointer which is passed to the user-defined callback
- * functions.  |mem| is a memory allocator.  If |mem| is NULL, the
+ * functions.  |mem| is a memory allocator.  If |mem| is ``NULL``, the
  * memory allocator returned by `nghttp2_mem_default()` is used.
  *
  * Call `nghttp2_conn_del` to free memory allocated for |*pconn|.
@@ -1703,9 +1705,9 @@ NGHTTP2_EXTERN void nghttp2_conn_del(nghttp2_conn *conn);
 /**
  * @function
  *
- * `nghttp2_conn_read` processes the incoming data pointed by |data| of
- * length |datalen|.  |ts| is the timestamp of this call.  Normally,
- * this function processes all input data.
+ * `nghttp2_conn_read` processes the incoming data pointed by |data|
+ * of length |datalen|.  |ts| is the timestamp of this call.  This
+ * function processes all input data.
  *
  * If this function returns an error code, the error is unrecoverable,
  * therefore the application should close the underlying connection
@@ -1739,8 +1741,9 @@ NGHTTP2_EXTERN int nghttp2_conn_read(nghttp2_conn *conn, const uint8_t *data,
  * This function returns 0 if it succeeds, or one of the following
  * negative error codes:
  *
- * :macro:`NGHTTP2_ERR_NOMEM`
- *     Out of memory.
+ * :macro:`NGHTTP2_ERR_FLOW_CONTROL`
+ *     Extending window by |datalen| makes flow control window exceed
+ *     ``INT32_MAX``.
  */
 NGHTTP2_EXTERN int nghttp2_conn_extend_max_stream_offset(nghttp2_conn *conn,
                                                          int64_t stream_id,
@@ -1752,6 +1755,10 @@ NGHTTP2_EXTERN int nghttp2_conn_extend_max_stream_offset(nghttp2_conn *conn,
  * `nghttp2_conn_extend_max_offset` extends max data offset by
  * |datalen|.  This function only extends connection-level flow
  * control window.
+ *
+ * :macro:`NGHTTP2_ERR_FLOW_CONTROL`
+ *     Extending window by |datalen| makes flow control window exceed
+ *     ``INT32_MAX``.
  */
 NGHTTP2_EXTERN int nghttp2_conn_extend_max_offset(nghttp2_conn *conn,
                                                   size_t datalen);
@@ -1867,7 +1874,9 @@ NGHTTP2_EXTERN nghttp2_tstamp nghttp2_conn_get_expiry(const nghttp2_conn *conn);
  * negative error codes:
  *
  * :macro:`NGHTTP2_ERR_SETTINGS_TIMEOUT`
- *     The SETTINGS ACK timer has fired.
+ *     The SETTINGS ACK timer has fired.  This means that the remote
+ *     endpoint is unable to acknowledge SETTINGS in timely manner.
+ *     Drop the underlying connection immediately.
  */
 NGHTTP2_EXTERN int nghttp2_conn_handle_expiry(nghttp2_conn *conn,
                                               nghttp2_tstamp ts);
@@ -1904,9 +1913,10 @@ NGHTTP2_EXTERN uint32_t nghttp2_err_infer_http2_error_code(int liberr);
  * @function
  *
  * `nghttp2_conn_get_next_stream_id` returns the next stream ID.  If
- * it returns the invalid stream ID > INT32_MAX, all stream IDs have
- * been spent or GOAWAY has been received, and new stream cannot be
- * created for this connection.  Only client can call this function.
+ * it returns the invalid stream ID > ``INT32_MAX``, all stream IDs
+ * have been spent or GOAWAY has been received, and new stream cannot
+ * be created for this connection.  Only client can call this
+ * function.
  */
 NGHTTP2_EXTERN int64_t
 nghttp2_conn_get_next_stream_id(const nghttp2_conn *conn);
@@ -1918,8 +1928,8 @@ nghttp2_conn_get_next_stream_id(const nghttp2_conn *conn);
  * request header fields and the optional request body.  Only client
  * can submit HTTP request.  |nva| of length |nvlen| specifies HTTP
  * request header fields.  |dr| specifies a request body.  If there is
- * no request body, specify NULL.  If |dr| is NULL, it implies the end
- * of stream.
+ * no request body, specify ``NULL``.  If |dr| is ``NULL``, it implies
+ * the end of stream.
  *
  * This function returns the stream ID if it succeeds.  To know the
  * stream ID before calling this function, use
@@ -1950,10 +1960,14 @@ NGHTTP2_EXTERN int64_t nghttp2_conn_submit_request(
  * This function returns 0 if it succeeds, or one of the following
  * negative error codes:
  *
- * :macro:`NGHTTP2_ERR_STREAM_NOT_FOUND`
- *     Stream not found
  * :macro:`NGHTTP2_ERR_NOMEM`
  *     Out of memory.
+ * :macro:`NGHTTP2_ERR_STREAM_NOT_FOUND`
+ *     Stream not found
+ * :macro:`NGHTTP2_ERR_STREAM_STATE`
+ *     The final response headers have already been submitted.
+ * :macro:`NGHTTP2_ERR_STREAM_SHUT_WR`
+ *     The send side of the stream has been closed.
  */
 NGHTTP2_EXTERN int nghttp2_conn_submit_info(nghttp2_conn *conn,
                                             int64_t stream_id,
@@ -1966,16 +1980,20 @@ NGHTTP2_EXTERN int nghttp2_conn_submit_info(nghttp2_conn *conn,
  * `nghttp2_conn_submit_response` submits HTTP response header fields
  * and body on the stream identified by |stream_id|.  |nva| of length
  * |nvlen| specifies HTTP response header fields.  |dr| specifies a
- * response body.  If there is no response body, specify NULL.  If
- * |dr| is NULL, it implies the end of stream.
+ * response body.  If there is no response body, specify ``NULL``.  If
+ * |dr| is ``NULL``, it implies the end of stream.
  *
  * This function returns 0 if it succeeds, or one of the following
  * negative error codes:
  *
- * :macro:`NGHTTP2_ERR_STREAM_NOT_FOUND`
- *     Stream not found
  * :macro:`NGHTTP2_ERR_NOMEM`
  *     Out of memory.
+ * :macro:`NGHTTP2_ERR_STREAM_NOT_FOUND`
+ *     Stream not found
+ * :macro:`NGHTTP2_ERR_STREAM_STATE`
+ *     The final response headers have already been submitted.
+ * :macro:`NGHTTP2_ERR_STREAM_SHUT_WR`
+ *     The send side of the stream has been closed.
  */
 NGHTTP2_EXTERN int nghttp2_conn_submit_response(nghttp2_conn *conn,
                                                 int64_t stream_id,
@@ -1994,12 +2012,14 @@ NGHTTP2_EXTERN int nghttp2_conn_submit_response(nghttp2_conn *conn,
  * This function returns 0 if it succeeds, or one of the following
  * negative error codes:
  *
- * :macro:`NGHTTP2_ERR_STREAM_NOT_FOUND`
- *     Stream not found
- * :macro:`NGHTTP2_ERR_INVALID_STATE`
- *     Application has already submitted fin to stream.
  * :macro:`NGHTTP2_ERR_NOMEM`
  *     Out of memory.
+ * :macro:`NGHTTP2_ERR_STREAM_NOT_FOUND`
+ *     Stream not found
+ * :macro:`NGHTTP2_ERR_STREAM_STATE`
+ *     The final response headers have not been submitted yet.
+ * :macro:`NGHTTP2_ERR_STREAM_SHUT_WR`
+ *     The send side of the stream has been closed.
  */
 NGHTTP2_EXTERN int nghttp2_conn_submit_trailers(nghttp2_conn *conn,
                                                 int64_t stream_id,
@@ -2073,7 +2093,8 @@ NGHTTP2_EXTERN int nghttp2_conn_set_stream_user_data(nghttp2_conn *conn,
  *
  * `nghttp2_conn_get_stream_user_data` returns the user data
  * associated to the stream identified by |stream_id|.  If no data is
- * associated or the stream is not found, this function returns NULL.
+ * associated or the stream is not found, this function returns
+ * ``NULL``.
  *
  * The user data can be associated to the stream by the following
  * functions:
@@ -2083,6 +2104,7 @@ NGHTTP2_EXTERN int nghttp2_conn_set_stream_user_data(nghttp2_conn *conn,
  */
 NGHTTP2_EXTERN void *nghttp2_conn_get_stream_user_data(const nghttp2_conn *conn,
                                                        int64_t stream_id);
+
 /**
  * @function
  *
@@ -2263,7 +2285,7 @@ nghttp2_conn_set_server_stream_priority(nghttp2_conn *conn, int64_t stream_id,
  *
  * `nghttp2_check_header_name` returns nonzero if HTTP field name
  * |name| of length |len| is valid according to
- * :rfc:`7230#section-3.2`.
+ * :rfc:`9110#section-5`.
  *
  * Because this is an HTTP field name in HTTP/2, the upper cased
  * alphabet is treated as error.
@@ -2275,7 +2297,7 @@ NGHTTP2_EXTERN int nghttp2_check_header_name(const uint8_t *name, size_t len);
  *
  * `nghttp2_check_header_value` returns nonzero if HTTP field value
  * |value| of length |len| is valid according to
- * :rfc:`7230#section-3.2`.
+ * :rfc:`9110#section-5`.
  */
 NGHTTP2_EXTERN int nghttp2_check_header_value(const uint8_t *value, size_t len);
 
@@ -2284,7 +2306,7 @@ NGHTTP2_EXTERN int nghttp2_check_header_value(const uint8_t *value, size_t len);
  *
  * `nghttp2_check_authority` returns nonzero if the |value| which is
  * supposed to be the value of the :authority or host header field is
- * valid according to https://tools.ietf.org/html/rfc3986#section-3.2
+ * valid according to :rfc:`3986#section-3.2`.
  *
  * |value| is valid if it merely consists of the allowed characters.
  * In particular, it does not check whether |value| follows the syntax
