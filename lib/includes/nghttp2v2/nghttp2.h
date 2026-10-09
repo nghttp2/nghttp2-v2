@@ -989,7 +989,7 @@ typedef struct nghttp2_settings {
   uint64_t conn_id;
   /**
    * :member:`initial_ts` is an initial timestamp given to the
-   * library.
+   * library.  This should be set to the current timestamp.
    */
   nghttp2_tstamp initial_ts;
   /**
@@ -1451,17 +1451,19 @@ typedef struct nghttp2_callbacks {
   /**
    * :member:`recv_settings_entry` is a callback function which is
    * invoked when SETTINGS entry is received from the remote endpoint.
+   * This callback function is optional.
    */
   nghttp2_recv_settings_entry recv_settings_entry;
   /**
    * :member:`recv_settings` is a callback function which is invoked
-   * when SETTINGS frame is received from the remote endpoint.
+   * when SETTINGS frame is received from the remote endpoint.  This
+   * callback function is optional.
    */
   nghttp2_recv_settings recv_settings;
   /**
    * :member:`recv_settings_ack` is a callback function which is
    * invoked when SETTINGS frame with ACK flag set is received from
-   * the remote endpoint.
+   * the remote endpoint.  This callback function is optional.
    */
   nghttp2_recv_settings_ack recv_settings_ack;
   /**
@@ -1484,42 +1486,42 @@ typedef struct nghttp2_callbacks {
   /**
    * :member:`begin_headers` is a callback function which is invoked
    * when an HTTP header field section has started on a particular
-   * stream.
+   * stream.  This callback function is optional.
    */
   nghttp2_begin_fields begin_headers;
   /**
    * :member:`recv_header` is a callback function which is invoked
    * when a single HTTP header field is received on a particular
-   * stream.
+   * stream.  This callback function is optional.
    */
   nghttp2_recv_field recv_header;
   /**
    * :member:`end_headers` is a callback function which is invoked
    * when an HTTP header field section has ended on a particular
-   * stream.
+   * stream.  This callback function is optional.
    */
   nghttp2_end_fields end_headers;
   /**
    * :member:`begin_trailers` is a callback function which is invoked
    * when an HTTP trailer field section has started on a particular
-   * stream.
+   * stream.  This callback function is optional.
    */
   nghttp2_begin_fields begin_trailers;
   /**
    * :member:`recv_trailer` is a callback function which is invoked
    * when a single HTTP trailer field is received on a particular
-   * stream.
+   * stream.  This callback function is optional.
    */
   nghttp2_recv_field recv_trailer;
   /**
    * :member:`end_trailers` is a callback function which is invoked
    * when an HTTP trailer field section has ended on a particular
-   * stream.
+   * stream.  This callback function is optional.
    */
   nghttp2_end_fields end_trailers;
   /**
    * :member:`recv_data` is a callback function which is invoked when
-   * stream data is received.
+   * stream data is received.  This callback function is optional.
    */
   nghttp2_recv_data recv_data;
   /**
@@ -1527,7 +1529,8 @@ typedef struct nghttp2_callbacks {
    * invoked when a sending side of stream has been closed.  For
    * server, this callback function is invoked when HTTP response is
    * sent completely.  For client, this callback function is invoked
-   * when HTTP request is sent completely.
+   * when HTTP request is sent completely.  This callback function is
+   * optional.
    */
   nghttp2_end_stream local_end_stream;
   /**
@@ -1535,17 +1538,19 @@ typedef struct nghttp2_callbacks {
    * invoked when a receiving side of stream has been closed.  For
    * server, this callback function is invoked when HTTP request is
    * received completely.  For client, this callback function is
-   * invoked when HTTP response is received completely.
+   * invoked when HTTP response is received completely.  This callback
+   * function is optional.
    */
   nghttp2_end_stream remote_end_stream;
   /**
    * :member:`recv_ping_ack` is a callback function which is invoked
-   * when PING frame with ACK flag set is received.
+   * when PING frame with ACK flag set is received.  This callback
+   * function is optional.
    */
   nghttp2_recv_ping_ack recv_ping_ack;
   /**
    * :member:`shutdown` is a callback function which is invoked when
-   * GOAWAY frame is received.
+   * GOAWAY frame is received.  This callback function is optional.
    */
   nghttp2_shutdown shutdown;
 } nghttp2_callbacks;
