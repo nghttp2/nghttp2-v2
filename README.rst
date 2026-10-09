@@ -8,6 +8,11 @@ This is an implementation of the Hypertext Transfer Protocol version 2
 It is a complete rewrite of nghttp2 version 1, aiming for better
 performance, security, and API ergonomics.
 
+Documentation
+-------------
+
+`Online documentation <https://nghttp2.org/v2/>`_ is available.
+
 Requirements
 ------------
 
