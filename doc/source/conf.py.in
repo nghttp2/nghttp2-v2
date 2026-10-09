@@ -30,7 +30,7 @@ from pathlib import Path
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
-project = 'nghttp2'
+project = 'nghttp2-v2'
 copyright = '2026, nghttp2 contributors'
 author = 'nghttp2 contributors'
 
