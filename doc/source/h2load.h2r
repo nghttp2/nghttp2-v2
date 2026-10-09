@@ -106,4 +106,4 @@ window size described in HTTP/2 protocol specification.
 SEE ALSO
 --------
 
-:manpage:`nghttp(1)`, :manpage:`nghttpd(1)`, :manpage:`nghttpx(1)`
+:doc:`nghttp.1`, :doc:`nghttpd.1`, :doc:`nghttpx.1`
