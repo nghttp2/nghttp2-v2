@@ -8,8 +8,8 @@ github.com/quic-go/quic-go v0.63.0 h1:LIFGHI4PFUhhw2dDD1ARHdCff143ffMHwZtbnbuJ78
 github.com/quic-go/quic-go v0.63.0/go.mod h1:RAro2j2yN9a9EiPACLHT9IB2NXCvGQmmo/alT0yYI0w=
 github.com/stretchr/testify v1.12.1 h1:EuwCh5fleGS7H32xRwO3wRGT7DxrDhLAT6FF8MpWDWE=
 github.com/stretchr/testify v1.12.1/go.mod h1:MDEgiDPPsNp5cuIrHPPCyornHKgEVbtFUmoNlxoYthg=
-github.com/tatsuhiro-t/go-nghttp2/v2 v2.0.0-20261007103042-7de76ede6be6 h1:WGRlM3LLQzbA8OIkYIis8n4a2gRyjhEOm5iFwbNbcBc=
-github.com/tatsuhiro-t/go-nghttp2/v2 v2.0.0-20261007103042-7de76ede6be6/go.mod h1:bUmiW1OcCIwUHzPp8y6FaVZGhgi6+up0FCRt1VJIm24=
+github.com/tatsuhiro-t/go-nghttp2/v2 v2.0.0-20261009075847-0171f9723b61 h1:ENIubt/eNSVUeAYR2E3bnTOh4ySYbT9po2oWApZETT4=
+github.com/tatsuhiro-t/go-nghttp2/v2 v2.0.0-20261009075847-0171f9723b61/go.mod h1:bUmiW1OcCIwUHzPp8y6FaVZGhgi6+up0FCRt1VJIm24=
 go.uber.org/mock v0.5.2 h1:LbtPTcP8A5k9WPXj54PPPbjcI4Y6lhyOZXn+VS7wNko=
 go.uber.org/mock v0.5.2/go.mod h1:wLlUxC2vVTPTaE3UD51E0BGOAElKrILxhVSDYQLld5o=
 go.yaml.in/yaml/v3 v3.0.5 h1:N6y/pJk8buWs9NY5ERU2HSMfm+IuD/OtfdAnq6kESPw=
