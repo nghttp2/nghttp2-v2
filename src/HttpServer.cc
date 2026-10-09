@@ -713,8 +713,10 @@ std::expected<void, Error> Http2Handler::fill_wb(nghttp2_tstamp ts) {
 
   auto nwrite = nghttp2_conn_write(conn_, buf.data(), buf.size(), ts);
   if (nwrite < 0) {
-    std::println(stderr, "nghttp2_conn_write: {}",
-                 nghttp2_strerror(static_cast<int>(nwrite)));
+    if (nwrite != NGHTTP2_ERR_CLOSING) {
+      std::println(stderr, "nghttp2_conn_write: {}",
+                   nghttp2_strerror(static_cast<int>(nwrite)));
+    }
 
     return std::unexpected{Error::HTTP2};
   }

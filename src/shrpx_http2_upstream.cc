@@ -871,8 +871,10 @@ std::expected<void, Error> Http2Upstream::on_write() {
       auto nwrite =
         nghttp2_conn_write(conn_, dest.data(), dest.size(), util::timestamp());
       if (nwrite < 0) {
-        Log{ERROR, this} << "nghttp2_conn_write() returned error: "
-                         << nghttp2_strerror(static_cast<int>(nwrite));
+        if (nwrite != NGHTTP2_ERR_CLOSING) {
+          Log{ERROR, this} << "nghttp2_conn_write() returned error: "
+                           << nghttp2_strerror(static_cast<int>(nwrite));
+        }
 
         return std::unexpected{Error::HTTP2};
       }

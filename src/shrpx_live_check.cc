@@ -626,8 +626,10 @@ std::expected<void, Error> LiveCheck::on_write() {
           return {};
         }
 
-        Log{ERROR} << "nghttp2_conn_write() returned error: "
-                   << nghttp2_strerror(static_cast<int>(nwrite));
+        if (nwrite != NGHTTP2_ERR_CLOSING) {
+          Log{ERROR} << "nghttp2_conn_write() returned error: "
+                     << nghttp2_strerror(static_cast<int>(nwrite));
+        }
 
         return std::unexpected{Error::HTTP2};
       }
