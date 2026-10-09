@@ -1349,12 +1349,6 @@ static int stream_apply_rx_initial_max_stream_data(void *data, void *ptr) {
 
   stream->rx.max_offset = max_offset;
 
-  if (!(stream->flags & NGHTTP2_STREAM_FLAG_SHUT_RD) &&
-      conn_should_send_stream_window_update(arg->conn, stream)) {
-    stream->flags |= NGHTTP2_STREAM_FLAG_SEND_WINDOW_UPDATE;
-    nghttp2_conn_strmq_push(arg->conn, stream);
-  }
-
   return 0;
 }
 
