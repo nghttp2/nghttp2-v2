@@ -433,6 +433,7 @@ static int conn_new(nghttp2_conn **pconn, const nghttp2_callbacks *callbacks,
     .hpack_max_dtable_capacity = NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY,
     .max_concurrent_streams = settings->max_concurrent_streams_local,
     .initial_max_stream_data = NGHTTP2_INITIAL_WINDOW_SIZE,
+    .max_field_section_size = UINT32_MAX,
   };
 
   if (server) {

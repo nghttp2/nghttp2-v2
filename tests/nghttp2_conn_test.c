@@ -5040,7 +5040,7 @@ void test_nghttp2_conn_recv_settings(void) {
   assert_size(0, ==, ud.recv_settings.settings.max_concurrent_streams);
   assert_size(NGHTTP2_INITIAL_WINDOW_SIZE, ==,
               ud.recv_settings.settings.initial_max_stream_data);
-  assert_size(0, ==, ud.recv_settings.settings.max_field_section_size);
+  assert_size(UINT32_MAX, ==, ud.recv_settings.settings.max_field_section_size);
   assert_size(0, ==, ud.recv_settings.settings.enable_connect_protocol);
 
   nghttp2_conn_del(conn);
