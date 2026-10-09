@@ -939,16 +939,6 @@ typedef struct nghttp2_hpack_nv {
 } nghttp2_hpack_nv;
 
 /**
- * @function
- *
- * `nghttp2_hpack_lookup_token` returns :type:`nghttp2_hpack_token`
- * value for |name| of length |namelen|.  It returns -1 if the look up
- * fails.
- */
-NGHTTP2_EXTERN int32_t nghttp2_hpack_lookup_token(const uint8_t *name,
-                                                  size_t namelen);
-
-/**
  * @struct
  *
  * :type:`nghttp2_conn` represents a single HTTP/2 connection.
@@ -2322,7 +2312,228 @@ NGHTTP2_EXTERN int nghttp2_check_authority(const uint8_t *value, size_t len);
  */
 NGHTTP2_EXTERN const char *nghttp2_http2_strerror(uint32_t error_code);
 
-/* TODO: Add HPACK public API here */
+/* HPACK API */
+
+/**
+ * @struct
+ *
+ * :type:`nghttp2_hpack_encoder` represents HPACK encoder.
+ */
+typedef struct nghttp2_hpack_encoder nghttp2_hpack_encoder;
+
+/**
+ * @function
+ *
+ * `nghttp2_hpack_encoder_new` creates new HPACK encoder and assigns
+ * its pointer to |*penc|.  |hard_max_dtable_capacity| is the maximum
+ * dynamic header table size that the encoder uses regardless of the
+ * table size limit declared by the decoder.  |mem| is the memory
+ * allocator, and must not be ``NULL``.
+ *
+ * This function returns 0 if it succeeds, or one of the following
+ * negative error codes:
+ *
+ * :macro:`NGHTTP2_ERR_NOMEM`
+ *     Out of memory.
+ */
+NGHTTP2_EXTERN int nghttp2_hpack_encoder_new(nghttp2_hpack_encoder **penc,
+                                             size_t hard_max_dtable_capacity,
+                                             const nghttp2_mem *mem);
+
+/**
+ * @function
+ *
+ * `nghttp2_hpack_encoder_del` frees the resources allocated for
+ * |enc|.  It also frees memory pointed by |enc|.
+ */
+NGHTTP2_EXTERN void nghttp2_hpack_encoder_del(nghttp2_hpack_encoder *enc);
+
+/**
+ * @function
+ *
+ * `nghttp2_hpack_encoder_write` encodes the |nva| of |nvlen| elements
+ * into |buf|.
+ *
+ * This function expands |buf| as necessary to store the result.
+ * :member:`buf->last <nghttp2_buf.last>` will be adjusted when data
+ * is written.  |buf| can be empty buffer, that is initialized by
+ * `nghttp2_buf_init`.  If :member:`buf->begin <nghttp2_buf.begin>` is
+ * not ``NULL``, it must be allocated by the same memory allocator
+ * passed to `nghttp2_hpack_encoder_new`.
+ *
+ * After this function returns, it is safe to delete the |nva|.
+ *
+ * This function returns 0 if it succeeds, or one of the following
+ * negative error codes:
+ *
+ * :macro:`NGHTTP2_ERR_NOMEM`
+ *     Out of memory.
+ * :macro:`NGHTTP2_ERR_HPACK_FATAL`
+ *     Encoding process has failed.
+ */
+NGHTTP2_EXTERN int nghttp2_hpack_encoder_write(nghttp2_hpack_encoder *enc,
+                                               nghttp2_buf *buf,
+                                               const nghttp2_nv *nva,
+                                               size_t nvlen);
+
+/**
+ * @function
+ *
+ * `nghttp2_hpack_encoder_set_max_dtable_capacity` sets the maximum
+ * dynamic table size of the |encoder| to |max_dtable_capacity| bytes.
+ * This may trigger eviction in the dynamic table.
+ *
+ * The |max_dtable_capacity| should be the value received in
+ * ``SETTINGS_HEADER_TABLE_SIZE``.
+ *
+ * The encoder never uses more memory than
+ * ``hard_max_dtable_capacity`` bytes specified in
+ * `nghttp2_hpack_encoder_new`.  Therefore, if |max_dtable_capacity| >
+ * ``hard_max_dtable_capacity``, resulting maximum table size becomes
+ * ``hard_max_dtable_capacity``.
+ */
+NGHTTP2_EXTERN void
+nghttp2_hpack_encoder_set_max_dtable_capacity(nghttp2_hpack_encoder *enc,
+                                              size_t max_dtable_capacity);
+
+/**
+ * @struct
+ *
+ * :type:`nghttp2_hpack_decoder` represents HPACK decoder.
+ */
+typedef struct nghttp2_hpack_decoder nghttp2_hpack_decoder;
+
+/**
+ * @function
+ *
+ * `nghttp2_hpack_decoder_new` creates new HPACK decoder and assigns
+ * its pointer to |*pdec|.  |mem| is the memory allocator, and must
+ * not be ``NULL``.
+ *
+ * This function returns 0 if it succeeds, or one of the following
+ * negative error codes:
+ *
+ * :macro:`NGHTTP2_ERR_NOMEM`
+ *     Out of memory.
+ */
+NGHTTP2_EXTERN int nghttp2_hpack_decoder_new(nghttp2_hpack_decoder **pdec,
+                                             const nghttp2_mem *mem);
+
+/**
+ * @function
+ *
+ * `nghttp2_hpack_decoder_del` frees the resources allocated for
+ * |dec|.  It also frees memory pointed by |dec|.
+ */
+NGHTTP2_EXTERN void nghttp2_hpack_decoder_del(nghttp2_hpack_decoder *dec);
+
+/**
+ * @macrosection
+ *
+ * Flags for HPACK decoder
+ */
+
+/**
+ * @macro
+ *
+ * :macro:`NGHTTP2_HPACK_DECODE_FLAG_NONE` indicates that no flag set.
+ */
+#define NGHTTP2_HPACK_DECODE_FLAG_NONE 0x0U
+
+/**
+ * @macro
+ *
+ * :macro:`NGHTTP2_HPACK_DECODE_FLAG_EMIT` indicates that an HTTP
+ * field is successfully decoded.
+ */
+#define NGHTTP2_HPACK_DECODE_FLAG_EMIT 0x01U
+
+/**
+ * @macro
+ *
+ * :macro:`NGHTTP2_HPACK_DECODE_FLAG_FINAL` indicates that an entire
+ * HTTP field section has been decoded.
+ */
+#define NGHTTP2_HPACK_DECODE_FLAG_FINAL 0x02U
+
+/**
+ * @function
+ *
+ * `nghttp2_hpack_decoder_read` reads the encoded HPACK stream given
+ * by the buffer pointed by |src| of length |srclen| bytes.  |*pflags|
+ * must be non-NULL pointer.  |dest| must be non-NULL pointer.
+ *
+ * If this function succeeds, it assigns flags to |*pflags|.  If
+ * |*pflags| has :macro:`NGHTTP2_HPACK_DECODE_FLAG_EMIT` set, a
+ * decoded HTTP field is assigned to |dest|.  If |*pflags| has
+ * :macro:`NGHTTP2_HPACK_DECODE_FLAG_FINAL` set, the entire HTTP field
+ * section has been successfully decoded.
+ *
+ * When an HTTP field is decoded, the caller receives it in |dest|.
+ * :member:`dest->name <nghttp2_hpack_nv.name>` and
+ * :member:`dest->value <nghttp2_hpack_nv.value>` are reference
+ * counted buffer, and their reference counts are already incremented
+ * for application use.  Therefore, when the caller finishes
+ * processing |dest|, it must call `nghttp2_rcbuf_decref(dest->name)
+ * <nghttp2_rcbuf_decref>` and `nghttp2_rcbuf_decref(dest->value)
+ * <nghttp2_rcbuf_decref>`, or memory leak might occur.  These
+ * :type:`nghttp2_rcbuf` objects hold the pointer to
+ * :type:`nghttp2_mem` that is passed to `nghttp2_hpack_decoder_new`.
+ * As long as these objects are alive, the pointed :type:`nghttp2_mem`
+ * object must be available.  Otherwise, `nghttp2_rcbuf_decref` causes
+ * undefined behavior.
+ *
+ * This function returns the number of bytes read, or one of the
+ * following negative error codes:
+ *
+ * :macro:`NGHTTP2_ERR_NOMEM`
+ *     Out of memory.
+ * :macro:`NGHTTP2_ERR_HPACK_FATAL`
+ *     |dec| is in unrecoverable error state, and cannot be used
+ *     anymore.
+ */
+NGHTTP2_EXTERN nghttp2_ssize nghttp2_hpack_decoder_read(
+  nghttp2_hpack_decoder *dec, nghttp2_hpack_nv *dest, uint8_t *pflags,
+  const uint8_t *src, size_t srclen, int fin);
+
+/**
+ * @function
+ *
+ * `nghttp2_hpack_decoder_set_max_dtable_capacity` sets the maximum
+ * dynamic table size in the |dec|.  This may trigger eviction in the
+ * dynamic table.
+ *
+ * The |max_dtable_capacity| should be the value transmitted in
+ * ``SETTINGS_HEADER_TABLE_SIZE``.
+ *
+ * This function must not be called while a header block is being
+ * decoded.  In other words, this function must be called after
+ * initialization of |dec|, but before calling
+ * `nghttp2_hpack_decoder_read`, or after `nghttp2_hpack_decoder_read`
+ * emits :macro:`NGHTTP2_HPACK_DECODE_FLAG_FINAL`.  Otherwise,
+ * :macro:`NGHTTP2_ERR_INVALID_STATE` is returned.
+ *
+ * This function returns 0 if it succeeds, or one of the following
+ * negative error codes:
+ *
+ * :macro:`NGHTTP2_ERR_NOMEM`
+ *     Out of memory.
+ * :macro:`NGHTTP2_ERR_INVALID_STATE`
+ *     The function is called while a header block is being decoded.
+ */
+NGHTTP2_EXTERN int
+nghttp2_hpack_decoder_set_max_dtable_capacity(nghttp2_hpack_decoder *dec,
+                                              size_t max_dtable_capacity);
+
+/**
+ * @function
+ *
+ * `nghttp2_hpack_lookup_token` returns :type:`nghttp2_hpack_token`
+ * value for |name| of length |namelen|.  It returns -1 if the look up
+ * fails.
+ */
+NGHTTP2_EXTERN int32_t nghttp2_hpack_lookup_token(const uint8_t *name,
+                                                  size_t namelen);
 
 #ifdef _MSC_VER
 #  pragma warning(pop)

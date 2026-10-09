@@ -2147,3 +2147,62 @@ void nghttp2_hpack_read_state_reset(nghttp2_hpack_read_state *rstate) {
   rstate->indexing = 0;
   rstate->huffman_encoded = 0;
 }
+
+int nghttp2_hpack_encoder_new(nghttp2_hpack_encoder **penc,
+                              size_t hard_max_dtable_capacity,
+                              const nghttp2_mem *mem) {
+  nghttp2_hpack_encoder *enc;
+
+  enc = nghttp2_mem_malloc(mem, sizeof(*enc));
+  if (!enc) {
+    return NGHTTP2_ERR_NOMEM;
+  }
+
+  nghttp2_hpack_encoder_init(enc, hard_max_dtable_capacity, mem);
+
+  *penc = enc;
+
+  return 0;
+}
+
+void nghttp2_hpack_encoder_del(nghttp2_hpack_encoder *enc) {
+  const nghttp2_mem *mem;
+
+  if (!enc) {
+    return;
+  }
+
+  mem = enc->ctx.mem;
+
+  nghttp2_hpack_encoder_free(enc);
+  nghttp2_mem_free(mem, enc);
+}
+
+int nghttp2_hpack_decoder_new(nghttp2_hpack_decoder **pdec,
+                              const nghttp2_mem *mem) {
+  nghttp2_hpack_decoder *dec;
+
+  dec = nghttp2_mem_malloc(mem, sizeof(*dec));
+  if (!dec) {
+    return NGHTTP2_ERR_NOMEM;
+  }
+
+  nghttp2_hpack_decoder_init(dec, mem);
+
+  *pdec = dec;
+
+  return 0;
+}
+
+void nghttp2_hpack_decoder_del(nghttp2_hpack_decoder *dec) {
+  const nghttp2_mem *mem;
+
+  if (!dec) {
+    return;
+  }
+
+  mem = dec->ctx.mem;
+
+  nghttp2_hpack_decoder_free(dec);
+  nghttp2_mem_free(mem, dec);
+}

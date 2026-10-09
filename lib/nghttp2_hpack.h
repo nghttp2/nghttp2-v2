@@ -209,30 +209,6 @@ void nghttp2_hpack_encoder_init(nghttp2_hpack_encoder *encoder,
 void nghttp2_hpack_encoder_free(nghttp2_hpack_encoder *encoder);
 
 /*
- * nghttp2_hpack_encoder_write endoes the |nva|, which has the |nvlen|
- * name/value pairs, into the |buf|.
- *
- * This function expands |buf| as necessary to store the result. If
- * buffers is full and the process still requires more space, this
- * function fails and returns NGHTTP2_ERR_HPACK_FATAL.
- *
- * After this function returns, it is safe to delete the |nva|.
- *
- * This function returns 0 if it succeeds, or one of the following
- * negative error codes:
- *
- * NGHTTP2_ERR_NOMEM
- *     Out of memory.
- * NGHTTP2_ERR_HPACK_FATAL
- *     Encoding process has failed.
- * NGHTTP2_ERR_BUFFER_ERROR
- *     Out of buffer space.
- */
-int nghttp2_hpack_encoder_write(nghttp2_hpack_encoder *encoder,
-                                nghttp2_buf *buf, const nghttp2_nv *nva,
-                                size_t nvlen);
-
-/*
  * nghttp2_hpack_decoder_init initializes |decoder| for decoding
  * name/values pairs.
  */
@@ -244,24 +220,6 @@ void nghttp2_hpack_decoder_init(nghttp2_hpack_decoder *decoder,
  * |decoder|.
  */
 void nghttp2_hpack_decoder_free(nghttp2_hpack_decoder *decoder);
-
-/**
- * No flag set.
- */
-#define NGHTTP2_HPACK_DECODE_FLAG_NONE 0x0U
-/**
- * Indicates all headers were decoded.
- */
-#define NGHTTP2_HPACK_DECODE_FLAG_FINAL 0x01U
-/**
- * Indicates a header was emitted.
- */
-#define NGHTTP2_HPACK_DECODE_FLAG_EMIT 0x02U
-
-nghttp2_ssize nghttp2_hpack_decoder_read(nghttp2_hpack_decoder *decoder,
-                                         nghttp2_hpack_nv *dest,
-                                         uint8_t *pflags, const uint8_t *src,
-                                         size_t srclen, int fin);
 
 /* For unittesting purpose */
 int nghttp2_hpack_encoder_write_indname(nghttp2_hpack_encoder *encoder,
@@ -289,24 +247,6 @@ nghttp2_ssize nghttp2_hpack_decode_length(uint32_t *res, size_t *pshift,
                                           uint8_t *last, size_t prefix);
 
 /* From former public API */
-/**
- * @function
- *
- * nghttp2_hpack_encoder_set_max_dtable_capacity sets the maximum
- * dynamic table size of the |encoder| to |max_dtable_capacity| bytes.
- * This may trigger eviction in the dynamic table.
- *
- * The |max_dtable_capacity| should be the value received
- * in SETTINGS_HEADER_TABLE_SIZE.
- *
- * The encoder never uses more memory than
- * ``hard_max_dtable_capacity`` bytes specified in
- * `nghttp2_hpack_encoder_init`.  Therefore, if |max_dtable_capacity|
- * > ``hard_max_dtable_capacity``, resulting maximum table size
- * becomes ``hard_max_dtable_capacity``.
- */
-void nghttp2_hpack_encoder_set_max_dtable_capacity(
-  nghttp2_hpack_encoder *encoder, size_t max_dtable_capacity);
 
 /**
  * @function
@@ -360,34 +300,6 @@ nghttp2_hpack_encoder_get_dtable_size(const nghttp2_hpack_encoder *encoder);
  */
 size_t nghttp2_hpack_encoder_get_max_dtable_capacity(
   const nghttp2_hpack_encoder *encoder);
-
-/**
- * @function
- *
- * nghttp2_hpack_decoder_set_max_dtable_capacity sets the maximum
- * dynamic table size in the |decoder|.  This may trigger eviction in
- * the dynamic table.
- *
- * The |max_dtable_capacity| should be the value transmitted in
- * SETTINGS_HEADER_TABLE_SIZE.
- *
- * This function must not be called while header block is being
- * decoded.  In other words, this function must be called after
- * initialization of |decoder|, but before calling
- * `nghttp2_hpack_decoder_read`, or after `nghttp2_hpack_decoder_read`
- * emits NGHTTP2_HPACK_DECODE_FLAG_FINAL.  Otherwise,
- * `NGHTTP2_ERR_INVALID_STATE` was returned.
- *
- * This function returns 0 if it succeeds, or one of the following
- * negative error codes:
- *
- * :enum:`nghttp2_error.NGHTTP2_ERR_NOMEM`
- *     Out of memory.
- * :enum:`nghttp2_error.NGHTTP2_ERR_INVALID_STATE`
- *     The function is called while header block is being decoded.
- */
-int nghttp2_hpack_decoder_set_max_dtable_capacity(
-  nghttp2_hpack_decoder *decoder, size_t max_dtable_capacity);
 
 /**
  * @function
