@@ -99,12 +99,6 @@ OPTIONS
     Request each URI <N> times.  By default, same URI is not
     requested twice.  This option disables it too.
 
-.. option:: -u, --upgrade
-
-    Perform HTTP Upgrade for HTTP/2.  This option is ignored
-    if the request URI has https scheme.  If :option:`-d` is used, the
-    HTTP upgrade request is performed with OPTIONS method.
-
 .. option:: --extpri=<PRI>
 
     Sets RFC 9218 priority of  given URI.  <PRI> must be the
@@ -125,12 +119,7 @@ OPTIONS
 
 .. option:: -c, --header-table-size=<SIZE>
 
-    Specify decoder  header table  size.  If this  option is
-    used  multiple times,  and the  minimum value  among the
-    given values except  for last one is  strictly less than
-    the last  value, that minimum  value is set  in SETTINGS
-    frame  payload  before  the   last  value,  to  simulate
-    multiple header table size change.
+    Specify decoder header table size.
 
 .. option:: --encoder-header-table-size=<SIZE>
 
@@ -139,19 +128,10 @@ OPTIONS
     Then the negotiated dynamic table size is the minimum of
     this option value and the value which server specified.
 
-.. option:: -b, --padding=<N>
-
-    Add at  most <N>  bytes to a  frame payload  as padding.
-    Specify 0 to disable padding.
-
 .. option:: -r, --har=<PATH>
 
     Output HTTP  transactions <PATH> in HAR  format.  If '-'
     is given, data is written to stdout.
-
-.. option:: --color
-
-    Force colored log output.
 
 .. option:: --continuation
 
@@ -166,15 +146,6 @@ OPTIONS
     Display the  incoming traffic in  hexadecimal (Canonical
     hex+ASCII display).  If SSL/TLS  is used, decrypted data
     are used.
-
-.. option:: --no-push
-
-    Disable server push.
-
-.. option:: --max-concurrent-streams=<N>
-
-    The  number of  concurrent  pushed  streams this  client
-    accepts.
 
 .. option:: --expect-continue
 
@@ -213,4 +184,4 @@ is omitted, a second is used as unit.
 SEE ALSO
 --------
 
-:manpage:`nghttpd(1)`, :manpage:`nghttpx(1)`, :manpage:`h2load(1)`
+:doc:`nghttpd.1`, :doc:`nghttpx.1`, :doc:`h2load.1`

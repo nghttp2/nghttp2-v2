@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "NGHTTP" "1" "Jul 29, 2026" "1.70.0" "nghttp2"
+.TH "NGHTTP" "1" "Oct 09, 2026" "0.1.0-DEV" "nghttp2-v2"
 .SH NAME
 nghttp \- HTTP/2 client
 .SH SYNOPSIS
@@ -135,13 +135,6 @@ requested twice.  This option disables it too.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-u, \-\-upgrade
-Perform HTTP Upgrade for HTTP/2.  This option is ignored
-if the request URI has https scheme.  If \fB\-d\fP is used, the
-HTTP upgrade request is performed with OPTIONS method.
-.UNINDENT
-.INDENT 0.0
-.TP
 .B \-\-extpri=<PRI>
 Sets RFC 9218 priority of  given URI.  <PRI> must be the
 wire format  of priority  header field  (e.g., \(dqu=3,i\(dq).
@@ -163,12 +156,7 @@ Default: \fB100\fP
 .INDENT 0.0
 .TP
 .B \-c, \-\-header\-table\-size=<SIZE>
-Specify decoder  header table  size.  If this  option is
-used  multiple times,  and the  minimum value  among the
-given values except  for last one is  strictly less than
-the last  value, that minimum  value is set  in SETTINGS
-frame  payload  before  the   last  value,  to  simulate
-multiple header table size change.
+Specify decoder header table size.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -180,20 +168,9 @@ this option value and the value which server specified.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-b, \-\-padding=<N>
-Add at  most <N>  bytes to a  frame payload  as padding.
-Specify 0 to disable padding.
-.UNINDENT
-.INDENT 0.0
-.TP
 .B \-r, \-\-har=<PATH>
 Output HTTP  transactions <PATH> in HAR  format.  If \(aq\-\(aq
 is given, data is written to stdout.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-color
-Force colored log output.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -211,17 +188,6 @@ Don\(aqt send content\-length header field.
 Display the  incoming traffic in  hexadecimal (Canonical
 hex+ASCII display).  If SSL/TLS  is used, decrypted data
 are used.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-no\-push
-Disable server push.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-max\-concurrent\-streams=<N>
-The  number of  concurrent  pushed  streams this  client
-accepts.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -262,9 +228,9 @@ is 1 second and 500ms is 500 milliseconds).  Units are h, m, s or ms
 is omitted, a second is used as unit.
 .SH SEE ALSO
 .sp
-\fBnghttpd(1)\fP, \fBnghttpx(1)\fP, \fBh2load(1)\fP
+nghttpd(1) \%<>, nghttpx(1) \%<>, h2load(1) \%<>
 .SH Author
 Tatsuhiro Tsujikawa
 .SH Copyright
-2012, 2015, 2016, Tatsuhiro Tsujikawa
+2026, nghttp2 contributors
 .\" End of generated man page.

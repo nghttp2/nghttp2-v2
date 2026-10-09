@@ -77,18 +77,6 @@ OPTIONS
     Then the negotiated dynamic table size is the minimum of
     this option value and the value which client specified.
 
-.. option:: --color
-
-    Force colored log output.
-
-.. option:: -p, --push=<PATH>=<PUSH_PATH,...>
-
-    Push  resources <PUSH_PATH>s  when <PATH>  is requested.
-    This option  can be used repeatedly  to specify multiple
-    push  configurations.    <PATH>  and   <PUSH_PATH>s  are
-    relative  to   document  root.   See   :option:`--htdocs`  option.
-    Example: :option:`-p`\/=/foo.png :option:`-p`\/doc=/bar.css
-
 .. option:: -b, --padding=<N>
 
     Add at  most <N>  bytes to a  frame payload  as padding.
@@ -185,4 +173,4 @@ The <SIZE> argument is an integer and an optional unit (e.g., 10K is
 SEE ALSO
 --------
 
-:manpage:`nghttp(1)`, :manpage:`nghttpx(1)`, :manpage:`h2load(1)`
+:doc:`nghttp.1`, :doc:`nghttpx.1`, :doc:`h2load.1`
