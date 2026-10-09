@@ -268,7 +268,3 @@ endif # HAVE_NEVERBLEED
 TESTS += nghttpx-unittest
 
 endif # ENABLE_APP
-
-if ENABLE_HPACK_TOOLS
-
-endif # ENABLE_HPACK_TOOLS

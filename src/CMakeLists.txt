@@ -245,21 +245,3 @@ if(ENABLE_APP)
 
   # install(TARGETS nghttp nghttpd nghttpx h2load)
 endif()
-
-# if(ENABLE_HPACK_TOOLS)
-#   set(inflatehd_SOURCES
-#     inflatehd.cc
-#     comp_helper.c
-#   )
-#   set(deflatehd_SOURCES
-#     deflatehd.cc
-#     comp_helper.c
-#     util.cc
-#     timegm.c
-#     tls.cc
-#     network.cc
-#   )
-#   add_executable(inflatehd ${inflatehd_SOURCES})
-#   add_executable(deflatehd ${deflatehd_SOURCES})
-#   install(TARGETS inflatehd deflatehd)
-# endif()

@@ -77,11 +77,6 @@ AC_ARG_ENABLE([app],
                     [Build applications (nghttp, nghttpd, nghttpx and h2load) [default=check]])],
     [request_app=$enableval], [request_app=check])
 
-AC_ARG_ENABLE([hpack-tools],
-    [AS_HELP_STRING([--enable-hpack-tools],
-                    [Build HPACK tools [default=check]])],
-    [request_hpack_tools=$enableval], [request_hpack_tools=check])
-
 AC_ARG_ENABLE([failmalloc],
     [AS_HELP_STRING([--disable-failmalloc],
                     [Do not build failmalloc test program])],
@@ -89,7 +84,7 @@ AC_ARG_ENABLE([failmalloc],
 
 AC_ARG_ENABLE([lib-only],
     [AS_HELP_STRING([--enable-lib-only],
-                    [Build libnghttp2 only.  This is a short hand for --disable-app --disable-hpack-tools])],
+                    [Build libnghttp2 only])],
     [request_lib_only=$enableval], [request_lib_only=no])
 
 AC_ARG_ENABLE([http3],
@@ -210,7 +205,6 @@ AM_PATH_PYTHON([3.8],, [:])
 
 if [test "x$request_lib_only" = "xyes"]; then
   request_app=no
-  request_hpack_tools=no
   request_http3=no
   request_libxml2=no
   request_jansson=no
@@ -887,27 +881,12 @@ fi
 
 AM_CONDITIONAL([ENABLE_HTTP3], [ test "x${enable_http3}" = "xyes" ])
 
-enable_hpack_tools=no
-# HPACK tools requires jansson
-if test "x${request_hpack_tools}" != "xno" &&
-   test "x${have_jansson}" = "xyes"; then
-  enable_hpack_tools=yes
-fi
-
-if test "x${request_hpack_tools}" = "xyes" &&
-   test "x${enable_hpack_tools}" != "xyes"; then
-  AC_MSG_ERROR([HPACK tools were requested (--enable-hpack-tools) but dependencies are not met.])
-fi
-
-AM_CONDITIONAL([ENABLE_HPACK_TOOLS], [ test "x${enable_hpack_tools}" = "xyes" ])
-
 # third-party only be built when needed
 
 enable_third_party=no
 have_mruby=no
 have_neverbleed=no
-if test "x${enable_app}" = "xyes" ||
-   test "x${enable_hpack_tools}" = "xyes"; then
+if test "x${enable_app}" = "xyes"; then
   enable_third_party=yes
 
   # mruby (for src/nghttpx)
@@ -1289,7 +1268,6 @@ AC_MSG_NOTICE([summary of build options:
       Neverbleed:     ${have_neverbleed}
     Features:
       Applications:   ${enable_app}
-      HPACK tools:    ${enable_hpack_tools}
       Threading:      ${enable_threads}
       HTTP/3 (EXPERIMENTAL): ${enable_http3}
 ])

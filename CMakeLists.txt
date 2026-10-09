@@ -86,7 +86,6 @@ else()
 endif()
 find_package(Systemd 209)
 find_package(Jansson  2.5)
-set(ENABLE_HPACK_TOOLS_DEFAULT ${JANSSON_FOUND})
 # 2.0.8 is required because we use evconnlistener_set_error_cb()
 find_package(Libevent 2.0.8 COMPONENTS core extra openssl)
 set(ENABLE_EXAMPLES_DEFAULT ${LIBEVENT_OPENSSL_FOUND})
@@ -101,7 +100,7 @@ include(CMakeOptions.txt)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-if(ENABLE_LIB_ONLY AND (ENABLE_APP OR ENABLE_HPACK_TOOLS OR ENABLE_EXAMPLES))
+if(ENABLE_LIB_ONLY AND (ENABLE_APP OR ENABLE_EXAMPLES))
   # Remember when disabled options are disabled for later diagnostics.
   set(ENABLE_LIB_ONLY_DISABLED_OTHERS 1)
 else()
@@ -109,7 +108,6 @@ else()
 endif()
 if(ENABLE_LIB_ONLY)
   set(ENABLE_APP            OFF)
-  set(ENABLE_HPACK_TOOLS    OFF)
   set(ENABLE_EXAMPLES       OFF)
 endif()
 
@@ -312,18 +310,13 @@ if(ENABLE_HTTP3 AND NOT (LIBNGTCP2_FOUND AND LIBNGHTTP3_FOUND AND
   message(FATAL_ERROR "HTTP/3 was requested (ENABLE_HTTP3=1) but dependencies are not met.")
 endif()
 
-# HPACK tools requires jansson
-if(ENABLE_HPACK_TOOLS AND NOT HAVE_JANSSON)
-  message(FATAL_ERROR "HPACK tools were requested (ENABLE_HPACK_TOOLS=1) but dependencies are not met.")
-endif()
-
 # examples
 if(ENABLE_EXAMPLES AND NOT (OPENSSL_FOUND AND LIBEVENT_OPENSSL_FOUND))
   message(FATAL_ERROR "examples were requested (ENABLE_EXAMPLES=1) but dependencies are not met.")
 endif()
 
 # third-party http-parser only be built when needed
-if(ENABLE_EXAMPLES OR ENABLE_APP OR ENABLE_HPACK_TOOLS)
+if(ENABLE_EXAMPLES OR ENABLE_APP)
   set(ENABLE_THIRD_PARTY 1)
   # mruby (for src/nghttpx)
   set(HAVE_MRUBY      ${WITH_MRUBY})
@@ -549,7 +542,6 @@ message(STATUS "summary of build options:
       Neverbleed:     ${HAVE_NEVERBLEED}
     Features:
       Applications:   ${ENABLE_APP}
-      HPACK tools:    ${ENABLE_HPACK_TOOLS}
       Examples:       ${ENABLE_EXAMPLES}
       Threading:      ${ENABLE_THREADS}
       HTTP/3(EXPERIMENTAL): ${ENABLE_HTTP3}
