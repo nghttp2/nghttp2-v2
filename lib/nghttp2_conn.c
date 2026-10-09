@@ -757,6 +757,7 @@ static int conn_recv_data(nghttp2_conn *conn, nghttp2_context ctx,
 
   if (fr->hd.flags & NGHTTP2_DATA_FLAG_PADDED) {
     stream->rx.unsent_max_offset += fr->padlen + 1;
+    conn->rx.unsent_max_offset += fr->padlen + 1;
 
     if (nghttp2_stream_require_strmq(stream)) {
       nghttp2_conn_strmq_push(conn, stream);
