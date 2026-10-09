@@ -101,7 +101,7 @@ extern "C" {
 /**
  * @macro
  *
- * :macro:`NGHTTP2_INITIAL_WINDOW_SIZE` is he default initial window
+ * :macro:`NGHTTP2_INITIAL_WINDOW_SIZE` is the default initial window
  * size for both connection and stream-level flow control.
  */
 #define NGHTTP2_INITIAL_WINDOW_SIZE ((size_t)((1U << 16) - 1))
