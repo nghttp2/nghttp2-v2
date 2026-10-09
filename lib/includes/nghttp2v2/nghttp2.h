@@ -1044,7 +1044,7 @@ typedef struct nghttp2_settings {
   size_t initial_max_data;
   /**
    * :member:`enable_connect_protocol`, if set to nonzero, enables
-   * Extended CONNECT Method (see :rfc:`9220`).  Client ignores this
+   * Extended CONNECT Method (see :rfc:`8441`).  Client ignores this
    * field.
    */
   uint8_t enable_connect_protocol;
