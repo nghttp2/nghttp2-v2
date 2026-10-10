@@ -166,8 +166,8 @@ int nghttp2_http_writer_write_headers(nghttp2_http_writer *hw,
   int rv;
 
   if (!(hw->flags & NGHTTP2_HTTP_WRITER_FLAG_INPROGRESS)) {
-    if (!(stream->flags & NGHTTP2_STREAM_FLAG_OPENED) &&
-        (stream->flags & NGHTTP2_STREAM_FLAG_SEND_RST_STREAM)) {
+    if ((stream->flags & NGHTTP2_STREAM_FLAG_SEND_RST_STREAM) &&
+        !(stream->flags & NGHTTP2_STREAM_FLAG_OPENED)) {
       /* If there is no activity in the stream, and we are sending
          RST_STREAM, they are cancelled out each other. */
       stream->flags &= ~NGHTTP2_STREAM_FLAG_SEND_RST_STREAM;
