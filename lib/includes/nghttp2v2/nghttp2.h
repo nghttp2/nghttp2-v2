@@ -737,7 +737,7 @@ NGHTTP2_EXTERN void nghttp2_buf_free(nghttp2_buf *buf, const nghttp2_mem *mem);
  * :member:`buf->end <nghttp2_buf.end>` - :member:`buf->last
  * <nghttp2_buf.last>`.
  */
-NGHTTP2_EXTERN size_t nghttp2_buf_left(const nghttp2_buf *buf);
+#define nghttp2_buf_left(BUF) (size_t)((BUF)->end - (BUF)->last)
 
 /**
  * @function
@@ -746,7 +746,7 @@ NGHTTP2_EXTERN size_t nghttp2_buf_left(const nghttp2_buf *buf);
  * other words, it returns :member:`buf->last <nghttp2_buf.last>` -
  * :member:`buf->pos <nghttp2_buf.pos>`.
  */
-NGHTTP2_EXTERN size_t nghttp2_buf_len(const nghttp2_buf *buf);
+#define nghttp2_buf_len(BUF) (size_t)((BUF)->last - (BUF)->pos)
 
 /**
  * @function

@@ -37,14 +37,6 @@ void nghttp2_buf_free(nghttp2_buf *buf, const nghttp2_mem *mem) {
   nghttp2_mem_free(mem, buf->begin);
 }
 
-size_t nghttp2_buf_left(const nghttp2_buf *buf) {
-  return (size_t)(buf->end - buf->last);
-}
-
-size_t nghttp2_buf_len(const nghttp2_buf *buf) {
-  return (size_t)(buf->last - buf->pos);
-}
-
 size_t nghttp2_buf_cap(const nghttp2_buf *buf) {
   return (size_t)(buf->end - buf->begin);
 }
