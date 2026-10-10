@@ -123,10 +123,11 @@ void writecb(struct ev_loop *loop, ev_io *w, int revents) {
 }
 } // namespace
 
+constexpr auto MAX_READ_PER_LOOP = 10UZ;
+
 std::expected<void, Error> ClientHandler::read_clear() {
-  auto should_break = false;
   rb_.ensure_chunk();
-  for (;;) {
+  for (auto i = 0UZ; i < MAX_READ_PER_LOOP; ++i) {
     if (rb_.rleft()) {
       if (auto rv = on_read(); !rv) {
         return rv;
@@ -139,7 +140,7 @@ std::expected<void, Error> ClientHandler::read_clear() {
       return {};
     }
 
-    if (!ev_is_active(&conn_.rev) || should_break) {
+    if (!ev_is_active(&conn_.rev)) {
       return {};
     }
 
@@ -157,8 +158,9 @@ std::expected<void, Error> ClientHandler::read_clear() {
     }
 
     rb_.write(data.size());
-    should_break = true;
   }
+
+  return {};
 }
 
 std::expected<void, Error> ClientHandler::write_clear() {
@@ -253,13 +255,11 @@ std::expected<void, Error> ClientHandler::tls_handshake() {
 }
 
 std::expected<void, Error> ClientHandler::read_tls() {
-  auto should_break = false;
-
   ERR_clear_error();
 
   rb_.ensure_chunk();
 
-  for (;;) {
+  for (auto i = 0UZ; i < MAX_READ_PER_LOOP; ++i) {
     // we should process buffered data first before we read EOF.
     if (rb_.rleft()) {
       if (auto rv = on_read(); !rv) {
@@ -273,7 +273,7 @@ std::expected<void, Error> ClientHandler::read_tls() {
       return {};
     }
 
-    if (!ev_is_active(&conn_.rev) || should_break) {
+    if (!ev_is_active(&conn_.rev)) {
       return {};
     }
 
@@ -291,8 +291,9 @@ std::expected<void, Error> ClientHandler::read_tls() {
     }
 
     rb_.write(data.size());
-    should_break = true;
   }
+
+  return {};
 }
 
 std::expected<void, Error> ClientHandler::write_tls() {
