@@ -77,7 +77,7 @@ std::tuple<nghttp2_conn *, bool> setup_conn(FuzzedDataProvider &fdp,
     .rand = [](uint8_t *dest, size_t destlen) { memset(dest, 0, destlen); },
     .recv_settings_entry =
       [](nghttp2_conn *conn, const nghttp2_settings_entry *ent,
-         void *conn_user_data) { return simple_callback(conn, user_data); },
+         void *user_data) { return simple_callback(conn, user_data); },
     .recv_settings =
       [](nghttp2_conn *conn, const nghttp2_proto_settings *settings,
          void *user_data) { return simple_callback(conn, user_data); },
