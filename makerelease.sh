@@ -4,7 +4,10 @@ TAG=$1
 PREV_TAG=$2
 
 git checkout refs/tags/$TAG
-git log --pretty=fuller --date=short refs/tags/$PREV_TAG..HEAD > ChangeLog
+
+if [ -n "$PREV_TAG" ]; then
+    git log --pretty=fuller --date=short refs/tags/$PREV_TAG..HEAD > ChangeLog
+fi
 
 autoreconf -i
 ./configure
