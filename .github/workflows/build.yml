@@ -10,7 +10,6 @@ concurrency:
 
 env:
   LIBBPF_VERSION: v1.7.0
-  OPENSSL1_VERSION: 1_1_1w+quic
   BORINGSSL_VERSION: 22a0079b189c391b95689813a41982ce11876f0a
   AWSLC_VERSION: v5.4.0
   NGHTTP3_VERSION: v1.18.0
@@ -35,12 +34,6 @@ jobs:
       with:
         path: libbpf/build
         key: ${{ matrix.os }}-libbpf-${{ env.LIBBPF_VERSION }}
-    - name: Restore OpenSSL v1.1.1 cache
-      id: cache-openssl1
-      uses: actions/cache@v6
-      with:
-        path: openssl1/build
-        key: ${{ matrix.os }}-openssl-${{ env.OPENSSL1_VERSION }}
     - name: Restore BoringSSL cache
       id: cache-boringssl
       uses: actions/cache@v6
@@ -71,22 +64,21 @@ jobs:
       with:
         path: nghttp3/build
         key: ${{ matrix.os }}-nghttp3-${{ env.NGHTTP3_VERSION }}
-    - name: Restore ngtcp2 + quictls/openssl v1.1.1 + boringssl cache
+    - name: Restore ngtcp2 + boringssl cache
       id: cache-ngtcp2-boringssl
       uses: actions/cache@v6
       with:
         path: ngtcp2-boringssl/build
-        key: ${{ matrix.os }}-ngtcp2-${{ env.NGTCP2_VERSION }}-openssl-${{ env.OPENSSL1_VERSION }}-boringssl-${{ env.BORINGSSL_VERSION }}
-    - name: Restore ngtcp2 + openssl + aws-lc cache
+        key: ${{ matrix.os }}-ngtcp2-${{ env.NGTCP2_VERSION }}-boringssl-${{ env.BORINGSSL_VERSION }}
+    - name: Restore ngtcp2 + aws-lc cache
       id: cache-ngtcp2-awslc
       uses: actions/cache@v6
       with:
         path: ngtcp2-awslc/build
-        key: ${{ matrix.os }}-ngtcp2-${{ env.NGTCP2_VERSION }}-openssl-awslc-${{ env.AWSLC_VERSION }}
+        key: ${{ matrix.os }}-ngtcp2-${{ env.NGTCP2_VERSION }}-awslc-${{ env.AWSLC_VERSION }}
     - id: settings
       if: |
         (steps.cache-libbpf.outputs.cache-hit != 'true' && runner.os == 'Linux') ||
-        steps.cache-openssl1.outputs.cache-hit != 'true' ||
         steps.cache-boringssl.outputs.cache-hit != 'true' ||
         steps.cache-awslc.outputs.cache-hit != 'true' ||
         steps.cache-wolfssl.outputs.cache-hit != 'true' ||
@@ -124,14 +116,6 @@ jobs:
         git clone --recursive --shallow-submodules -b ${{ env.LIBBPF_VERSION }} https://github.com/libbpf/libbpf
         cd libbpf
         make -C src install PREFIX=$PWD/build
-    - name: Build quictls/openssl v1.1.1
-      if: steps.cache-openssl1.outputs.cache-hit != 'true'
-      run: |
-        git clone --recursive --shallow-submodules --depth 1 -b OpenSSL_${{ env.OPENSSL1_VERSION }} https://github.com/quictls/openssl openssl1
-        cd openssl1
-        ./config --prefix=$PWD/build
-        make -j"$(nproc 2> /dev/null || sysctl -n hw.ncpu)"
-        make install_sw
     - name: Build BoringSSL
       if: steps.cache-boringssl.outputs.cache-hit != 'true'
       run: |
@@ -172,24 +156,22 @@ jobs:
           --enable-lib-only
         make -j"$(nproc 2> /dev/null || sysctl -n hw.ncpu)" check
         make install
-    - name: Build ngtcp2 + quictls/openssl v1.1.1 + BoringSSL
+    - name: Build ngtcp2 + BoringSSL
       if: steps.cache-ngtcp2-boringssl.outputs.cache-hit != 'true'
       run: |
         git clone --recursive --shallow-submodules --depth 1 -b ${{ env.NGTCP2_VERSION }} https://github.com/ngtcp2/ngtcp2 ngtcp2-boringssl
         cd ngtcp2-boringssl
         autoreconf -i
         ./configure --prefix=$PWD/build --enable-lib-only \
-          PKG_CONFIG_PATH="../openssl1/build/lib/pkgconfig:../wolfssl/build/lib/pkgconfig" \
+          PKG_CONFIG_PATH="../wolfssl/build/lib/pkgconfig" \
           BORINGSSL_CFLAGS="-I$PWD/../boringssl/include/" \
           BORINGSSL_LIBS="-L$PWD/../boringssl/build -lssl -lcrypto" \
           --disable-dependency-tracking \
           --with-boringssl \
           --with-wolfssl
-        # Skip tests due to non-standard library path issue with
-        # OpenSSL.
-        make -j"$(nproc 2> /dev/null || sysctl -n hw.ncpu)"
+        make -j"$(nproc 2> /dev/null || sysctl -n hw.ncpu)" check
         make install
-    - name: Build ngtcp2 + openssl + aws-lc
+    - name: Build ngtcp2 + aws-lc
       if: steps.cache-ngtcp2-awslc.outputs.cache-hit != 'true'
       run: |
         git clone --recursive --shallow-submodules --depth 1 -b ${{ env.NGTCP2_VERSION }} https://github.com/ngtcp2/ngtcp2 ngtcp2-awslc
@@ -237,11 +219,6 @@ jobs:
           buildtool: autotools
           http3: http3
           openssl: wolfssl
-        - os: ubuntu-26.04
-          compiler: clang
-          buildtool: autotools
-          http3: http3
-          openssl: openssl1
         - os: ubuntu-26.04
           compiler: clang
           buildtool: cmake
@@ -372,13 +349,6 @@ jobs:
 
         echo 'LIBEV_CFLAGS='"$LIBEV_CFLAGS" >> $GITHUB_ENV
         echo 'LIBEV_LIBS='"$LIBEV_LIBS" >> $GITHUB_ENV
-    - name: Restore quictls/openssl v1.1.1 cache
-      uses: actions/cache/restore@v6
-      if: matrix.openssl == 'openssl1'
-      with:
-        path: openssl1/build
-        key: ${{ matrix.os }}-openssl-${{ env.OPENSSL1_VERSION }}
-        fail-on-cache-miss: true
     - name: Set OpenSSL variables
       if: matrix.openssl == 'openssl'
       run: |
@@ -457,33 +427,31 @@ jobs:
         path: nghttp3/build
         key: ${{ matrix.os }}-nghttp3-${{ env.NGHTTP3_VERSION }}
         fail-on-cache-miss: true
-    - name: Restore ngtcp2 + quictls/openssl v1.1.1 + BoringSSL cache
+    - name: Restore ngtcp2 + BoringSSL cache
       uses: actions/cache/restore@v6
-      if: matrix.http3 == 'http3' && (matrix.openssl == 'openssl1' || matrix.openssl == 'boringssl' || matrix.openssl == 'wolfssl')
+      if: matrix.http3 == 'http3' && (matrix.openssl == 'boringssl' || matrix.openssl == 'wolfssl')
       with:
         path: ngtcp2-boringssl/build
-        key: ${{ matrix.os }}-ngtcp2-${{ env.NGTCP2_VERSION }}-openssl-${{ env.OPENSSL1_VERSION }}-boringssl-${{ env.BORINGSSL_VERSION }}
+        key: ${{ matrix.os }}-ngtcp2-${{ env.NGTCP2_VERSION }}-boringssl-${{ env.BORINGSSL_VERSION }}
         fail-on-cache-miss: true
-    - name: Restore ngtcp2 + openssl + aws-lc cache
+    - name: Restore ngtcp2 + aws-lc cache
       uses: actions/cache/restore@v6
       if: matrix.http3 == 'http3' && (matrix.openssl == 'openssl' || matrix.openssl == 'awslc')
       with:
         path: ngtcp2-awslc/build
-        key: ${{ matrix.os }}-ngtcp2-${{ env.NGTCP2_VERSION }}-openssl-awslc-${{ env.AWSLC_VERSION }}
+        key: ${{ matrix.os }}-ngtcp2-${{ env.NGTCP2_VERSION }}-awslc-${{ env.AWSLC_VERSION }}
         fail-on-cache-miss: true
     - name: Setup extra environment variables
       if: matrix.http3 == 'no-http3'
       run: |
-        PKG_CONFIG_PATH="$PWD/openssl1/build/lib/pkgconfig:$PWD/wolfssl/build/lib/pkgconfig:$PKG_CONFIG_PATH"
-        LDFLAGS="$LDFLAGS -Wl,-rpath,$PWD/openssl1/build/lib"
+        PKG_CONFIG_PATH="$PWD/wolfssl/build/lib/pkgconfig:$PKG_CONFIG_PATH"
 
         echo 'PKG_CONFIG_PATH='"$PKG_CONFIG_PATH" >> $GITHUB_ENV
-        echo 'LDFLAGS='"$LDFLAGS" >> $GITHUB_ENV
     - name: Setup extra environment variables for HTTP/3
       if: matrix.http3 == 'http3'
       run: |
-        PKG_CONFIG_PATH="$PWD/openssl1/build/lib/pkgconfig:$PWD/wolfssl/build/lib/pkgconfig:$PWD/nghttp3/build/lib/pkgconfig:$PWD/ngtcp2-boringssl/build/lib/pkgconfig:$PWD/ngtcp2-awslc/build/lib/pkgconfig:$PWD/libbpf/build/lib64/pkgconfig:$PKG_CONFIG_PATH"
-        LDFLAGS="$LDFLAGS -Wl,-rpath,$PWD/openssl1/build/lib -Wl,-rpath,$PWD/libbpf/build/lib64"
+        PKG_CONFIG_PATH="$PWD/wolfssl/build/lib/pkgconfig:$PWD/nghttp3/build/lib/pkgconfig:$PWD/ngtcp2-boringssl/build/lib/pkgconfig:$PWD/ngtcp2-awslc/build/lib/pkgconfig:$PWD/libbpf/build/lib64/pkgconfig:$PKG_CONFIG_PATH"
+        LDFLAGS="$LDFLAGS -Wl,-rpath,$PWD/libbpf/build/lib64"
         EXTRA_AUTOTOOLS_OPTS="$EXTRA_AUTOTOOLS_OPTS --enable-http3"
         EXTRA_CMAKE_OPTS="$EXTRA_CMAKE_OPTS -DENABLE_HTTP3=1"
 
