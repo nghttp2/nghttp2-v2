@@ -166,6 +166,18 @@ int nghttp2_http_writer_write_headers(nghttp2_http_writer *hw,
   int rv;
 
   if (!(hw->flags & NGHTTP2_HTTP_WRITER_FLAG_INPROGRESS)) {
+    if (!(stream->flags & NGHTTP2_STREAM_FLAG_OPENED) &&
+        (stream->flags & NGHTTP2_STREAM_FLAG_SEND_RST_STREAM)) {
+      /* If there is no activity in the stream, and we are sending
+         RST_STREAM, they are cancelled out each other. */
+      stream->flags &= ~NGHTTP2_STREAM_FLAG_SEND_RST_STREAM;
+
+      nghttp2_mem_free(hw->mem, (nghttp2_nv *)fr->nva);
+      nghttp2_ringbuf_pop_front(&hw->outq);
+
+      return 0;
+    }
+
     if (nghttp2_buf_left(dest) < NGHTTP2_FRAME_HDLEN) {
       return NGHTTP2_ERR_NOBUF;
     }
