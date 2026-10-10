@@ -726,32 +726,37 @@ std::expected<void, Error> Http2Handler::fill_wb(nghttp2_tstamp ts) {
   return {};
 }
 
+constexpr auto MAX_READ_PER_LOOP = 10UZ;
+
 std::expected<void, Error> Http2Handler::read_clear() {
   std::array<uint8_t, 16_k> buf;
   auto ts = util::timestamp();
 
   ssize_t nread;
-  while ((nread = read(fd_, buf.data(), buf.size())) == -1 && errno == EINTR)
-    ;
-  if (nread == -1) {
-    if (errno == EAGAIN || errno == EWOULDBLOCK) {
-      return on_write();
+
+  for (auto i = 0UZ; i < MAX_READ_PER_LOOP; ++i) {
+    while ((nread = read(fd_, buf.data(), buf.size())) == -1 && errno == EINTR)
+      ;
+    if (nread == -1) {
+      if (errno == EAGAIN || errno == EWOULDBLOCK) {
+        return on_write();
+      }
+      return std::unexpected{Error::SYSCALL};
     }
-    return std::unexpected{Error::SYSCALL};
-  }
-  if (nread == 0) {
-    return std::unexpected{Error::RECV_EOF};
-  }
+    if (nread == 0) {
+      return std::unexpected{Error::RECV_EOF};
+    }
 
-  if (config.hexdump) {
-    (void)util::hexdump(stdout, buf.data(), as_unsigned(nread));
-  }
+    if (config.hexdump) {
+      (void)util::hexdump(stdout, buf.data(), as_unsigned(nread));
+    }
 
-  if (auto rv = nghttp2_conn_read(conn_, buf.data(), as_unsigned(nread), ts);
-      rv != 0) {
-    std::println(stderr, "nghttp2_conn_read: {}", nghttp2_strerror(rv));
+    if (auto rv = nghttp2_conn_read(conn_, buf.data(), as_unsigned(nread), ts);
+        rv != 0) {
+      std::println(stderr, "nghttp2_conn_read: {}", nghttp2_strerror(rv));
 
-    return std::unexpected{Error::HTTP2};
+      return std::unexpected{Error::HTTP2};
+    }
   }
 
   return on_write();
@@ -841,7 +846,7 @@ std::expected<void, Error> Http2Handler::read_tls() {
 
   ERR_clear_error();
 
-  for (;;) {
+  for (auto i = 0UZ; i < MAX_READ_PER_LOOP; ++i) {
     auto rv = SSL_read(ssl_, buf.data(), buf.size());
 
     if (rv <= 0) {
@@ -867,10 +872,6 @@ std::expected<void, Error> Http2Handler::read_tls() {
                    rv);
 
       return std::unexpected{Error::HTTP2};
-    }
-
-    if (SSL_pending(ssl_) == 0) {
-      break;
     }
   }
 
