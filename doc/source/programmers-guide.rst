@@ -91,6 +91,42 @@ following:
 
 In any case, the connection can be closed.
 
+Sending the HTTP message body
+-----------------------------
+
+To send the HTTP message body in HTTP requests and responses,
+:type:`nghttp2_data_reader` is used.
+:type:`nghttp2_data_reader.read_data` pulls data from the application.
+
+The callback provides a writable :type:`nghttp2_vec` array of *veccnt*
+elements.  If there is data to send, the application should populate
+them with data and return the number of elements it fills.  If this is
+the end of the message body, set :macro:`NGHTTP2_READ_DATA_FLAG_EOF`,
+which signifies the end of the stream.  If, for some reason, the
+application does not want to end the sending side of the stream at
+this moment, for example, if it plans to send trailers later, also set
+:macro:`NGHTTP2_READ_DATA_FLAG_NO_END_STREAM`.
+
+If there is no data to send at this point and it is not the end of the
+message body, return :macro:`NGHTTP2_ERR_WOULDBLOCK`.  When data
+becomes available later, call `nghttp2_conn_resume_stream` so that
+:type:`nghttp2_conn` can schedule this stream for transmission.
+
+Returning 0 from the callback is only valid when
+:macro:`NGHTTP2_READ_DATA_FLAG_EOF` is set.  The following cases are
+treated as errors:
+
+- 0 is returned without :macro:`NGHTTP2_READ_DATA_FLAG_EOF` set.
+- The sum of the data filled in the :type:`nghttp2_vec` array is 0,
+  and :macro:`NGHTTP2_READ_DATA_FLAG_EOF` is not set.
+
+The memory region passed to the :type:`nghttp2_vec` array in this
+callback must be retained until that portion of the data is written to
+the underlying stream.  This is notified via
+:member:`nghttp2_callbacks.write_stream_data_offset`.  The callback is
+not called if the stream or the connection is closed before sending
+data.
+
 Stream life cycle
 -----------------
 
