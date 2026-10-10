@@ -237,6 +237,10 @@ static int conn_call_recv_settings_entry(nghttp2_conn *conn, uint16_t id,
     return NGHTTP2_ERR_CALLBACK_FAILURE;
   }
 
+  if (conn->rx.frrd.state == NGHTTP2_FRAME_READ_STATE_CLOSING) {
+    return NGHTTP2_ERR_STOP_READING;
+  }
+
   return 0;
 }
 
