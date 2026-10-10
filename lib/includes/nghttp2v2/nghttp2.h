@@ -721,6 +721,12 @@ typedef struct nghttp2_buf {
 NGHTTP2_EXTERN void nghttp2_buf_init(nghttp2_buf *buf);
 
 /**
+ * @macrosection
+ *
+ * :type:`nghttp2_buf` helper macros
+ */
+
+/**
  * @function
  *
  * `nghttp2_buf_free` frees resources allocated for |buf| using |mem|
@@ -730,7 +736,7 @@ NGHTTP2_EXTERN void nghttp2_buf_init(nghttp2_buf *buf);
 NGHTTP2_EXTERN void nghttp2_buf_free(nghttp2_buf *buf, const nghttp2_mem *mem);
 
 /**
- * @function
+ * @macro
  *
  * `nghttp2_buf_left` returns the number of additional bytes which can
  * be written to the underlying buffer.  In other words, it returns
@@ -740,7 +746,7 @@ NGHTTP2_EXTERN void nghttp2_buf_free(nghttp2_buf *buf, const nghttp2_mem *mem);
 #define nghttp2_buf_left(BUF) (size_t)((BUF)->end - (BUF)->last)
 
 /**
- * @function
+ * @macro
  *
  * `nghttp2_buf_len` returns the number of bytes left to read.  In
  * other words, it returns :member:`buf->last <nghttp2_buf.last>` -
