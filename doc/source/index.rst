@@ -15,11 +15,11 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
+   programmers-guide
+   apiref
    nghttp.1
    nghttpd.1
    nghttpx.1
    h2load.1
    nghttpx-howto
    h2load-howto
-   programmers-guide
-   apiref
