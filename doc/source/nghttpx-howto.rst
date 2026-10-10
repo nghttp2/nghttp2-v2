@@ -227,18 +227,9 @@ Hot swapping
 nghttpx supports hot swapping using signals.  The hot swapping in
 nghttpx is multi step process.  First send USR2 signal to nghttpx
 process.  It will do fork and execute new executable, using same
-command-line arguments and environment variables.
-
-As of nghttpx version 1.20.0, that is all you have to do.  The new
-main process sends QUIT signal to the original process, when it is
-ready to serve requests, to shut it down gracefully.
-
-For earlier versions of nghttpx, you have to do one more thing.  At
-this point, both current and new processes can accept requests.  To
-gracefully shutdown current process, send QUIT signal to current
-nghttpx process.  When all existing frontend connections are done, the
-current process will exit.  At this point, only new nghttpx process
-exists and serves incoming requests.
+command-line arguments and environment variables.  The new main
+process sends QUIT signal to the original process, when it is ready to
+serve requests, to shut it down gracefully.
 
 If you want to just reload configuration file without executing new
 binary, send SIGHUP to nghttpx main process.
@@ -487,17 +478,17 @@ should understand its implications.
 TLSv1.3
 -------
 
-As of nghttpx v1.34.0, if it is built with OpenSSL 1.1.1 or later, it
-supports TLSv1.3.  0-RTT data is supported, but by default its
-processing is postponed until TLS handshake completes to mitigate
-replay attack.  This costs extra round trip and reduces effectiveness
-of 0-RTT data.  :option:`--tls-no-postpone-early-data` makes nghttpx
-not wait for handshake to complete before forwarding request included
-in 0-RTT to get full potential of 0-RTT data.  In this case, nghttpx
-adds ``Early-Data: 1`` header field when forwarding a request to a
-backend server.  All backend servers should recognize this header
-field and understand that there is a risk for replay attack.  See `RFC
-8470 <https://tools.ietf.org/html/rfc8470>`_ for ``Early-Data`` header
+TLSv1.3 0-RTT data is supported if the underlying TLS stack supports
+it, but by default its processing is postponed until TLS handshake
+completes to mitigate replay attack.  This costs extra round trip and
+reduces effectiveness of 0-RTT data.
+:option:`--tls-no-postpone-early-data` makes nghttpx not wait for
+handshake to complete before forwarding request included in 0-RTT to
+get full potential of 0-RTT data.  In this case, nghttpx adds
+``Early-Data: 1`` header field when forwarding a request to a backend
+server.  All backend servers should recognize this header field and
+understand that there is a risk for replay attack.  See `RFC 8470
+<https://tools.ietf.org/html/rfc8470>`_ for ``Early-Data`` header
 field.
 
 nghttpx disables anti replay protection provided by OpenSSL.  The anti
@@ -589,74 +580,3 @@ alt-svc header field in HTTP/1.1 and HTTP/2 response:
 
    altsvc=h3,443,,,ma=3600
    http2-altsvc=h3,443,,,ma=3600
-
-Migration from nghttpx v1.18.x or earlier
------------------------------------------
-
-As of nghttpx v1.19.0, :option:`--ciphers` option only changes cipher
-list for frontend TLS connection.  In order to change cipher list for
-backend connection, use :option:`--client-ciphers` option.
-
-Similarly, :option:`--no-http2-cipher-block-list` option only disables
-HTTP/2 cipher block list for frontend connection.  In order to disable
-HTTP/2 cipher block list for backend connection, use
-:option:`--client-no-http2-cipher-block-list` option.
-
-``--accept-proxy-protocol`` option was deprecated.  Instead, use
-``proxyproto`` parameter in :option:`--frontend` option to enable
-PROXY protocol support per frontend.
-
-Migration from nghttpx v1.8.0 or earlier
-----------------------------------------
-
-As of nghttpx 1.9.0, ``--frontend-no-tls`` and ``--backend-no-tls``
-have been removed.
-
-To disable encryption on frontend connection, use ``no-tls`` keyword
-in :option:`--frontend` potion:
-
-.. code-block:: text
-
-   frontend=*,3000;no-tls
-
-The TLS encryption is now disabled on backend connection in all modes
-by default.  To enable encryption on backend connection, use ``tls``
-keyword in :option:`--backend` option:
-
-.. code-block:: text
-
-   backend=127.0.0.1,8080;tls
-
-As of nghttpx 1.9.0, ``--http2-bridge``, ``--client`` and
-``--client-proxy`` options have been removed.  These functionality can
-be used using combinations of options.
-
-Use following option instead of ``--http2-bridge``:
-
-.. code-block:: text
-
-   backend=<ADDR>,<PORT>;;proto=h2;tls
-
-Use following options instead of ``--client``:
-
-.. code-block:: text
-
-   frontend=<ADDR>,<PORT>;no-tls
-   backend=<ADDR>,<PORT>;;proto=h2;tls
-
-Use following options instead of ``--client-proxy``:
-
-.. code-block:: text
-
-   http2-proxy=yes
-   frontend=<ADDR>,<PORT>;no-tls
-   backend=<ADDR>,<PORT>;;proto=h2;tls
-
-We also removed ``--backend-http2-connections-per-worker`` option.  It
-was present because previously the number of backend h2 connection was
-statically configured, and defaulted to 1.  Now the number of backend
-h2 connection is increased on demand.  We know the maximum number of
-concurrent streams per connection.  When we push as many request as
-the maximum concurrency to the one connection, we create another new
-connection so that we can distribute load and avoid delay the request
-processing.  This is done automatically without any configuration.
