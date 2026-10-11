@@ -9,12 +9,12 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
 
 env:
-  LIBBPF_VERSION: v1.7.0
-  BORINGSSL_VERSION: 22a0079b189c391b95689813a41982ce11876f0a
-  AWSLC_VERSION: v5.4.0
+  LIBBPF_VERSION: v1.8.0
+  BORINGSSL_VERSION: 3fed4f207543470b3d639db6ed40737e30308b51
+  AWSLC_VERSION: v5.11.0
   NGHTTP3_VERSION: v1.18.0
   NGTCP2_VERSION: v1.25.0
-  WOLFSSL_VERSION: v5.9.2-stable
+  WOLFSSL_VERSION: v5.9.4-stable
 
 jobs:
   build-cache:
