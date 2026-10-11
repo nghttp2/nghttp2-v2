@@ -139,65 +139,65 @@ NGHTTPX_SRCS = \
 	app_helper.cc app_helper.h \
 	tls.cc tls.h ssl_compat.h \
 	network.cc network.h \
-	shrpx_config.cc shrpx_config.h \
-	shrpx_error.h \
-	shrpx_accept_handler.cc shrpx_accept_handler.h \
-	shrpx_connection_handler.cc shrpx_connection_handler.h \
-	shrpx_client_handler.cc shrpx_client_handler.h \
-	shrpx_upstream.h \
-	shrpx_http2_upstream.cc shrpx_http2_upstream.h \
-	shrpx_https_upstream.cc shrpx_https_upstream.h \
-	shrpx_downstream.cc shrpx_downstream.h \
-	shrpx_downstream_connection.cc shrpx_downstream_connection.h \
-	shrpx_http_downstream_connection.cc shrpx_http_downstream_connection.h \
-	shrpx_http2_downstream_connection.cc shrpx_http2_downstream_connection.h \
-	shrpx_http2_session.cc shrpx_http2_session.h \
-	shrpx_downstream_queue.cc shrpx_downstream_queue.h \
-	shrpx_log.cc shrpx_log.h \
-	shrpx_http.cc shrpx_http.h \
-	shrpx_io_control.cc shrpx_io_control.h \
-	shrpx_tls.cc shrpx_tls.h \
-	shrpx_worker.cc shrpx_worker.h \
-	shrpx_log_config.cc shrpx_log_config.h \
-	shrpx_connect_blocker.cc shrpx_connect_blocker.h \
-	shrpx_live_check.cc shrpx_live_check.h \
-	shrpx_downstream_connection_pool.cc shrpx_downstream_connection_pool.h \
-	shrpx_rate_limit.cc shrpx_rate_limit.h \
-	shrpx_connection.cc shrpx_connection.h \
-	shrpx_memcached_dispatcher.cc shrpx_memcached_dispatcher.h \
-	shrpx_memcached_connection.cc shrpx_memcached_connection.h \
-	shrpx_memcached_request.h \
-	shrpx_memcached_result.h \
-	shrpx_worker_process.cc shrpx_worker_process.h \
-	shrpx_process.h \
-	shrpx_signal.cc shrpx_signal.h \
-	shrpx_router.cc shrpx_router.h \
-	shrpx_api_downstream_connection.cc shrpx_api_downstream_connection.h \
-	shrpx_health_monitor_downstream_connection.cc \
-	shrpx_health_monitor_downstream_connection.h \
-	shrpx_null_downstream_connection.cc shrpx_null_downstream_connection.h \
-	shrpx_dns_resolver.cc shrpx_dns_resolver.h \
-	shrpx_dual_dns_resolver.cc shrpx_dual_dns_resolver.h \
-	shrpx_dns_tracker.cc shrpx_dns_tracker.h \
+	nghttpx_config.cc nghttpx_config.h \
+	nghttpx_error.h \
+	nghttpx_accept_handler.cc nghttpx_accept_handler.h \
+	nghttpx_connection_handler.cc nghttpx_connection_handler.h \
+	nghttpx_client_handler.cc nghttpx_client_handler.h \
+	nghttpx_upstream.h \
+	nghttpx_http2_upstream.cc nghttpx_http2_upstream.h \
+	nghttpx_https_upstream.cc nghttpx_https_upstream.h \
+	nghttpx_downstream.cc nghttpx_downstream.h \
+	nghttpx_downstream_connection.cc nghttpx_downstream_connection.h \
+	nghttpx_http_downstream_connection.cc nghttpx_http_downstream_connection.h \
+	nghttpx_http2_downstream_connection.cc nghttpx_http2_downstream_connection.h \
+	nghttpx_http2_session.cc nghttpx_http2_session.h \
+	nghttpx_downstream_queue.cc nghttpx_downstream_queue.h \
+	nghttpx_log.cc nghttpx_log.h \
+	nghttpx_http.cc nghttpx_http.h \
+	nghttpx_io_control.cc nghttpx_io_control.h \
+	nghttpx_tls.cc nghttpx_tls.h \
+	nghttpx_worker.cc nghttpx_worker.h \
+	nghttpx_log_config.cc nghttpx_log_config.h \
+	nghttpx_connect_blocker.cc nghttpx_connect_blocker.h \
+	nghttpx_live_check.cc nghttpx_live_check.h \
+	nghttpx_downstream_connection_pool.cc nghttpx_downstream_connection_pool.h \
+	nghttpx_rate_limit.cc nghttpx_rate_limit.h \
+	nghttpx_connection.cc nghttpx_connection.h \
+	nghttpx_memcached_dispatcher.cc nghttpx_memcached_dispatcher.h \
+	nghttpx_memcached_connection.cc nghttpx_memcached_connection.h \
+	nghttpx_memcached_request.h \
+	nghttpx_memcached_result.h \
+	nghttpx_worker_process.cc nghttpx_worker_process.h \
+	nghttpx_process.h \
+	nghttpx_signal.cc nghttpx_signal.h \
+	nghttpx_router.cc nghttpx_router.h \
+	nghttpx_api_downstream_connection.cc nghttpx_api_downstream_connection.h \
+	nghttpx_health_monitor_downstream_connection.cc \
+	nghttpx_health_monitor_downstream_connection.h \
+	nghttpx_null_downstream_connection.cc nghttpx_null_downstream_connection.h \
+	nghttpx_dns_resolver.cc nghttpx_dns_resolver.h \
+	nghttpx_dual_dns_resolver.cc nghttpx_dual_dns_resolver.h \
+	nghttpx_dns_tracker.cc nghttpx_dns_tracker.h \
 	buffer.h memchunk.h template.h allocator.h \
 	errors.h \
 	xsi_strerror.c xsi_strerror.h
 
 if HAVE_MRUBY
 NGHTTPX_SRCS += \
-	shrpx_mruby.cc shrpx_mruby.h \
-	shrpx_mruby_module.cc shrpx_mruby_module.h \
-	shrpx_mruby_module_env.cc shrpx_mruby_module_env.h \
-	shrpx_mruby_module_request.cc shrpx_mruby_module_request.h \
-	shrpx_mruby_module_response.cc shrpx_mruby_module_response.h
+	nghttpx_mruby.cc nghttpx_mruby.h \
+	nghttpx_mruby_module.cc nghttpx_mruby_module.h \
+	nghttpx_mruby_module_env.cc nghttpx_mruby_module_env.h \
+	nghttpx_mruby_module_request.cc nghttpx_mruby_module_request.h \
+	nghttpx_mruby_module_response.cc nghttpx_mruby_module_response.h
 endif # HAVE_MRUBY
 
 if ENABLE_HTTP3
 NGHTTPX_SRCS += \
-	shrpx_quic.cc shrpx_quic.h \
-	shrpx_quic_listener.cc shrpx_quic_listener.h \
-	shrpx_quic_connection_handler.cc shrpx_quic_connection_handler.h \
-	shrpx_http3_upstream.cc shrpx_http3_upstream.h \
+	nghttpx_quic.cc nghttpx_quic.h \
+	nghttpx_quic_listener.cc nghttpx_quic_listener.h \
+	nghttpx_quic_connection_handler.cc nghttpx_quic_connection_handler.h \
+	nghttpx_http3_upstream.cc nghttpx_http3_upstream.h \
 	http3.cc http3.h \
 	siphash.cc siphash.h
 endif # ENABLE_HTTP3
@@ -206,7 +206,7 @@ noinst_LIBRARIES = libnghttpx.a
 libnghttpx_a_SOURCES = ${NGHTTPX_SRCS}
 libnghttpx_a_CPPFLAGS = ${AM_CPPFLAGS}
 
-nghttpx_SOURCES = shrpx.cc shrpx.h
+nghttpx_SOURCES = nghttpx.cc nghttpx.h
 nghttpx_CPPFLAGS = ${libnghttpx_a_CPPFLAGS}
 nghttpx_LDADD = libnghttpx.a ${LDADD}
 
@@ -224,13 +224,13 @@ nghttpx_LDADD += ${top_builddir}/third-party/libneverbleed.la
 endif # HAVE_NEVERBLEED
 
 check_PROGRAMS += nghttpx-unittest
-nghttpx_unittest_SOURCES = shrpx-unittest.cc \
-	shrpx_tls_test.cc shrpx_tls_test.h \
-	shrpx_downstream_test.cc shrpx_downstream_test.h \
-	shrpx_config_test.cc shrpx_config_test.h \
-	shrpx_worker_test.cc shrpx_worker_test.h \
-	shrpx_http_test.cc shrpx_http_test.h \
-	shrpx_router_test.cc shrpx_router_test.h \
+nghttpx_unittest_SOURCES = nghttpx-unittest.cc \
+	nghttpx_tls_test.cc nghttpx_tls_test.h \
+	nghttpx_downstream_test.cc nghttpx_downstream_test.h \
+	nghttpx_config_test.cc nghttpx_config_test.h \
+	nghttpx_worker_test.cc nghttpx_worker_test.h \
+	nghttpx_http_test.cc nghttpx_http_test.h \
+	nghttpx_router_test.cc nghttpx_router_test.h \
 	http2_test.cc http2_test.h \
 	util_test.cc util_test.h \
 	nghttp2_gzip_test.c nghttp2_gzip_test.h \

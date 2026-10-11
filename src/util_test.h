@@ -33,7 +33,7 @@
 
 #include "munitxx.h"
 
-namespace shrpx {
+namespace nghttpx {
 
 extern const MunitSuite util_suite;
 
@@ -92,6 +92,6 @@ munit_void_test_decl(test_util_fieldeq)
 munit_void_test_decl(test_util_sha256)
 munit_void_test_decl(test_util_sha1)
 
-} // namespace shrpx
+} // namespace nghttpx
 
 #endif // !defined(UTIL_TEST_H)

@@ -43,7 +43,7 @@
 using namespace nghttp2;
 using namespace std::literals;
 
-namespace shrpx {
+namespace nghttpx {
 
 namespace {
 const MunitTest tests[]{
@@ -1158,4 +1158,4 @@ void test_util_sha1(void) {
   assert_eq("6e65eeb0bab294dadf2297a7aa2315703ed5b958"sv, mdhex);
 }
 
-} // namespace shrpx
+} // namespace nghttpx

@@ -101,57 +101,57 @@ if(ENABLE_APP)
     app_helper.cc
     tls.cc
     network.cc
-    shrpx_config.cc
-    shrpx_accept_handler.cc
-    shrpx_connection_handler.cc
-    shrpx_client_handler.cc
-    shrpx_http2_upstream.cc
-    shrpx_https_upstream.cc
-    shrpx_downstream.cc
-    shrpx_downstream_connection.cc
-    shrpx_http_downstream_connection.cc
-    shrpx_http2_downstream_connection.cc
-    shrpx_http2_session.cc
-    shrpx_downstream_queue.cc
-    shrpx_log.cc
-    shrpx_http.cc
-    shrpx_io_control.cc
-    shrpx_tls.cc
-    shrpx_worker.cc
-    shrpx_log_config.cc
-    shrpx_connect_blocker.cc
-    shrpx_live_check.cc
-    shrpx_downstream_connection_pool.cc
-    shrpx_rate_limit.cc
-    shrpx_connection.cc
-    shrpx_memcached_dispatcher.cc
-    shrpx_memcached_connection.cc
-    shrpx_worker_process.cc
-    shrpx_signal.cc
-    shrpx_router.cc
-    shrpx_api_downstream_connection.cc
-    shrpx_health_monitor_downstream_connection.cc
-    shrpx_null_downstream_connection.cc
-    shrpx_dns_resolver.cc
-    shrpx_dual_dns_resolver.cc
-    shrpx_dns_tracker.cc
+    nghttpx_config.cc
+    nghttpx_accept_handler.cc
+    nghttpx_connection_handler.cc
+    nghttpx_client_handler.cc
+    nghttpx_http2_upstream.cc
+    nghttpx_https_upstream.cc
+    nghttpx_downstream.cc
+    nghttpx_downstream_connection.cc
+    nghttpx_http_downstream_connection.cc
+    nghttpx_http2_downstream_connection.cc
+    nghttpx_http2_session.cc
+    nghttpx_downstream_queue.cc
+    nghttpx_log.cc
+    nghttpx_http.cc
+    nghttpx_io_control.cc
+    nghttpx_tls.cc
+    nghttpx_worker.cc
+    nghttpx_log_config.cc
+    nghttpx_connect_blocker.cc
+    nghttpx_live_check.cc
+    nghttpx_downstream_connection_pool.cc
+    nghttpx_rate_limit.cc
+    nghttpx_connection.cc
+    nghttpx_memcached_dispatcher.cc
+    nghttpx_memcached_connection.cc
+    nghttpx_worker_process.cc
+    nghttpx_signal.cc
+    nghttpx_router.cc
+    nghttpx_api_downstream_connection.cc
+    nghttpx_health_monitor_downstream_connection.cc
+    nghttpx_null_downstream_connection.cc
+    nghttpx_dns_resolver.cc
+    nghttpx_dual_dns_resolver.cc
+    nghttpx_dns_tracker.cc
     xsi_strerror.c
   )
   if(HAVE_MRUBY)
     list(APPEND NGHTTPX_SRCS
-      shrpx_mruby.cc
-      shrpx_mruby_module.cc
-      shrpx_mruby_module_env.cc
-      shrpx_mruby_module_request.cc
-      shrpx_mruby_module_response.cc
+      nghttpx_mruby.cc
+      nghttpx_mruby_module.cc
+      nghttpx_mruby_module_env.cc
+      nghttpx_mruby_module_request.cc
+      nghttpx_mruby_module_response.cc
     )
   endif()
   if(ENABLE_HTTP3)
     list(APPEND NGHTTPX_SRCS
-     shrpx_quic.cc
-     shrpx_quic_listener.cc
-     shrpx_quic_connection_handler.cc
-     shrpx_http3_upstream.cc
+     nghttpx_quic.cc
+     nghttpx_quic_listener.cc
+     nghttpx_quic_connection_handler.cc
+     nghttpx_http3_upstream.cc
      http3.cc
      siphash.cc
     )
@@ -160,7 +160,7 @@ if(ENABLE_APP)
   set_target_properties(nghttpx_static PROPERTIES ARCHIVE_OUTPUT_NAME nghttpx)
 
   set(NGHTTPX-bin_SOURCES
-    shrpx.cc
+    nghttpx.cc
   )
 
   if(HAVE_SYSTEMD)
@@ -180,13 +180,13 @@ if(ENABLE_APP)
 
   if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME AND BUILD_TESTING)
     set(NGHTTPX_UNITTEST_SOURCES
-      shrpx-unittest.cc
-      shrpx_tls_test.cc
-      shrpx_downstream_test.cc
-      shrpx_config_test.cc
-      shrpx_worker_test.cc
-      shrpx_http_test.cc
-      shrpx_router_test.cc
+      nghttpx-unittest.cc
+      nghttpx_tls_test.cc
+      nghttpx_downstream_test.cc
+      nghttpx_config_test.cc
+      nghttpx_worker_test.cc
+      nghttpx_http_test.cc
+      nghttpx_router_test.cc
       http2_test.cc
       util_test.cc
       nghttp2_gzip_test.c

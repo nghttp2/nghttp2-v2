@@ -35,7 +35,7 @@
 using namespace nghttp2;
 using namespace std::literals;
 
-namespace shrpx {
+namespace nghttpx {
 
 namespace {
 const MunitTest tests[]{
@@ -767,4 +767,4 @@ void test_http2_make_websocket_accept_token(void) {
     http2::make_websocket_accept_token(dest, "uq3K/rqtyv66rcr+uq3K/g=="sv));
 }
 
-} // namespace shrpx
+} // namespace nghttpx

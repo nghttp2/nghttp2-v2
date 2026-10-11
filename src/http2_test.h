@@ -33,7 +33,7 @@
 
 #include "munitxx.h"
 
-namespace shrpx {
+namespace nghttpx {
 
 extern const MunitSuite http2_suite;
 
@@ -52,6 +52,6 @@ munit_void_test_decl(test_http2_check_transfer_encoding)
 munit_void_test_decl(test_http2_capitalize)
 munit_void_test_decl(test_http2_make_websocket_accept_token)
 
-} // namespace shrpx
+} // namespace nghttpx
 
 #endif // !defined(HTTP2_TEST_H)
