@@ -114,7 +114,7 @@ std::string_view get_reason_phrase(unsigned int status_code) {
   case 421:
     return "Misdirected Request"sv;
   case 425:
-    // https://tools.ietf.org/html/rfc8470
+    // https://datatracker.ietf.org/doc/html/rfc8470
     return "Too Early"sv;
   case 426:
     return "Upgrade Required"sv;

@@ -1068,7 +1068,7 @@ int htp_hdrs_completecb(llhttp_t *htp) {
   // Content-Length or Transfer-Encoding: chunked.  Some server send
   // 304 status code with nonzero Content-Length, but without response
   // body. See
-  // https://tools.ietf.org/html/rfc7230#section-3.3
+  // https://datatracker.ietf.org/doc/html/rfc9112#section-6.3
 
   // TODO It seems that the cases other than HEAD are handled by
   // llhttp.  Need test.

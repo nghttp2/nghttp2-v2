@@ -238,7 +238,8 @@ void rewrite_request_host_path_from_uri(BlockAllocator &balloc, Request &req,
                                         std::string_view uri, urlparse_url &u) {
   assert(u.field_set & (1 << URLPARSE_HOST));
 
-  // As per https://tools.ietf.org/html/rfc7230#section-5.4, we
+  // As per
+  // https://datatracker.ietf.org/doc/html/rfc9112#section-3.2.2, we
   // rewrite host header field with authority component.
   auto authority = util::get_uri_field(uri.data(), u, URLPARSE_HOST);
   // TODO properly check IPv6 numeric address
@@ -283,7 +284,7 @@ void rewrite_request_host_path_from_uri(BlockAllocator &balloc, Request &req,
     // OPTIONS http://example.org HTTP/1.1
     //
     // Notice that no slash after authority. See
-    // http://tools.ietf.org/html/rfc7230#section-5.3.4
+    // https://datatracker.ietf.org/doc/html/rfc9112#section-3.2.4
     req.path = ""sv;
     // we ignore query component here
     return;

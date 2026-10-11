@@ -972,12 +972,11 @@ SSL_CTX *create_ssl_context(const char *private_key_file, const char *cert_file,
     SSL_OP_SINGLE_DH_USE |
     SSL_OP_CIPHER_SERVER_PREFERENCE
 #ifdef NGHTTP2_GENUINE_OPENSSL
-    // The reason for disabling built-in anti-replay in
-    // OpenSSL is that it only works if client gets back
-    // to the same server.  The freshness check
-    // described in
-    // https://tools.ietf.org/html/rfc8446#section-8.3
-    // is still performed.
+    // The reason for disabling built-in anti-replay in OpenSSL is
+    // that it only works if client gets back to the same server.  The
+    // freshness check described in
+    // https://datatracker.ietf.org/doc/html/rfc9846/#section-8.3 is
+    // still performed.
     | SSL_OP_NO_ANTI_REPLAY
 #endif // defined(NGHTTP2_GENUINE_OPENSSL)
   );
@@ -1257,10 +1256,10 @@ SSL_CTX *create_quic_ssl_context(const char *private_key_file,
     SSL_OP_CIPHER_SERVER_PREFERENCE
 #  ifdef NGHTTP2_GENUINE_OPENSSL
     // The reason for disabling built-in anti-replay in OpenSSL is
-    // that it only works if client gets back to the same server.
-    // The freshness check described in
-    // https://tools.ietf.org/html/rfc8446#section-8.3 is still
-    // performed.
+    // that it only works if client gets back to the same server.  The
+    // freshness check described in
+    // https://datatracker.ietf.org/doc/html/rfc9846/#section-8.3 is
+    // still performed.
     | SSL_OP_NO_ANTI_REPLAY
 #  endif // defined(NGHTTP2_GENUINE_OPENSSL)
     ;

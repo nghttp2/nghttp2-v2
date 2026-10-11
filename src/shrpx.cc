@@ -2724,16 +2724,16 @@ Options:
                util::duration_str(config->tls.dyn_rec.idle_timeout));
 
   std::println(out, R"(  --no-http2-cipher-block-list
-              Allow  block  listed  cipher suite  on  frontend  HTTP/2
-              connection.                                          See
-              https://tools.ietf.org/html/rfc7540#appendix-A  for  the
-              complete HTTP/2 cipher suites block list.)");
+              Allow the  prohibited TLSv1.2 cipher suites  on frontend
+              HTTP/2                  connection.                  See
+              https://datatracker.ietf.org/doc/html/rfc9113#appendix-A
+              for the complete prohibited TLSv1.2 cipher suites.)");
 
   std::println(out, R"(  --client-no-http2-cipher-block-list
-              Allow  block  listed  cipher  suite  on  backend  HTTP/2
-              connection.                                          See
-              https://tools.ietf.org/html/rfc7540#appendix-A  for  the
-              complete HTTP/2 cipher suites block list.)");
+              Allow the  prohibited TLSv1.2  cipher suites  on backend
+              HTTP/2                  connection.                  See
+              https://datatracker.ietf.org/doc/html/rfc9113#appendix-A
+              for the complete prohitibted TLSv1.2 cipher suites.)");
 
   std::println(out, R"(  --tls-sct-dir=<DIR>
               Specifies the  directory where  *.sct files  exist.  All

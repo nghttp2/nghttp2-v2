@@ -446,10 +446,9 @@ nghttpx server accepts any of the identity and secret pairs in the
 file.  The default cipher suite list does not contain PSK cipher
 suites.  In order to use PSK, PSK cipher suite must be enabled by
 using :option:`--ciphers` option.  The desired PSK cipher suite may be
-listed in `HTTP/2 cipher block list
-<https://tools.ietf.org/html/rfc7540#appendix-A>`_.  In order to use
-such PSK cipher suite with HTTP/2, disable HTTP/2 cipher block list by
-using :option:`--no-http2-cipher-block-list` option.  But you should
+listed in :rfc:`9113#appendix-A`.  In order to use such PSK cipher
+suite with HTTP/2, disable HTTP/2 cipher block list by using
+:option:`--no-http2-cipher-block-list` option.  But you should
 understand its implications.
 
 At the time of writing, even if only PSK cipher suites are specified
@@ -469,11 +468,10 @@ used, like so:
 The default cipher suite list does not contain PSK cipher suites.  In
 order to use PSK, PSK cipher suite must be enabled by using
 :option:`--client-ciphers` option.  The desired PSK cipher suite may
-be listed in `HTTP/2 cipher block list
-<https://tools.ietf.org/html/rfc7540#appendix-A>`_.  In order to use
-such PSK cipher suite with HTTP/2, disable HTTP/2 cipher block list by
-using :option:`--client-no-http2-cipher-block-list` option.  But you
-should understand its implications.
+be listed in :rfc:`9113#appendix-A`.  In order to use such PSK cipher
+suite with HTTP/2, disable HTTP/2 cipher block list by using
+:option:`--client-no-http2-cipher-block-list` option.  But you should
+understand its implications.
 
 TLSv1.3
 -------
@@ -487,9 +485,8 @@ handshake to complete before forwarding request included in 0-RTT to
 get full potential of 0-RTT data.  In this case, nghttpx adds
 ``Early-Data: 1`` header field when forwarding a request to a backend
 server.  All backend servers should recognize this header field and
-understand that there is a risk for replay attack.  See `RFC 8470
-<https://tools.ietf.org/html/rfc8470>`_ for ``Early-Data`` header
-field.
+understand that there is a risk for replay attack.  See :rfc:`8470`
+for ``Early-Data`` header field.
 
 nghttpx disables anti replay protection provided by OpenSSL.  The anti
 replay protection of OpenSSL requires that a resumed request must hit
@@ -522,10 +519,9 @@ least once when enabling ECH.
 WebSockets over HTTP/2
 ----------------------
 
-nghttpx supports `RFC 8441 <https://tools.ietf.org/html/rfc8441>`_
-Bootstrapping WebSockets with HTTP/2 for both frontend and backend
-connections.  This feature is enabled by default and no configuration
-is required.
+nghttpx supports :rfc:`8441` Bootstrapping WebSockets with HTTP/2 for
+both frontend and backend connections.  This feature is enabled by
+default and no configuration is required.
 
 WebSockets over HTTP/3 is also supported.
 

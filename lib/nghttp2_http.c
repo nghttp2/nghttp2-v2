@@ -391,10 +391,14 @@ static int http_request_on_header(nghttp2_http_state *http,
     }
     break;
   case NGHTTP2_HPACK_TOKEN_CONTENT_LENGTH: {
-    /* https://tools.ietf.org/html/rfc7230#section-4.1.2: A sender
-       MUST NOT generate a trailer that contains a field necessary for
-       message framing (e.g., Transfer-Encoding and Content-Length),
-       ... */
+    /* https://datatracker.ietf.org/doc/html/rfc7230#section-4.1.2: A
+       sender MUST NOT generate a trailer that contains a field
+       necessary for message framing (e.g., Transfer-Encoding and
+       Content-Length), ...
+
+       https://datatracker.ietf.org/doc/html/rfc9110#section-6.5.1 now
+       does not say that strongly, but we keep enforcing it.
+    */
     if (trailers) {
       return NGHTTP2_ERR_REMOVE_HTTP_HEADER;
     }
@@ -471,10 +475,10 @@ static int http_response_on_header(nghttp2_http_state *http,
     break;
   }
   case NGHTTP2_HPACK_TOKEN_CONTENT_LENGTH: {
-    /* https://tools.ietf.org/html/rfc7230#section-4.1.2: A sender
-       MUST NOT generate a trailer that contains a field necessary for
-       message framing (e.g., Transfer-Encoding and Content-Length),
-       ... */
+    /* https://datatracker.ietf.org/doc/html/rfc7230#section-4.1.2: A
+       sender MUST NOT generate a trailer that contains a field
+       necessary for message framing (e.g., Transfer-Encoding and
+       Content-Length), ... */
     if (trailers) {
       return NGHTTP2_ERR_REMOVE_HTTP_HEADER;
     }
@@ -491,7 +495,7 @@ static int http_response_on_header(nghttp2_http_state *http,
       return NGHTTP2_ERR_REMOVE_HTTP_HEADER;
     }
     if (http->status_code / 100 == 1 ||
-        /* https://tools.ietf.org/html/rfc7230#section-3.3.3 */
+        /* https://datatracker.ietf.org/doc/html/rfc9112#section-6.3 */
         (http->status_code / 100 == 2 &&
          (http->flags & NGHTTP2_HTTP_FLAG_METH_CONNECT))) {
       return NGHTTP2_ERR_REMOVE_HTTP_HEADER;
