@@ -949,17 +949,17 @@ SSL/TLS
 
 .. option:: --no-http2-cipher-block-list
 
-    Allow  block  listed  cipher suite  on  frontend  HTTP/2
-    connection.                                          See
-    https://tools.ietf.org/html/rfc7540#appendix-A  for  the
-    complete HTTP/2 cipher suites block list.
+    Allow the  prohibited TLSv1.2 cipher suites  on frontend
+    HTTP/2                  connection.                  See
+    https://datatracker.ietf.org/doc/html/rfc9113#appendix-A
+    for the complete prohibited TLSv1.2 cipher suites.
 
 .. option:: --client-no-http2-cipher-block-list
 
-    Allow  block  listed  cipher  suite  on  backend  HTTP/2
-    connection.                                          See
-    https://tools.ietf.org/html/rfc7540#appendix-A  for  the
-    complete HTTP/2 cipher suites block list.
+    Allow the  prohibited TLSv1.2  cipher suites  on backend
+    HTTP/2                  connection.                  See
+    https://datatracker.ietf.org/doc/html/rfc9113#appendix-A
+    for the complete prohitibted TLSv1.2 cipher suites.
 
 .. option:: --tls-sct-dir=<DIR>
 
@@ -1990,16 +1990,15 @@ SIGNALS).
 CERTIFICATE TRANSPARENCY
 ------------------------
 
-nghttpx supports TLS ``signed_certificate_timestamp`` extension (`RFC
-6962 <https://tools.ietf.org/html/rfc6962>`_).  The relevant options
-are :option:`--tls-sct-dir` and ``sct-dir`` parameter in
-:option:`--subcert`.  They takes a directory, and nghttpx reads all
-files whose extension is ``.sct`` under the directory.  The ``*.sct``
-files are encoded as ``SignedCertificateTimestamp`` struct described
-in `section 3.2 of RFC 69662
-<https://tools.ietf.org/html/rfc6962#section-3.2>`_.  This format is
-the same one used by `nginx-ct
-<https://github.com/grahamedgecombe/nginx-ct>`_ and `mod_ssl_ct
+nghttpx supports :rfc:`6962` TLS ``signed_certificate_timestamp``
+extension.  The relevant options are :option:`--tls-sct-dir` and
+``sct-dir`` parameter in :option:`--subcert`.  They takes a directory,
+and nghttpx reads all files whose extension is ``.sct`` under the
+directory.  The ``*.sct`` files are encoded as
+``SignedCertificateTimestamp`` struct described in
+:rfc:`6962#section-3.2`.  This format is the same one used by
+`nginx-ct <https://github.com/grahamedgecombe/nginx-ct>`_ and
+`mod_ssl_ct
 <https://httpd.apache.org/docs/trunk/mod/mod_ssl_ct.html>`_.
 `ct-submit <https://github.com/grahamedgecombe/ct-submit>`_ can be
 used to submit certificates to log servers, and obtain the
@@ -2213,10 +2212,9 @@ respectively.
         not include authority component of URI.  This may include
         query component.  nghttpx makes certain normalization for
         path.  It decodes percent-encoding for unreserved characters
-        (see https://tools.ietf.org/html/rfc3986#section-2.3), and
-        resolves ".." and ".".  But it may leave characters which
-        should be percent-encoded as is. So be careful when comparing
-        path against desired string.
+        (see :rfc:`3986#section-2.3`), and resolves ".." and ".".  But
+        it may leave characters which should be percent-encoded as
+        is. So be careful when comparing path against desired string.
 
     .. rb:attr_reader:: headers
 

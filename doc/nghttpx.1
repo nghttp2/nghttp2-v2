@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "NGHTTPX" "1" "Oct 09, 2026" "0.1.0-DEV" "nghttp2-v2"
+.TH "NGHTTPX" "1" "Oct 11, 2026" "0.1.0" "nghttp2-v2"
 .SH NAME
 nghttpx \- HTTP/2 proxy
 .SH SYNOPSIS
@@ -1029,18 +1029,18 @@ Default: \fB1s\fP
 .INDENT 0.0
 .TP
 .B \-\-no\-http2\-cipher\-block\-list
-Allow  block  listed  cipher suite  on  frontend  HTTP/2
-connection.                                          See
-\%<https://\:tools\:.ietf\:.org/\:html/\:rfc7540#\:appendix-A>  for  the
-complete HTTP/2 cipher suites block list.
+Allow the  prohibited TLSv1.2 cipher suites  on frontend
+HTTP/2                  connection.                  See
+\%<https://\:datatracker\:.ietf\:.org/\:doc/\:html/\:rfc9113#\:appendix-A>
+for the complete prohibited TLSv1.2 cipher suites.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-client\-no\-http2\-cipher\-block\-list
-Allow  block  listed  cipher  suite  on  backend  HTTP/2
-connection.                                          See
-\%<https://\:tools\:.ietf\:.org/\:html/\:rfc7540#\:appendix-A>  for  the
-complete HTTP/2 cipher suites block list.
+Allow the  prohibited TLSv1.2  cipher suites  on backend
+HTTP/2                  connection.                  See
+\%<https://\:datatracker\:.ietf\:.org/\:doc/\:html/\:rfc9113#\:appendix-A>
+for the complete prohitibted TLSv1.2 cipher suites.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -2166,14 +2166,15 @@ automatically.  To rotate key, one has to restart nghttpx (see
 SIGNALS).
 .SH CERTIFICATE TRANSPARENCY
 .sp
-nghttpx supports TLS \fBsigned_certificate_timestamp\fP extension (RFC
-6962 \%<https://\:tools\:.ietf\:.org/\:html/\:rfc6962>).  The relevant options
-are \fB\-\-tls\-sct\-dir\fP and \fBsct\-dir\fP parameter in
-\fB\-\-subcert\fP\&.  They takes a directory, and nghttpx reads all
-files whose extension is \fB\&.sct\fP under the directory.  The \fB*.sct\fP
-files are encoded as \fBSignedCertificateTimestamp\fP struct described
-in section 3.2 of RFC 69662 \%<https://\:tools\:.ietf\:.org/\:html/\:rfc6962#\:section-3.2>\&.  This format is
-the same one used by nginx\-ct \%<https://\:github\:.com/\:grahamedgecombe/\:nginx-ct> and mod_ssl_ct \%<https://\:httpd\:.apache\:.org/\:docs/\:trunk/\:mod/\:mod_ssl_ct\:.html>\&.
+nghttpx supports \fBRFC 6962\fP \%<https://\:datatracker\:.ietf\:.org/\:doc/\:html/\:rfc6962\:.html> TLS \fBsigned_certificate_timestamp\fP
+extension.  The relevant options are \fB\-\-tls\-sct\-dir\fP and
+\fBsct\-dir\fP parameter in \fB\-\-subcert\fP\&.  They takes a directory,
+and nghttpx reads all files whose extension is \fB\&.sct\fP under the
+directory.  The \fB*.sct\fP files are encoded as
+\fBSignedCertificateTimestamp\fP struct described in
+\fBRFC 6962 Section 3.2\fP \%<https://\:datatracker\:.ietf\:.org/\:doc/\:html/\:rfc6962\:.html#\:section-3.2>\&.  This format is the same one used by
+nginx\-ct \%<https://\:github\:.com/\:grahamedgecombe/\:nginx-ct> and
+mod_ssl_ct \%<https://\:httpd\:.apache\:.org/\:docs/\:trunk/\:mod/\:mod_ssl_ct\:.html>\&.
 ct\-submit \%<https://\:github\:.com/\:grahamedgecombe/\:ct-submit> can be
 used to submit certificates to log servers, and obtain the
 \fBSignedCertificateTimestamp\fP struct which can be used with nghttpx.
@@ -2418,10 +2419,9 @@ On assignment, copy of given value is assigned.  The path does
 not include authority component of URI.  This may include
 query component.  nghttpx makes certain normalization for
 path.  It decodes percent\-encoding for unreserved characters
-(see \%<https://\:tools\:.ietf\:.org/\:html/\:rfc3986#\:section-2.3>), and
-resolves \(dq..\(dq and \(dq.\(dq.  But it may leave characters which
-should be percent\-encoded as is. So be careful when comparing
-path against desired string.
+(see \fBRFC 3986 Section 2.3\fP \%<https://\:datatracker\:.ietf\:.org/\:doc/\:html/\:rfc3986\:.html#\:section-2.3>), and resolves \(dq..\(dq and \(dq.\(dq.  But
+it may leave characters which should be percent\-encoded as
+is. So be careful when comparing path against desired string.
 .UNINDENT
 .INDENT 7.0
 .TP
