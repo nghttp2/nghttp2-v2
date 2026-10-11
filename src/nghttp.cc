@@ -2102,7 +2102,6 @@ int main(int argc, char **argv) {
       {"header", required_argument, nullptr, 'H'},
       {"data", required_argument, nullptr, 'd'},
       {"multiply", required_argument, nullptr, 'm'},
-      {"weight", required_argument, nullptr, 'p'},
       {"peer-max-concurrent-streams", required_argument, nullptr, 'M'},
       {"header-table-size", required_argument, nullptr, 'c'},
       {"har", required_argument, nullptr, 'r'},
@@ -2112,17 +2111,15 @@ int main(int argc, char **argv) {
       {"continuation", no_argument, &flag, 4},
       {"version", no_argument, &flag, 5},
       {"no-content-length", no_argument, &flag, 6},
-      {"no-dep", no_argument, &flag, 7},
       {"trailer", required_argument, &flag, 9},
       {"hexdump", no_argument, &flag, 10},
       {"expect-continue", no_argument, &flag, 13},
       {"encoder-header-table-size", required_argument, &flag, 14},
       {"ktls", no_argument, &flag, 15},
-      {"no-rfc7540-pri", no_argument, &flag, 16},
       {"extpri", required_argument, &flag, 17},
       {nullptr, 0, nullptr, 0}};
     int option_index = 0;
-    int c = getopt_long(argc, argv, "M:Oac:d:m:np:r:hH:vst:w:yW:", long_options,
+    int c = getopt_long(argc, argv, "M:Oac:d:m:nr:hH:vst:w:yW:", long_options,
                         &option_index);
     if (c == -1) {
       break;
@@ -2146,9 +2143,6 @@ int main(int argc, char **argv) {
       exit(EXIT_SUCCESS);
     case 'n':
       config.null_out = true;
-      break;
-    case 'p':
-      std::println(stderr, "[WARNING]: --weight option has been deprecated.");
       break;
     case 'r':
 #ifdef HAVE_JANSSON
@@ -2275,10 +2269,6 @@ int main(int argc, char **argv) {
         // no-content-length option
         config.no_content_length = true;
         break;
-      case 7:
-        // no-dep option
-        std::println(stderr, "[WARNING]: --no-dep option has been deprecated.");
-        break;
       case 9: {
         // trailer option
         auto header = optarg;
@@ -2333,11 +2323,6 @@ int main(int argc, char **argv) {
       case 15:
         // ktls option
         config.ktls = true;
-        break;
-      case 16:
-        // no-rfc7540-pri option
-        std::println(stderr,
-                     "[WARNING]: --no-rfc7540-pri option has been deprecated.");
         break;
       case 17: {
         // extpri option
