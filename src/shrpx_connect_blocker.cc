@@ -39,7 +39,7 @@ void connect_blocker_cb(struct ev_loop *loop, ev_timer *w, int revents) {
 }
 } // namespace
 
-ConnectBlocker::ConnectBlocker(std::mt19937 &gen, struct ev_loop *loop,
+ConnectBlocker::ConnectBlocker(std::mt19937_64 &gen, struct ev_loop *loop,
                                std::function<void()> block_func,
                                std::function<void()> unblock_func)
   : gen_(gen),

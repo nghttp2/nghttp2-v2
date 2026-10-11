@@ -1772,9 +1772,9 @@ split_hostport(std::string_view hostport) {
            std::string_view{p + 1, std::ranges::end(hostport)}}};
 }
 
-std::mt19937 make_mt19937() {
+std::mt19937_64 make_mt19937_64() {
   std::random_device rd;
-  return std::mt19937(rd());
+  return std::mt19937_64(rd());
 }
 
 std::expected<void, Error> daemonize(int nochdir, int noclose) {

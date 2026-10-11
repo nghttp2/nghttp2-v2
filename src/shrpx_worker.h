@@ -343,7 +343,7 @@ public:
   MemchunkPool *get_mcpool();
   void schedule_clear_mcpool();
 
-  std::mt19937 &get_randgen();
+  std::mt19937_64 &get_randgen();
 
 #ifdef HAVE_MRUBY
   std::expected<void, Error> create_mruby_context();
@@ -414,7 +414,7 @@ private:
   size_t index_;
   std::mutex m_;
   std::deque<WorkerEvent> q_;
-  std::mt19937 randgen_;
+  std::mt19937_64 randgen_;
   ev_async w_;
   ev_timer mcpool_clear_timer_;
   ev_timer proc_wev_timer_;

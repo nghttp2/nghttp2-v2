@@ -3728,7 +3728,7 @@ std::expected<void, Error> process_options(
     auto iov = make_byte_ref(config->balloc, SHRPX_OBFUSCATED_NODE_LENGTH + 2);
     auto p = std::ranges::begin(iov);
     *p++ = '_';
-    auto gen = util::make_mt19937();
+    auto gen = util::make_mt19937_64();
     p = util::random_alpha_digit(p, p + SHRPX_OBFUSCATED_NODE_LENGTH, gen);
     *p = '\0';
     fwdconf.by_obfuscated = as_string_view(std::ranges::begin(iov), p);

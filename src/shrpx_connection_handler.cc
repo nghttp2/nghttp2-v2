@@ -67,7 +67,7 @@ void serial_event_async_cb(struct ev_loop *loop, ev_async *w, int revent) {
 }
 } // namespace
 
-ConnectionHandler::ConnectionHandler(struct ev_loop *loop, std::mt19937 &gen)
+ConnectionHandler::ConnectionHandler(struct ev_loop *loop, std::mt19937_64 &gen)
   : gen_(gen),
     loop_(loop),
     worker_round_robin_cnt_(get_config()->api.enabled ? 1 : 0) {

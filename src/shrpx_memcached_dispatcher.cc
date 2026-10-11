@@ -35,7 +35,7 @@ MemcachedDispatcher::MemcachedDispatcher(const Address *addr,
                                          struct ev_loop *loop, SSL_CTX *ssl_ctx,
                                          std::string_view sni_name,
                                          MemchunkPool *mcpool,
-                                         std::mt19937 &gen)
+                                         std::mt19937_64 &gen)
   : loop_(loop),
     mconn_(std::make_unique<MemcachedConnection>(addr, loop_, ssl_ctx, sni_name,
                                                  mcpool, gen)) {}

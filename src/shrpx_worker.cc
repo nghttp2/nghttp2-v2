@@ -183,7 +183,7 @@ Worker::Worker(struct ev_loop *loop, SSL_CTX *sv_ssl_ctx, SSL_CTX *cl_ssl_ctx,
                ConnectionHandler *conn_handler,
                std::shared_ptr<DownstreamConfig> downstreamconf)
   : index_{index},
-    randgen_(util::make_mt19937()),
+    randgen_(util::make_mt19937_64()),
     worker_stat_{},
     dns_tracker_(loop, get_config()->conn.downstream->family),
     upstream_addrs_{get_config()->conn.listener.addrs},
@@ -658,7 +658,7 @@ bool Worker::get_graceful_shutdown() const { return graceful_shutdown_; }
 
 MemchunkPool *Worker::get_mcpool() { return &mcpool_; }
 
-std::mt19937 &Worker::get_randgen() { return randgen_; }
+std::mt19937_64 &Worker::get_randgen() { return randgen_; }
 
 #ifdef HAVE_MRUBY
 std::expected<void, Error> Worker::create_mruby_context() {

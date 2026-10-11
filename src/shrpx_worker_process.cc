@@ -467,7 +467,7 @@ worker_process_event_loop(WorkerProcessConfig *wpconf) {
 
   auto loop = EV_DEFAULT;
 
-  auto gen = util::make_mt19937();
+  auto gen = util::make_mt19937_64();
 
 #ifdef HAVE_NEVERBLEED
   std::array<char, NEVERBLEED_ERRBUF_SIZE> nb_errbuf;

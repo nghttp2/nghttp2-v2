@@ -1668,7 +1668,7 @@ unsigned int get_ev_loop_flags() {
 
 Worker::Worker(uint32_t id, SSL_CTX *ssl_ctx, size_t req_todo, size_t nclients,
                size_t rate, size_t max_samples, Config *config)
-  : randgen(util::make_mt19937()),
+  : randgen(util::make_mt19937_64()),
     stats(req_todo, nclients),
     loop(ev_loop_new(get_ev_loop_flags())),
     ssl_ctx(ssl_ctx),

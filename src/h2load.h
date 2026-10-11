@@ -330,7 +330,7 @@ struct Sampling {
 
 struct Worker {
   MemchunkPool mcpool;
-  std::mt19937 randgen;
+  std::mt19937_64 randgen;
   Stats stats;
   Sampling request_times_smp;
   Sampling client_smp;

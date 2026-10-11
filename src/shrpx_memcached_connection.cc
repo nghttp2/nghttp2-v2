@@ -100,7 +100,7 @@ MemcachedConnection::MemcachedConnection(const Address *addr,
                                          struct ev_loop *loop, SSL_CTX *ssl_ctx,
                                          std::string_view sni_name,
                                          MemchunkPool *mcpool,
-                                         std::mt19937 &gen)
+                                         std::mt19937_64 &gen)
   : conn_(loop, -1, nullptr, mcpool, write_timeout, read_timeout, {}, {},
           connectcb, readcb, timeoutcb, this, 0, 0., Proto::MEMCACHED),
     sni_name_(sni_name),

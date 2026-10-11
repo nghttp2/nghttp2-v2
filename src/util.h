@@ -1353,8 +1353,8 @@ std::expected<std::string_view, Error> extract_host(std::string_view hostport);
 std::expected<std::pair<std::string_view, std::string_view>, Error>
 split_hostport(std::string_view hostport);
 
-// Returns new std::mt19937 object.
-std::mt19937 make_mt19937();
+// Returns new std::mt19937_64 object.
+std::mt19937_64 make_mt19937_64();
 
 // daemonize calls daemon(3).  If __APPLE__ is defined, it implements
 // daemon() using fork().

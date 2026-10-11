@@ -56,7 +56,7 @@ struct DNSQuery;
 class LiveCheck {
 public:
   LiveCheck(struct ev_loop *loop, SSL_CTX *ssl_ctx, Worker *worker,
-            DownstreamAddr *addr, std::mt19937 &gen);
+            DownstreamAddr *addr, std::mt19937_64 &gen);
   ~LiveCheck();
 
   void disconnect();
@@ -102,7 +102,7 @@ public:
 private:
   Connection conn_;
   DefaultMemchunks wb_;
-  std::mt19937 &gen_;
+  std::mt19937_64 &gen_;
   ev_timer backoff_timer_;
   ev_timer http2_timer_;
   std::function<std::expected<void, Error>(LiveCheck &)> read_{

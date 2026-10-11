@@ -79,7 +79,7 @@ void backoff_timeoutcb(struct ev_loop *loop, ev_timer *w, int revents) {
 } // namespace
 
 LiveCheck::LiveCheck(struct ev_loop *loop, SSL_CTX *ssl_ctx, Worker *worker,
-                     DownstreamAddr *addr, std::mt19937 &gen)
+                     DownstreamAddr *addr, std::mt19937_64 &gen)
   : conn_(loop, -1, nullptr, worker->get_mcpool(),
           worker->get_downstream_config()->timeout.write,
           worker->get_downstream_config()->timeout.read, {}, {}, writecb,

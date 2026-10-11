@@ -36,7 +36,7 @@ namespace shrpx {
 
 class ConnectBlocker {
 public:
-  ConnectBlocker(std::mt19937 &gen, struct ev_loop *loop,
+  ConnectBlocker(std::mt19937_64 &gen, struct ev_loop *loop,
                  std::function<void()> block_func,
                  std::function<void()> unblock_func);
   ~ConnectBlocker();
@@ -67,7 +67,7 @@ public:
   void call_unblock_func();
 
 private:
-  std::mt19937 &gen_;
+  std::mt19937_64 &gen_;
   // Called when blocking is started
   std::function<void()> block_func_;
   // Called when unblocked

@@ -57,7 +57,7 @@ class MemcachedDispatcher {
 public:
   MemcachedDispatcher(const Address *addr, struct ev_loop *loop,
                       SSL_CTX *ssl_ctx, std::string_view sni_name,
-                      MemchunkPool *mcpool, std::mt19937 &gen);
+                      MemchunkPool *mcpool, std::mt19937_64 &gen);
   ~MemcachedDispatcher();
 
   std::expected<void, Error> add_request(std::unique_ptr<MemcachedRequest> req);

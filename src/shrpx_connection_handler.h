@@ -123,7 +123,7 @@ struct QUICLingeringWorkerProcess {
 
 class ConnectionHandler {
 public:
-  ConnectionHandler(struct ev_loop *loop, std::mt19937 &gen);
+  ConnectionHandler(struct ev_loop *loop, std::mt19937_64 &gen);
   ~ConnectionHandler();
   // Creates Worker object for single threaded configuration.
   std::expected<void, Error> create_single_worker();
@@ -231,7 +231,7 @@ private:
   std::vector<SSL_CTX *> quic_all_ssl_ctx_;
   std::vector<std::vector<SSL_CTX *>> quic_indexed_ssl_ctx_;
 #endif // defined(ENABLE_HTTP3)
-  std::mt19937 &gen_;
+  std::mt19937_64 &gen_;
   // ev_loop for each worker
   std::vector<struct ev_loop *> worker_loops_;
   // Worker instances when multi threaded mode (-nN, N >= 2) is used.

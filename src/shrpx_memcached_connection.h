@@ -101,7 +101,7 @@ class MemcachedConnection {
 public:
   MemcachedConnection(const Address *addr, struct ev_loop *loop,
                       SSL_CTX *ssl_ctx, std::string_view sni_name,
-                      MemchunkPool *mcpool, std::mt19937 &gen);
+                      MemchunkPool *mcpool, std::mt19937_64 &gen);
   ~MemcachedConnection();
 
   void disconnect();
