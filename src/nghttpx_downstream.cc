@@ -32,7 +32,6 @@
 #include "nghttpx_upstream.h"
 #include "nghttpx_client_handler.h"
 #include "nghttpx_config.h"
-#include "nghttpx_error.h"
 #include "nghttpx_downstream_connection.h"
 #include "nghttpx_downstream_queue.h"
 #include "nghttpx_worker.h"

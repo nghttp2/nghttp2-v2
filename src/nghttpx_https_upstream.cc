@@ -31,7 +31,6 @@
 #include "nghttpx_downstream_connection.h"
 #include "nghttpx_http.h"
 #include "nghttpx_config.h"
-#include "nghttpx_error.h"
 #include "nghttpx_log_config.h"
 #include "nghttpx_worker.h"
 #include "nghttpx_http2_session.h"

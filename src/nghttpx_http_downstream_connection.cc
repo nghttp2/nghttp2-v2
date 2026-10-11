@@ -37,7 +37,6 @@
 #include "nghttpx_upstream.h"
 #include "nghttpx_downstream.h"
 #include "nghttpx_config.h"
-#include "nghttpx_error.h"
 #include "nghttpx_http.h"
 #include "nghttpx_log_config.h"
 #include "nghttpx_connect_blocker.h"

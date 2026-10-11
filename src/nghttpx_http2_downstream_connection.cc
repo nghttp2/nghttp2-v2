@@ -34,7 +34,6 @@
 #include "nghttpx_upstream.h"
 #include "nghttpx_downstream.h"
 #include "nghttpx_config.h"
-#include "nghttpx_error.h"
 #include "nghttpx_http.h"
 #include "nghttpx_http2_session.h"
 #include "nghttpx_worker.h"

@@ -996,8 +996,6 @@ struct ConnectionConfig {
       RateLimitConfig write;
     } ratelimit;
     size_t worker_connections;
-    // Deprecated.  See UpstreamAddr.accept_proxy_protocol.
-    bool accept_proxy_protocol;
   } upstream;
 
   std::shared_ptr<DownstreamConfig> downstream;

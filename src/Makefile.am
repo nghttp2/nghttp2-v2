@@ -140,7 +140,6 @@ NGHTTPX_SRCS = \
 	tls.cc tls.h ssl_compat.h \
 	network.cc network.h \
 	nghttpx_config.cc nghttpx_config.h \
-	nghttpx_error.h \
 	nghttpx_accept_handler.cc nghttpx_accept_handler.h \
 	nghttpx_connection_handler.cc nghttpx_connection_handler.h \
 	nghttpx_client_handler.cc nghttpx_client_handler.h \

@@ -49,7 +49,6 @@
 #endif // defined(ENABLE_HTTP3)
 
 #include "nghttpx_rate_limit.h"
-#include "nghttpx_error.h"
 #include "memchunk.h"
 #include "errors.h"
 
