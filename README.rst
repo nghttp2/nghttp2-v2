@@ -3,7 +3,9 @@ nghttp2 version 2 - HTTP/2 C Library
 
 This is an implementation of the Hypertext Transfer Protocol version 2
 (HTTP/2) in C.  This implementation is based on `RFC 9113
-<https://datatracker.ietf.org/doc/html/rfc9113>`_
+<https://datatracker.ietf.org/doc/html/rfc9113>`_.  It also includes
+HPACK, the header compression for HTTP/2, described in `RFC 7541
+<https://datatracker.ietf.org/doc/html/rfc7541>`_.
 
 It is a complete rewrite of nghttp2 version 1, aiming for better
 performance, security, and API ergonomics.
@@ -148,16 +150,20 @@ Standards
 
 libnghttp2v2 implements the following HTTP/2 specification:
 
-- `HTTP/2 <https://datatracker.ietf.org/doc/html/rfc9113>`_
+- `RFC 9113 HTTP/2 <https://datatracker.ietf.org/doc/html/rfc9113>`_
+
+It also implements HPACK, the header compression for HTTP/2:
+
+- `RFC 7541 HPACK <https://datatracker.ietf.org/doc/html/rfc7541>`_.
 
 Note that libnghttp2v2 does not implement server push, which is
 largely regarded as useless.
 
 The following HTTP/2 extensions are implemented:
 
-- `Extensible Prioritization Scheme for HTTP
+- `RFC 9218 Extensible Prioritization Scheme for HTTP
   <https://datatracker.ietf.org/doc/html/rfc9218>`_
-- `Bootstrapping WebSockets with HTTP/2
+- `RFC 8441 Bootstrapping WebSockets with HTTP/2
   <https://datatracker.ietf.org/doc/html/rfc8441>`_
 
 Applications

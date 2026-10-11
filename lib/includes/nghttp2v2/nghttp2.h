@@ -2178,7 +2178,8 @@ nghttp2_conn_get_remote_settings(const nghttp2_conn *conn);
 /**
  * @struct
  *
- * :type:`nghttp2_pri` represents HTTP priority.
+ * :type:`nghttp2_pri` represents HTTP priority.  This priority scheme
+ * is defined in :rfc:`9218`.
  */
 typedef struct NGHTTP2_ALIGN(8) nghttp2_pri {
   /**
