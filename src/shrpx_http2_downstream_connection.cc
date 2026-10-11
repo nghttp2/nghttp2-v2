@@ -93,7 +93,7 @@ Http2DownstreamConnection::~Http2DownstreamConnection() {
 std::expected<void, Error>
 Http2DownstreamConnection::attach_downstream(Downstream *downstream) {
   if (log_enabled(INFO)) {
-    Log{INFO, this} << "Attaching to DOWNSTREAM:" << downstream;
+    Log{INFO, this, downstream} << "Attaching to DOWNSTREAM:" << downstream;
   }
   http2session_->add_downstream_connection(this);
   http2session_->signal_write();
@@ -114,7 +114,7 @@ Http2DownstreamConnection::attach_downstream(Downstream *downstream) {
 std::expected<void, Error>
 Http2DownstreamConnection::detach_downstream(Downstream *downstream) {
   if (log_enabled(INFO)) {
-    Log{INFO, this} << "Detaching from DOWNSTREAM:" << downstream;
+    Log{INFO, this, downstream} << "Detaching from DOWNSTREAM:" << downstream;
   }
 
   auto &resp = downstream_->response();
@@ -159,10 +159,10 @@ Http2DownstreamConnection::shutdown_stream(Downstream *downstream,
     }
 
     if (log_enabled(INFO)) {
-      Log{INFO, this} << "Submit RST_STREAM for DOWNSTREAM:" << downstream
-                      << ", stream_id="
-                      << downstream->get_downstream_stream_id()
-                      << ", error_code=" << error_code;
+      Log{INFO, this, downstream}
+        << "Submit RST_STREAM for DOWNSTREAM:" << downstream
+        << ", stream_id=" << downstream->get_downstream_stream_id()
+        << ", error_code=" << error_code;
     }
 
     http2session_->shutdown_stream(downstream->get_downstream_stream_id(),
@@ -491,7 +491,7 @@ std::expected<void, Error> Http2DownstreamConnection::push_request_headers() {
       ss += as_string_view(nv.value, nv.valuelen);
       ss += '\n';
     }
-    Log{INFO, this} << "HTTP request headers\n" << ss;
+    Log{INFO, this, downstream_} << "HTTP request headers\n" << ss;
   }
 
   auto transfer_encoding = req.fs.header(NGHTTP2_HPACK_TOKEN_TRANSFER_ENCODING);
@@ -512,7 +512,7 @@ std::expected<void, Error> Http2DownstreamConnection::push_request_headers() {
   if (auto rv =
         http2session_->submit_request(this, nva.data(), nva.size(), pdr);
       !rv) {
-    Log{FATAL, this} << "nghttp2_conn_submit_request() failed";
+    Log{FATAL, this, downstream_} << "nghttp2_conn_submit_request() failed";
     return rv;
   }
 

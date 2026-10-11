@@ -710,16 +710,17 @@ Http2Session::submit_request(Http2DownstreamConnection *dconn,
   assert(state_ == Http2SessionState::CONNECTED);
   auto sd = std::make_unique<StreamData>();
   sd->dlnext = sd->dlprev = nullptr;
+  auto downstream = dconn->get_downstream();
   auto stream_id =
     nghttp2_conn_submit_request(h2conn_, nva, nvlen, dr, sd.get());
   if (stream_id < 0) {
-    Log{FATAL, this} << "nghttp2_conn_submit_request() failed: "
-                     << nghttp2_strerror((int)stream_id);
+    Log{FATAL, this, downstream} << "nghttp2_conn_submit_request() failed: "
+                                 << nghttp2_strerror((int)stream_id);
     return std::unexpected{Error::HTTP2};
   }
 
   dconn->attach_stream_data(sd.get());
-  dconn->get_downstream()->set_downstream_stream_id(stream_id);
+  downstream->set_downstream_stream_id(stream_id);
   streams_.append(sd.release());
 
   return {};
@@ -745,8 +746,8 @@ Http2Session::resume_data(Http2DownstreamConnection *dconn) {
     nghttp2_conn_resume_stream(h2conn_, downstream->get_downstream_stream_id());
   if (rv != 0) {
     if (rv != NGHTTP2_ERR_INVALID_ARGUMENT) {
-      Log{FATAL, this} << "nghttp2_conn_resume_stream() failed: "
-                       << nghttp2_strerror(rv);
+      Log{FATAL, this, downstream} << "nghttp2_conn_resume_stream() failed: "
+                                   << nghttp2_strerror(rv);
 
       return std::unexpected{Error::HTTP2};
     }
@@ -778,11 +779,6 @@ int stream_close(nghttp2_conn *conn, uint32_t flags, int64_t stream_id,
     error_code = NGHTTP2_NO_ERROR;
   }
 
-  if (log_enabled(INFO)) {
-    Log{INFO, http2session} << "Stream stream_id=" << stream_id
-                            << " is being closed with error code "
-                            << error_code;
-  }
   auto sd = static_cast<StreamData *>(stream_user_data);
   if (!sd) {
     // We might get this close callback when pushed streams are
@@ -792,6 +788,12 @@ int stream_close(nghttp2_conn *conn, uint32_t flags, int64_t stream_id,
   auto dconn = sd->dconn;
   if (dconn) {
     auto downstream = dconn->get_downstream();
+
+    if (log_enabled(INFO)) {
+      Log{INFO, http2session, downstream} << "Stream stream_id=" << stream_id
+                                          << " is being closed with error code "
+                                          << error_code;
+    }
 
     if (downstream->get_upgraded() &&
         downstream->get_response_state() == DownstreamState::HEADER_COMPLETE) {
@@ -970,14 +972,14 @@ std::expected<void, Error> on_response_headers(Http2Session *http2session,
       ss += nv.value;
       ss += '\n';
     }
-    Log{INFO, http2session} << "HTTP response headers. stream_id=" << stream_id
-                            << "\n"
-                            << ss;
+    Log{INFO, http2session, downstream}
+      << "HTTP response headers. stream_id=" << stream_id << "\n"
+      << ss;
   }
 
   if (downstream->get_non_final_response()) {
     if (log_enabled(INFO)) {
-      Log{INFO, http2session} << "This is non-final response.";
+      Log{INFO, http2session, downstream} << "This is non-final response.";
     }
 
     downstream->set_expect_final_response(true);
@@ -1003,8 +1005,8 @@ std::expected<void, Error> on_response_headers(Http2Session *http2session,
     }
     downstream->set_request_state(DownstreamState::HEADER_COMPLETE);
     if (log_enabled(INFO)) {
-      Log{INFO, http2session} << "HTTP upgrade success. stream_id="
-                              << stream_id;
+      Log{INFO, http2session, downstream} << "HTTP upgrade success. stream_id="
+                                          << stream_id;
     }
   } else {
     auto content_length = resp.fs.header(NGHTTP2_HPACK_TOKEN_CONTENT_LENGTH);
@@ -1552,7 +1554,7 @@ std::expected<void, Error> Http2Session::submit_pending_requests() {
 
     if (!dconn->push_request_headers()) {
       if (log_enabled(INFO)) {
-        Log{INFO, this} << "backend request failed";
+        Log{INFO, this, downstream} << "backend request failed";
       }
 
       if (auto rv = upstream->on_downstream_abort_request(downstream, 400);

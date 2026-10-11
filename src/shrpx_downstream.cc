@@ -145,8 +145,8 @@ void downstream_wtimeoutcb(struct ev_loop *loop, ev_timer *w, int revents) {
 } // namespace
 
 // upstream could be nullptr for unittests
-Downstream::Downstream(Upstream *upstream, MemchunkPool *mcpool,
-                       int64_t stream_id)
+Downstream::Downstream(uint64_t trace_id, Upstream *upstream,
+                       MemchunkPool *mcpool, int64_t stream_id)
   : req_(balloc_),
     resp_(balloc_),
     request_start_time_(std::chrono::steady_clock::now()),
@@ -154,6 +154,7 @@ Downstream::Downstream(Upstream *upstream, MemchunkPool *mcpool,
     request_buf_(mcpool),
     response_buf_(mcpool),
     upstream_(upstream),
+    trace_id_(trace_id),
     stream_id_(stream_id) {
   auto config = get_config();
   auto &httpconf = config->http;

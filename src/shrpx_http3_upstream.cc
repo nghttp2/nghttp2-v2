@@ -242,8 +242,9 @@ int remove_connection_id(ngtcp2_conn *conn, const ngtcp2_cid *cid,
 } // namespace
 
 void Http3Upstream::http_begin_request_headers(int64_t stream_id) {
-  auto downstream =
-    std::make_unique<Downstream>(this, handler_->get_mcpool(), stream_id);
+  auto worker = handler_->get_worker();
+  auto downstream = std::make_unique<Downstream>(
+    worker->generate_trace_id(), this, handler_->get_mcpool(), stream_id);
   nghttp3_conn_set_stream_user_data(httpconn_, stream_id, downstream.get());
 
   downstream->reset_upstream_rtimer();
@@ -956,8 +957,8 @@ void Http3Upstream::send_packet(const ngtcp2_path &path,
 
 std::expected<void, Error> Http3Upstream::on_timeout(Downstream *downstream) {
   if (log_enabled(INFO)) {
-    Log{INFO, this} << "Stream timeout stream_id="
-                    << downstream->get_stream_id();
+    Log{INFO, this, downstream} << "Stream timeout stream_id="
+                                << downstream->get_stream_id();
   }
 
   if (auto rv = shutdown_stream(downstream, NGHTTP3_H3_INTERNAL_ERROR); !rv) {
@@ -1047,7 +1048,7 @@ Http3Upstream::downstream_read(DownstreamConnection *dconn) {
       }
       if (rv.error() != Error::NETWORK) {
         if (log_enabled(INFO)) {
-          Log{INFO, dconn} << "HTTP parser failure";
+          Log{INFO, dconn, downstream} << "HTTP parser failure";
         }
       }
       return downstream_error(dconn, Downstream::EVENT_ERROR);
@@ -1087,7 +1088,8 @@ Http3Upstream::downstream_eof(DownstreamConnection *dconn) {
   auto downstream = dconn->get_downstream();
 
   if (log_enabled(INFO)) {
-    Log{INFO, dconn} << "EOF. stream_id=" << downstream->get_stream_id();
+    Log{INFO, dconn, downstream} << "EOF. stream_id="
+                                 << downstream->get_stream_id();
   }
 
   // Delete downstream connection. If we don't delete it here, it will
@@ -1099,7 +1101,7 @@ Http3Upstream::downstream_eof(DownstreamConnection *dconn) {
   if (downstream->get_response_state() == DownstreamState::HEADER_COMPLETE) {
     // Server may indicate the end of the request by EOF
     if (log_enabled(INFO)) {
-      Log{INFO, this} << "Downstream body was ended by EOF";
+      Log{INFO, this, downstream} << "Downstream body was ended by EOF";
     }
     downstream->set_response_state(DownstreamState::MSG_COMPLETE);
 
@@ -1129,12 +1131,12 @@ Http3Upstream::downstream_error(DownstreamConnection *dconn, int events) {
 
   if (log_enabled(INFO)) {
     if (events & Downstream::EVENT_ERROR) {
-      Log{INFO, dconn} << "Downstream network/general error";
+      Log{INFO, dconn, downstream} << "Downstream network/general error";
     } else {
-      Log{INFO, dconn} << "Timeout";
+      Log{INFO, dconn, downstream} << "Timeout";
     }
     if (downstream->get_upgraded()) {
-      Log{INFO, dconn} << "Note: this is tunnel connection";
+      Log{INFO, dconn, downstream} << "Note: this is tunnel connection";
     }
   }
 
@@ -1313,7 +1315,7 @@ Http3Upstream::on_downstream_header_complete(Downstream *downstream) {
     resp.fs.clear_headers();
 
     if (rv != 0) {
-      Log{FATAL, this} << "nghttp3_conn_submit_info() failed";
+      Log{FATAL, this, downstream} << "nghttp3_conn_submit_info() failed";
       return std::unexpected{Error::HTTP3};
     }
 
@@ -1406,8 +1408,9 @@ Http3Upstream::on_downstream_header_complete(Downstream *downstream) {
       rv = nghttp3_conn_set_server_stream_priority(
         httpconn_, downstream->get_stream_id(), &pri);
       if (rv != 0) {
-        Log{ERROR, this} << "nghttp3_conn_set_server_stream_priority: "
-                         << nghttp3_strerror(rv);
+        Log{ERROR, this, downstream}
+          << "nghttp3_conn_set_server_stream_priority: "
+          << nghttp3_strerror(rv);
       }
     }
   }
@@ -1428,7 +1431,7 @@ Http3Upstream::on_downstream_header_complete(Downstream *downstream) {
   rv = nghttp3_conn_submit_response(httpconn_, downstream->get_stream_id(),
                                     nva.data(), nva.size(), data_readptr);
   if (rv != 0) {
-    Log{FATAL, this} << "nghttp3_conn_submit_response() failed";
+    Log{FATAL, this, downstream} << "nghttp3_conn_submit_response() failed";
     return std::unexpected{Error::HTTP3};
   }
 
@@ -1491,8 +1494,9 @@ Http3Upstream::on_downstream_body_complete(Downstream *downstream) {
         auto rv = nghttp3_conn_submit_trailers(
           httpconn_, downstream->get_stream_id(), nva.data(), nva.size());
         if (rv != 0) {
-          Log{FATAL, this} << "nghttp3_conn_submit_trailers() failed: "
-                           << nghttp3_strerror(rv);
+          Log{FATAL, this, downstream}
+            << "nghttp3_conn_submit_trailers() failed: "
+            << nghttp3_strerror(rv);
           return std::unexpected{Error::HTTP3};
         }
       }
@@ -1725,8 +1729,8 @@ Http3Upstream::send_reply(Downstream *downstream,
   rv = nghttp3_conn_submit_response(httpconn_, downstream->get_stream_id(),
                                     nva.data(), nva.size(), data_read_ptr);
   if (nghttp3_err_is_fatal(rv)) {
-    Log{FATAL, this} << "nghttp3_conn_submit_response() failed: "
-                     << nghttp3_strerror(rv);
+    Log{FATAL, this, downstream} << "nghttp3_conn_submit_response() failed: "
+                                 << nghttp3_strerror(rv);
     return std::unexpected{Error::HTTP3};
   }
 
@@ -2047,8 +2051,8 @@ std::expected<void, Error>
 Http3Upstream::http_acked_stream_data(Downstream *downstream,
                                       uint64_t datalen) {
   if (log_enabled(INFO)) {
-    Log{INFO, this} << "Stream " << downstream->get_stream_id() << " "
-                    << datalen << " bytes acknowledged";
+    Log{INFO, this, downstream} << "Stream " << downstream->get_stream_id()
+                                << " " << datalen << " bytes acknowledged";
   }
 
   auto body = downstream->get_response_buf();
@@ -2135,9 +2139,10 @@ std::expected<void, Error> Http3Upstream::http_recv_request_header(
     }
 
     if (log_enabled(INFO)) {
-      Log{INFO, this} << "Too large or many header field size="
-                      << req.fs.buffer_size() + namebuf.len + valuebuf.len
-                      << ", num=" << req.fs.num_fields() + 1;
+      Log{INFO, this, downstream}
+        << "Too large or many header field size="
+        << req.fs.buffer_size() + namebuf.len + valuebuf.len
+        << ", num=" << req.fs.num_fields() + 1;
     }
 
     // just ignore if this is a trailer part.
@@ -2218,9 +2223,10 @@ Http3Upstream::http_end_request_headers(Downstream *downstream, int fin) {
       ss += nv.value;
       ss += '\n';
     }
-    Log{INFO, this} << "HTTP request headers. stream_id="
-                    << downstream->get_stream_id() << "\n"
-                    << ss;
+    Log{INFO, this, downstream}
+      << "HTTP request headers. stream_id=" << downstream->get_stream_id()
+      << "\n"
+      << ss;
   }
 
   auto content_length = req.fs.header(NGHTTP2_HPACK_TOKEN_CONTENT_LENGTH);
@@ -2243,7 +2249,8 @@ Http3Upstream::http_end_request_headers(Downstream *downstream, int fin) {
 
   if (method_token == HTTP_CONNECT && content_length) {
     if (log_enabled(INFO)) {
-      Log{INFO, this} << "content-length are not allowed in CONNECT request";
+      Log{INFO, this, downstream}
+        << "content-length are not allowed in CONNECT request";
     }
 
     return error_reply(downstream, 400);
@@ -2515,14 +2522,14 @@ Http3Upstream::http_stream_close(Downstream *downstream,
   auto stream_id = downstream->get_stream_id();
 
   if (log_enabled(INFO)) {
-    Log{INFO, this} << "Stream stream_id=" << stream_id
-                    << " is being closed with app_error_code="
-                    << app_error_code;
+    Log{INFO, this, downstream}
+      << "Stream stream_id=" << stream_id
+      << " is being closed with app_error_code=" << app_error_code;
 
     auto body = downstream->get_response_buf();
 
-    Log{INFO, this} << "response unacked_left=" << body->rleft()
-                    << " not_sent=" << body->rleft_mark();
+    Log{INFO, this, downstream} << "response unacked_left=" << body->rleft()
+                                << " not_sent=" << body->rleft_mark();
   }
 
   auto &req = downstream->request();
@@ -2737,8 +2744,8 @@ Http3Upstream::error_reply(Downstream *downstream, unsigned int status_code) {
   rv = nghttp3_conn_submit_response(httpconn_, downstream->get_stream_id(),
                                     nva.data(), nva.size(), data_read_ptr);
   if (nghttp3_err_is_fatal(rv)) {
-    Log{FATAL, this} << "nghttp3_conn_submit_response() failed: "
-                     << nghttp3_strerror(rv);
+    Log{FATAL, this, downstream} << "nghttp3_conn_submit_response() failed: "
+                                 << nghttp3_strerror(rv);
     return std::unexpected{Error::HTTP3};
   }
 
@@ -2754,14 +2761,14 @@ Http3Upstream::shutdown_stream(Downstream *downstream,
   auto stream_id = downstream->get_stream_id();
 
   if (log_enabled(INFO)) {
-    Log{INFO, this} << "Shutdown stream_id=" << stream_id
-                    << " with app_error_code=" << app_error_code;
+    Log{INFO, this, downstream} << "Shutdown stream_id=" << stream_id
+                                << " with app_error_code=" << app_error_code;
   }
 
   auto rv = ngtcp2_conn_shutdown_stream(conn_, 0, stream_id, app_error_code);
   if (rv != 0) {
-    Log{FATAL, this} << "ngtcp2_conn_shutdown_stream() failed: "
-                     << ngtcp2_strerror(rv);
+    Log{FATAL, this, downstream} << "ngtcp2_conn_shutdown_stream() failed: "
+                                 << ngtcp2_strerror(rv);
     return std::unexpected{Error::QUIC};
   }
 
@@ -2823,9 +2830,10 @@ void Http3Upstream::log_response_headers(
     ss += as_string_view(nv.value, nv.valuelen);
     ss += '\n';
   }
-  Log{INFO, this} << "HTTP response headers. stream_id="
-                  << downstream->get_stream_id() << "\n"
-                  << ss;
+  Log{INFO, this, downstream}
+    << "HTTP response headers. stream_id=" << downstream->get_stream_id()
+    << "\n"
+    << ss;
 }
 
 std::expected<void, Error> Http3Upstream::check_shutdown() {

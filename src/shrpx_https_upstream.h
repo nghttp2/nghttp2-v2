@@ -94,7 +94,8 @@ public:
   bool response_empty() const override;
 
   void reset_current_header_length();
-  void log_response_headers(DefaultMemchunks *buf) const;
+  void log_response_headers(const Downstream *downstream,
+                            DefaultMemchunks *buf) const;
   std::expected<void, Error> redirect_to_https(Downstream *downstream);
 
   // Called when new request has started.

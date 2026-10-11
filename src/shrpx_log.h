@@ -44,6 +44,7 @@
 #include "template.h"
 #include "util.h"
 #include "errors.h"
+#include "shrpx_downstream.h"
 
 using namespace nghttp2;
 
@@ -65,6 +66,13 @@ class MemcachedConnection;
 enum SeverityLevel { INFO, NOTICE, WARN, ERROR, FATAL };
 
 using LogBuffer = std::array<uint8_t, 4_k>;
+
+class Log;
+
+namespace log {
+void hex(Log &log);
+void dec(Log &log);
+} // namespace log
 
 class Log {
 public:
@@ -91,20 +99,41 @@ public:
     : Log{severity, loc} {
     *this << "[UPSTREAM:" << obj << "] ";
   }
+  Log(SeverityLevel severity, const Upstream *obj, const Downstream *downstream,
+      const std::source_location loc = std::source_location::current())
+    : Log{severity, loc} {
+    *this << "[UPSTREAM:" << obj << "] [TRACE_ID:" << log::hex
+          << downstream->get_trace_id() << log::dec << "] ";
+  }
   Log(SeverityLevel severity, const Downstream *obj,
       const std::source_location loc = std::source_location::current())
     : Log{severity, loc} {
-    *this << "[DOWNSTREAM:" << obj << "] ";
+    *this << "[DOWNSTREAM:" << obj << "] [TRACE_ID:" << log::hex
+          << obj->get_trace_id() << log::dec << "] ";
   }
   Log(SeverityLevel severity, const DownstreamConnection *obj,
       const std::source_location loc = std::source_location::current())
     : Log{severity, loc} {
     *this << "[DCONN:" << obj << "] ";
   }
+  Log(SeverityLevel severity, const DownstreamConnection *obj,
+      const Downstream *downstream,
+      const std::source_location loc = std::source_location::current())
+    : Log{severity, loc} {
+    *this << "[DCONN:" << obj << "] [TRACE_ID:" << log::hex
+          << downstream->get_trace_id() << log::dec << "] ";
+  }
   Log(SeverityLevel severity, const Http2Session *obj,
       const std::source_location loc = std::source_location::current())
     : Log{severity, loc} {
     *this << "[DHTTP2:" << obj << "] ";
+  }
+  Log(SeverityLevel severity, const Http2Session *obj,
+      const Downstream *downstream,
+      const std::source_location loc = std::source_location::current())
+    : Log{severity, loc} {
+    *this << "[DHTTP2:" << obj << "] [TRACE_ID:" << log::hex
+          << downstream->get_trace_id() << log::dec << "] ";
   }
   Log(SeverityLevel severity, const MemcachedConnection *obj,
       const std::source_location loc = std::source_location::current())
@@ -260,11 +289,6 @@ private:
 inline auto log_enabled(SeverityLevel severity) {
   return ENABLE_LOG && Log::log_enabled(severity);
 }
-
-namespace log {
-void hex(Log &log);
-void dec(Log &log);
-} // namespace log
 
 [[nodiscard]] inline auto tty_http_hd() {
   return log_config()->errorlog_tty ? "\033[1;34m"sv : ""sv;

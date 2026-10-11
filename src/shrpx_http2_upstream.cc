@@ -55,14 +55,14 @@ int stream_close(nghttp2_conn *conn, uint32_t flags, int64_t stream_id,
                  uint32_t error_code, void *conn_user_data,
                  void *stream_user_data) {
   auto upstream = static_cast<Http2Upstream *>(conn_user_data);
-  if (log_enabled(INFO)) {
-    Log{INFO, upstream} << "Stream stream_id=" << stream_id
-                        << " is being closed";
-  }
-
   auto downstream = static_cast<Downstream *>(stream_user_data);
   if (!downstream) {
     return 0;
+  }
+
+  if (log_enabled(INFO)) {
+    Log{INFO, upstream, downstream} << "Stream stream_id=" << stream_id
+                                    << " is being closed";
   }
 
   auto &req = downstream->request();
@@ -136,9 +136,10 @@ int recv_header(nghttp2_conn *conn, int64_t stream_id, int32_t token,
     }
 
     if (log_enabled(INFO)) {
-      Log{INFO, upstream} << "Too large or many header field size="
-                          << req.fs.buffer_size() + namebuf.len + valuebuf.len
-                          << ", num=" << req.fs.num_fields() + 1;
+      Log{INFO, upstream, downstream}
+        << "Too large or many header field size="
+        << req.fs.buffer_size() + namebuf.len + valuebuf.len
+        << ", num=" << req.fs.num_fields() + 1;
     }
 
     if (!upstream->error_reply(downstream, 431)) {
@@ -189,9 +190,10 @@ int recv_trailer(nghttp2_conn *conn, int64_t stream_id, int32_t token,
     }
 
     if (log_enabled(INFO)) {
-      Log{INFO, upstream} << "Too large or many header field size="
-                          << req.fs.buffer_size() + namebuf.len + valuebuf.len
-                          << ", num=" << req.fs.num_fields() + 1;
+      Log{INFO, upstream, downstream}
+        << "Too large or many header field size="
+        << req.fs.buffer_size() + namebuf.len + valuebuf.len
+        << ", num=" << req.fs.num_fields() + 1;
     }
 
     // We don't care trailer part exceeds header size limit; just
@@ -217,11 +219,6 @@ int begin_headers(nghttp2_conn *conn, int64_t stream_id, void *conn_user_data,
                   void *stream_user_data) {
   auto upstream = static_cast<Http2Upstream *>(conn_user_data);
 
-  if (log_enabled(INFO)) {
-    Log{INFO, upstream} << "Received upstream request HEADERS stream_id="
-                        << stream_id;
-  }
-
   upstream->on_start_request(stream_id);
 
   return 0;
@@ -229,9 +226,15 @@ int begin_headers(nghttp2_conn *conn, int64_t stream_id, void *conn_user_data,
 } // namespace
 
 void Http2Upstream::on_start_request(int64_t stream_id) {
-  auto downstream =
-    std::make_unique<Downstream>(this, handler_->get_mcpool(), stream_id);
+  auto worker = handler_->get_worker();
+  auto downstream = std::make_unique<Downstream>(
+    worker->generate_trace_id(), this, handler_->get_mcpool(), stream_id);
   nghttp2_conn_set_stream_user_data(conn_, stream_id, downstream.get());
+
+  if (log_enabled(INFO)) {
+    Log{INFO, this, downstream.get()} << "Request started stream_id="
+                                      << stream_id;
+  }
 
   downstream->reset_upstream_rtimer();
 
@@ -309,9 +312,10 @@ Http2Upstream::on_request_headers(Downstream *downstream, bool fin) {
       ss += nv.value;
       ss += '\n';
     }
-    Log{INFO, this} << "HTTP request headers. stream_id="
-                    << downstream->get_stream_id() << "\n"
-                    << ss;
+    Log{INFO, this, downstream}
+      << "HTTP request headers. stream_id=" << downstream->get_stream_id()
+      << "\n"
+      << ss;
   }
 
   auto config = get_config();
@@ -341,7 +345,8 @@ Http2Upstream::on_request_headers(Downstream *downstream, bool fin) {
 
   if (method_token == HTTP_CONNECT && content_length) {
     if (log_enabled(INFO)) {
-      Log{INFO, this} << "content-length are not allowed in CONNECT request";
+      Log{INFO, this, downstream}
+        << "content-length are not allowed in CONNECT request";
     }
 
     return error_reply(downstream, 400);
@@ -549,10 +554,11 @@ int local_end_stream(nghttp2_conn *conn, int64_t stream_id,
   // For tunneling, issue RST_STREAM to finish the stream.
   if (downstream->get_upgraded()) {
     if (log_enabled(INFO)) {
-      Log{INFO, upstream} << "Send RST_STREAM to "
-                          << (downstream->get_upgraded() ? "tunneled " : "")
-                          << "stream stream_id=" << downstream->get_stream_id()
-                          << " to finish off incomplete request";
+      Log{INFO, upstream, downstream}
+        << "Send RST_STREAM to "
+        << (downstream->get_upgraded() ? "tunneled " : "")
+        << "stream stream_id=" << downstream->get_stream_id()
+        << " to finish off incomplete request";
     }
 
     upstream->shutdown_stream(downstream, NGHTTP2_NO_ERROR);
@@ -971,7 +977,7 @@ Http2Upstream::downstream_read(DownstreamConnection *dconn) {
       }
       if (rv.error() != Error::NETWORK) {
         if (log_enabled(INFO)) {
-          Log{INFO, dconn} << "HTTP parser failure";
+          Log{INFO, dconn, downstream} << "HTTP parser failure";
         }
       }
       return downstream_error(dconn, Downstream::EVENT_ERROR);
@@ -1011,7 +1017,8 @@ Http2Upstream::downstream_eof(DownstreamConnection *dconn) {
   auto downstream = dconn->get_downstream();
 
   if (log_enabled(INFO)) {
-    Log{INFO, dconn} << "EOF. stream_id=" << downstream->get_stream_id();
+    Log{INFO, dconn, downstream} << "EOF. stream_id="
+                                 << downstream->get_stream_id();
   }
 
   // Delete downstream connection. If we don't delete it here, it will
@@ -1023,7 +1030,7 @@ Http2Upstream::downstream_eof(DownstreamConnection *dconn) {
   if (downstream->get_response_state() == DownstreamState::HEADER_COMPLETE) {
     // Server may indicate the end of the request by EOF
     if (log_enabled(INFO)) {
-      Log{INFO, this} << "Downstream body was ended by EOF";
+      Log{INFO, this, downstream} << "Downstream body was ended by EOF";
     }
     downstream->set_response_state(DownstreamState::MSG_COMPLETE);
 
@@ -1053,12 +1060,12 @@ Http2Upstream::downstream_error(DownstreamConnection *dconn, int events) {
 
   if (log_enabled(INFO)) {
     if (events & Downstream::EVENT_ERROR) {
-      Log{INFO, dconn} << "Downstream network/general error";
+      Log{INFO, dconn, downstream} << "Downstream network/general error";
     } else {
-      Log{INFO, dconn} << "Timeout";
+      Log{INFO, dconn, downstream} << "Timeout";
     }
     if (downstream->get_upgraded()) {
-      Log{INFO, dconn} << "Note: this is tunnel connection";
+      Log{INFO, dconn, downstream} << "Note: this is tunnel connection";
     }
   }
 
@@ -1109,8 +1116,9 @@ Http2Upstream::downstream_error(DownstreamConnection *dconn, int events) {
 void Http2Upstream::shutdown_stream(Downstream *downstream,
                                     uint32_t error_code) {
   if (log_enabled(INFO)) {
-    Log{INFO, this} << "RST_STREAM stream_id=" << downstream->get_stream_id()
-                    << " with error_code=" << error_code;
+    Log{INFO, this, downstream}
+      << "RST_STREAM stream_id=" << downstream->get_stream_id()
+      << " with error_code=" << error_code;
   }
 
   nghttp2_conn_shutdown_stream(conn_, 0x00, downstream->get_stream_id(),
@@ -1225,8 +1233,8 @@ Http2Upstream::send_reply(Downstream *downstream,
   rv = nghttp2_conn_submit_response(conn_, downstream->get_stream_id(),
                                     nva.data(), nva.size(), pdr);
   if (nghttp2_err_is_fatal(rv)) {
-    Log{FATAL, this} << "nghttp2_conn_submit_response() failed: "
-                     << nghttp2_strerror(rv);
+    Log{FATAL, this, downstream} << "nghttp2_conn_submit_response() failed: "
+                                 << nghttp2_strerror(rv);
 
     return std::unexpected{Error::HTTP2};
   }
@@ -1285,8 +1293,8 @@ Http2Upstream::error_reply(Downstream *downstream, unsigned int status_code) {
   rv = nghttp2_conn_submit_response(conn_, downstream->get_stream_id(),
                                     nva.data(), nva.size(), pdr);
   if (rv < NGHTTP2_ERR_FATAL) {
-    Log{FATAL, this} << "nghttp2_conn_submit_response() failed: "
-                     << nghttp2_strerror(rv);
+    Log{FATAL, this, downstream} << "nghttp2_conn_submit_response() failed: "
+                                 << nghttp2_strerror(rv);
     return std::unexpected{Error::HTTP2};
   }
 
@@ -1420,7 +1428,7 @@ Http2Upstream::on_downstream_header_complete(Downstream *downstream) {
     resp.fs.clear_headers();
 
     if (rv != 0) {
-      Log{FATAL, this} << "nghttp2_conn_submit_info() failed";
+      Log{FATAL, this, downstream} << "nghttp2_conn_submit_info() failed";
       return std::unexpected{Error::HTTP2};
     }
 
@@ -1531,8 +1539,9 @@ Http2Upstream::on_downstream_header_complete(Downstream *downstream) {
       if (auto rv = nghttp2_conn_set_server_stream_priority(
             conn_, downstream->get_stream_id(), &pri);
           rv != 0) {
-        Log{ERROR, this} << "nghttp2_conn_set_server_stream_priority: "
-                         << nghttp2_strerror(rv);
+        Log{ERROR, this, downstream}
+          << "nghttp2_conn_set_server_stream_priority: "
+          << nghttp2_strerror(rv);
       }
     }
   }
@@ -1552,8 +1561,8 @@ Http2Upstream::on_downstream_header_complete(Downstream *downstream) {
   rv = nghttp2_conn_submit_response(conn_, downstream->get_stream_id(),
                                     nva.data(), nva.size(), pdr);
   if (rv != 0) {
-    Log{FATAL, this} << "nghttp2_conn_submit_response() failed: "
-                     << nghttp2_strerror(rv);
+    Log{FATAL, this, downstream} << "nghttp2_conn_submit_response() failed: "
+                                 << nghttp2_strerror(rv);
 
     return std::unexpected{Error::HTTP2};
   }
@@ -1573,8 +1582,8 @@ Http2Upstream::on_downstream_body(Downstream *downstream,
     if (auto rv =
           nghttp2_conn_resume_stream(conn_, downstream->get_stream_id());
         rv != 0) {
-      Log{FATAL, this} << "nghttp2_conn_resume_stream() failed: "
-                       << nghttp2_strerror(rv);
+      Log{FATAL, this, downstream} << "nghttp2_conn_resume_stream() failed: "
+                                   << nghttp2_strerror(rv);
 
       return std::unexpected{Error::HTTP2};
     }
@@ -1727,15 +1736,16 @@ std::string format_nva(std::span<const nghttp2_nv> nva) {
 
 void Http2Upstream::log_response_headers(
   Downstream *downstream, const std::vector<nghttp2_nv> &nva) const {
-  Log{INFO, this} << "HTTP response headers. stream_id="
-                  << downstream->get_stream_id() << "\n"
-                  << format_nva(nva);
+  Log{INFO, this, downstream}
+    << "HTTP response headers. stream_id=" << downstream->get_stream_id()
+    << "\n"
+    << format_nva(nva);
 }
 
 std::expected<void, Error> Http2Upstream::on_timeout(Downstream *downstream) {
   if (log_enabled(INFO)) {
-    Log{INFO, this} << "Stream timeout stream_id="
-                    << downstream->get_stream_id();
+    Log{INFO, this, downstream} << "Stream timeout stream_id="
+                                << downstream->get_stream_id();
   }
 
   shutdown_stream(downstream, NGHTTP2_INTERNAL_ERROR);

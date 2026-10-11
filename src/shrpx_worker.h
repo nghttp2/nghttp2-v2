@@ -406,6 +406,8 @@ public:
                                                socklen_t addrlen,
                                                const UpstreamAddr *faddr);
 
+  uint64_t generate_trace_id();
+
 private:
 #ifndef NOTHREADS
   std::future<void> fut_;

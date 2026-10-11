@@ -1739,4 +1739,6 @@ Worker::handle_connection(int fd, const sockaddr *addr, socklen_t addrlen,
   return {};
 }
 
+uint64_t Worker::generate_trace_id() { return randgen_(); }
+
 } // namespace shrpx

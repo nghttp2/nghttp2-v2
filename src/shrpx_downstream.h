@@ -270,10 +270,12 @@ enum class DispatchState {
 
 class Downstream {
 public:
-  Downstream(Upstream *upstream, MemchunkPool *mcpool, int64_t stream_id);
+  Downstream(uint64_t trace_id, Upstream *upstream, MemchunkPool *mcpool,
+             int64_t stream_id);
   ~Downstream();
   void reset_upstream(Upstream *upstream);
   Upstream *get_upstream() const;
+  uint64_t get_trace_id() const { return trace_id_; }
   void set_stream_id(int64_t stream_id);
   int64_t get_stream_id() const;
   void pause_read(IOCtrlReason reason);
@@ -539,6 +541,8 @@ private:
   const DownstreamAddr *addr_{};
   // How many times we tried in backend connection
   size_t num_retry_{};
+  // trace_id_ is the ID to uniquely identify this request.
+  uint64_t trace_id_;
   // The stream ID in frontend connection
   int64_t stream_id_;
   // stream ID in backend connection

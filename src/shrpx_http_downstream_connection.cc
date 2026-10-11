@@ -62,11 +62,12 @@ void timeoutcb(struct ev_loop *loop, ev_timer *w, int revents) {
     return;
   }
 
+  auto downstream = dconn->get_downstream();
+
   if (log_enabled(INFO)) {
-    Log{INFO, dconn} << "Time out";
+    Log{INFO, dconn, downstream} << "Time out";
   }
 
-  auto downstream = dconn->get_downstream();
   auto upstream = downstream->get_upstream();
   auto handler = upstream->get_client_handler();
   auto &resp = downstream->response();
@@ -130,12 +131,12 @@ void connect_timeoutcb(struct ev_loop *loop, ev_timer *w, int revents) {
   auto dconn = static_cast<HttpDownstreamConnection *>(conn->data);
   auto addr = dconn->get_addr();
   auto raddr = dconn->get_raddr();
+  auto downstream = dconn->get_downstream();
 
-  Log{WARN, dconn} << "Connect time out; addr=" << util::to_numeric_addr(raddr);
+  Log{WARN, dconn, downstream} << "Connect time out; addr="
+                               << util::to_numeric_addr(raddr);
 
   downstream_failure(addr, raddr);
-
-  auto downstream = dconn->get_downstream();
 
   retry_downstream_connection(downstream, 504);
 }
@@ -225,7 +226,7 @@ HttpDownstreamConnection::~HttpDownstreamConnection() {
 std::expected<void, Error>
 HttpDownstreamConnection::attach_downstream(Downstream *downstream) {
   if (log_enabled(INFO)) {
-    Log{INFO, this} << "Attaching to DOWNSTREAM:" << downstream;
+    Log{INFO, this, downstream} << "Attaching to DOWNSTREAM:" << downstream;
   }
 
   downstream_ = downstream;
@@ -678,9 +679,10 @@ std::expected<void, Error> HttpDownstreamConnection::push_request_headers() {
     if (log_config()->errorlog_tty) {
       nhdrs = http::colorize_headers(nhdrs);
     }
-    Log{INFO, this} << "HTTP request headers. stream_id="
-                    << downstream_->get_stream_id() << "\n"
-                    << nhdrs;
+    Log{INFO, this, downstream_}
+      << "HTTP request headers. stream_id=" << downstream_->get_stream_id()
+      << "\n"
+      << nhdrs;
   }
 
   // Don't call signal_write() if we anticipate request body.  We call
@@ -859,7 +861,7 @@ void idle_timeoutcb(struct ev_loop *loop, ev_timer *w, int revents) {
 std::expected<void, Error>
 HttpDownstreamConnection::detach_downstream(Downstream *downstream) {
   if (log_enabled(INFO)) {
-    Log{INFO, this} << "Detaching from DOWNSTREAM:" << downstream;
+    Log{INFO, this, downstream} << "Detaching from DOWNSTREAM:" << downstream;
   }
   downstream_ = nullptr;
 
@@ -1059,8 +1061,8 @@ int htp_hdrs_completecb(llhttp_t *htp) {
     }
     downstream->set_request_state(DownstreamState::HEADER_COMPLETE);
     if (log_enabled(INFO)) {
-      Log{INFO} << "HTTP upgrade success. stream_id="
-                << downstream->get_stream_id();
+      Log{INFO, downstream} << "HTTP upgrade success. stream_id="
+                            << downstream->get_stream_id();
     }
   }
 
@@ -1284,8 +1286,8 @@ std::expected<void, Error> HttpDownstreamConnection::read_clear() {
         auto htperr = llhttp_finish(&response_htp_);
         if (htperr != HPE_OK) {
           if (log_enabled(INFO)) {
-            Log{INFO, this} << "HTTP response ended prematurely: "
-                            << llhttp_errno_name(htperr);
+            Log{INFO, this, downstream_} << "HTTP response ended prematurely: "
+                                         << llhttp_errno_name(htperr);
           }
 
           return std::unexpected{Error::HTTP1};
@@ -1422,8 +1424,8 @@ std::expected<void, Error> HttpDownstreamConnection::read_tls() {
         auto htperr = llhttp_finish(&response_htp_);
         if (htperr != HPE_OK) {
           if (log_enabled(INFO)) {
-            Log{INFO, this} << "HTTP response ended prematurely: "
-                            << llhttp_errno_name(htperr);
+            Log{INFO, this, downstream_} << "HTTP response ended prematurely: "
+                                         << llhttp_errno_name(htperr);
           }
 
           return std::unexpected{Error::HTTP1};
@@ -1537,9 +1539,9 @@ HttpDownstreamConnection::process_input(std::span<const uint8_t> data) {
     }
 
     if (log_enabled(INFO)) {
-      Log{INFO, this} << "HTTP parser failure: "
-                      << "(" << llhttp_errno_name(htperr) << ") "
-                      << llhttp_get_error_reason(&response_htp_);
+      Log{INFO, this, downstream_} << "HTTP parser failure: "
+                                   << "(" << llhttp_errno_name(htperr) << ") "
+                                   << llhttp_get_error_reason(&response_htp_);
     }
 
     return std::unexpected{Error::HTTP1};
