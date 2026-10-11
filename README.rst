@@ -171,10 +171,12 @@ Applications
 
 There are 4 built-in applications:
 
-- nghttp: HTTP/2 client with debugging capabilities
-- nghttpd: HTTP/2 server
-- nghttpx: HTTP/1/2/3 proxy
-- h2load: HTTP/1/2/3 load testing tool
+- `nghttp <https://nghttp2.org/v2/nghttp.1.html>`_: HTTP/2 client with
+  debugging capabilities
+- `nghttpd <https://nghttp2.org/v2/nghttpd.1.html>`_: HTTP/2 server
+- `nghttpx <https://nghttp2.org/v2/nghttpx.1.html>`_: HTTP/1/2/3 proxy
+- `h2load <https://nghttp2.org/v2/h2load.1.html>`_: HTTP/1/2/3 load
+  testing tool
 
 License
 -------

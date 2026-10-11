@@ -49,15 +49,15 @@ The benchmarking result looks like this:
 
 .. code-block:: text
 
-    finished in 7.08s, 141164.80 req/s, 555.33MB/s
-    requests: 1000000 total, 1000000 started, 1000000 done, 1000000 succeeded, 0 failed, 0 errored, 0 timeout
-    status codes: 1000000 2xx, 0 3xx, 0 4xx, 0 5xx
-    traffic: 4125025824 bytes total, 11023424 bytes headers (space savings 93.07%), 4096000000 bytes data
-                         min         max         mean         sd        +/- sd
-    time for request:    15.31ms    146.85ms     69.78ms      9.26ms    92.43%
-    time for connect:     1.08ms     25.04ms     10.71ms      9.80ms    64.00%
-    time to 1st byte:    25.36ms    184.96ms     79.11ms     53.97ms    78.00%
-    req/s (client)  :    1412.04     1447.84     1426.52       10.57    63.00%
+    finished in 10.04s, 1022070.00 req/s, 1002.99MB/s
+    requests: 10220700 total, 10230700 started, 10220700 done, 10220700 succeeded, 0 failed, 0 errored, 0 timeout
+    status codes: 10220700 2xx, 0 3xx, 0 4xx, 0 5xx
+    traffic: 9.79GB (10517133900) total, 107.25MB (112458300) headers (space savings 93.08%), 9.52GB (10220700000) data
+		     min         max         median      p95         p99         mean        sd         +/- sd
+    request     :     2.77ms     29.70ms      9.75ms      9.86ms     11.78ms      9.76ms       722us    97.90%
+    connect     :    17.58ms     90.77ms     43.50ms     88.58ms     90.77ms     48.64ms     22.90ms    54.00%
+    TTFB        :    30.04ms    108.93ms     61.32ms    108.51ms    108.93ms     67.34ms     27.07ms    54.00%
+    req/s       :   10168.16    10269.11    10224.41    10259.08    10269.11    10219.57       27.99    47.00%
 
 See the h2load manual page :ref:`h2load-1-output` section for the
 explanation of the above numbers.
