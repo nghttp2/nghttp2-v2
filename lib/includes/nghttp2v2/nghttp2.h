@@ -955,12 +955,12 @@ typedef struct nghttp2_conn nghttp2_conn;
  * @functypedef
  *
  * :type:`nghttp2_log_write` is a callback function for logging.
- * |user_data| is the same object passed to `nghttp2_conn_client_new` or
- * `nghttp2_conn_server_new`.  The caller guarantees that the memory
- * region [|msg|, |msg| + |len|], inclusive, are writable, and
- * |msg|[|len|] == '\0'.  If application needs to emit a single line
- * with a line terminator, one can do msg[len] = '\n', and write |len|
- * + 1 bytes from |msg|.
+ * |user_data| is the same object passed to `nghttp2_conn_client_new`
+ * or `nghttp2_conn_server_new`.  The caller guarantees that the
+ * memory region [|msg|, |msg| + |len|], inclusive, are writable, and
+ * |msg| [|len|] == '\0'.  If application needs to emit a single line
+ * with a line terminator, one can do |msg| [|len|] = '\n', and write
+ * |len| + 1 bytes from |msg|.
  */
 typedef void (*nghttp2_log_write)(void *user_data, char *msg, size_t len);
 
