@@ -21,7 +21,7 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-configfiles = nghttpx-init nghttpx.service nghttpx-upstart.conf
+configfiles = nghttpx-init nghttpx.service
 
 EXTRA_DIST = \
 	CMakeLists.txt \
@@ -38,9 +38,6 @@ nghttpx-init: $(srcdir)/nghttpx-init.in
 	mv $@.tmp $@
 
 nghttpx.service: $(srcdir)/nghttpx.service.in
-	$(edit) $< > $@
-
-nghttpx-upstart.conf: $(srcdir)/nghttpx-upstart.conf.in
 	$(edit) $< > $@
 
 $(configfiles): Makefile
