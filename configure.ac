@@ -107,11 +107,6 @@ AC_ARG_WITH([zlib],
                     [Use zlib [default=check]])],
     [request_zlib=$withval], [request_zlib=check])
 
-AC_ARG_WITH([libevent-openssl],
-    [AS_HELP_STRING([--with-libevent-openssl],
-                    [Use libevent_openssl [default=check]])],
-    [request_libevent_openssl=$withval], [request_libevent_openssl=check])
-
 AC_ARG_WITH([libcares],
     [AS_HELP_STRING([--with-libcares],
                     [Use libc-ares [default=check]])],
@@ -209,7 +204,6 @@ if [test "x$request_lib_only" = "xyes"]; then
   request_libxml2=no
   request_jansson=no
   request_zlib=no
-  request_libevent_openssl=no
   request_libcares=no
   request_openssl=no
   request_libev=no
@@ -1255,7 +1249,6 @@ AC_MSG_NOTICE([summary of build options:
       libngtcp2_crypto_ossl: ${have_libngtcp2_crypto_ossl} (CFLAGS='${LIBNGTCP2_CRYPTO_OSSL_CFLAGS}' LIBS='${LIBNGTCP2_CRYPTO_OSSL_LIBS}')
       libnghttp3:     ${have_libnghttp3} (CFLAGS='${LIBNGHTTP3_CFLAGS}' LIBS='${LIBNGHTTP3_LIBS}')
       libbpf:         ${have_libbpf} (CFLAGS='${LIBBPF_CFLAGS}' LIBS='${LIBBPF_LIBS}')
-      Libevent(SSL):  ${have_libevent_openssl} (CFLAGS='${LIBEVENT_OPENSSL_CFLAGS}' LIBS='${LIBEVENT_OPENSSL_LIBS}')
       Jansson:        ${have_jansson} (CFLAGS='${JANSSON_CFLAGS}' LIBS='${JANSSON_LIBS}')
       Jemalloc:       ${have_jemalloc} (CFLAGS='${JEMALLOC_CFLAGS}' LIBS='${JEMALLOC_LIBS}')
       Zlib:           ${have_zlib} (CFLAGS='${ZLIB_CFLAGS}' LIBS='${ZLIB_LIBS}')
