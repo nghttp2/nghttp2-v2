@@ -1,7 +1,6 @@
 set(CONFIGFILES
   nghttpx-init
   nghttpx.service
-  nghttpx-upstart.conf
 )
 
 # Note that the execute permissions of nghttpx-init is preserved
