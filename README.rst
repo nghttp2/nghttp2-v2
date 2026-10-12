@@ -145,6 +145,18 @@ libelf-dev is needed to build libbpf.
    variables.  For a complete list of these variables, run
    ``./configure -h``.
 
+Build from git
+--------------
+
+.. code-block:: shell
+
+   $ git clone https://github.com/nghttp2/nghttp2-v2
+   $ cd nghttp2-v2
+   $ git submodule update --init
+   $ autoreconf -i
+   $ ./configure
+   $ make -j$(nproc) check
+
 Standards
 ---------
 
