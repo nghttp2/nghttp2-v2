@@ -16,6 +16,7 @@ Contents:
    :maxdepth: 2
 
    programmers-guide
+   migration-from-nghttp2-v1
    apiref
    nghttp.1
    nghttpd.1
