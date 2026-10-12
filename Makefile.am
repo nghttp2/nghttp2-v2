@@ -27,7 +27,7 @@ ACLOCAL_AMFLAGS = -I m4
 
 dist_doc_DATA = README.rst
 
-EXTRA_DIST = nghttpx.conf.sample proxy.pac.sample android-config android-env \
+EXTRA_DIST = nghttpx.conf.sample proxy.pac.sample \
 	Dockerfile.android \
 	cmakeconfig.h.in \
 	CMakeLists.txt \
@@ -36,7 +36,6 @@ EXTRA_DIST = nghttpx.conf.sample proxy.pac.sample android-config android-env \
 	cmake/FindJemalloc.cmake \
 	cmake/FindLibev.cmake \
 	cmake/Version.cmake \
-	cmake/FindLibevent.cmake \
 	cmake/FindJansson.cmake \
 	cmake/FindLibcares.cmake \
 	cmake/FindSystemd.cmake \
