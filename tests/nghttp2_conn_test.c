@@ -6759,6 +6759,83 @@ void test_nghttp2_conn_recv_window_update(void) {
 
   nghttp2_conn_del(conn);
 
+  /* Receive WINDOW_UPDATE to the active stream with window_size_inc =
+     0 */
+  setup_default_server(&conn);
+  read_client_preface(conn, NULL, 0, ts);
+
+  nghttp2_hpack_encoder_init(&enc, NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY, mem);
+  nghttp2_buf_reset(&hbuf);
+  rv =
+    nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
+
+  fr.headers = (nghttp2_frame_headers){
+    .hd =
+      {
+        .type = NGHTTP2_FRAME_HEADERS,
+        .flags = NGHTTP2_HEADERS_FLAG_END_HEADERS,
+        .stream_id = 0x01,
+      },
+    .field_block = hbuf.pos,
+    .field_blocklen = nghttp2_buf_len(&hbuf),
+  };
+
+  fr.headers.hd.len =
+    (uint32_t)nghttp2_frame_encode_headers_payloadlen(&fr.headers);
+
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
+
+  assert_int(0, ==, rv);
+
+  fr.window_update = (nghttp2_frame_window_update){
+    .hd =
+      {
+        .len = 4,
+        .type = NGHTTP2_FRAME_WINDOW_UPDATE,
+        .stream_id = 0x01,
+      },
+  };
+
+  rv = nghttp2_frame_encode_window_update(&buf, &fr.window_update);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_CLOSING, ==,
+              conn->rx.frrd.state);
+
+  nghttp2_hpack_encoder_free(&enc);
+  nghttp2_conn_del(conn);
+
+  /* Receive WINDOW_UPDATE to the connection with window_size_inc =
+     0 */
+  setup_default_server(&conn);
+  read_client_preface(conn, NULL, 0, ts);
+
+  fr.window_update = (nghttp2_frame_window_update){
+    .hd =
+      {
+        .len = 4,
+        .type = NGHTTP2_FRAME_WINDOW_UPDATE,
+      },
+  };
+
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_window_update(&buf, &fr.window_update);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_CLOSING, ==,
+              conn->rx.frrd.state);
+
+  nghttp2_conn_del(conn);
+
   nghttp2_buf_free(&hbuf, mem);
 }
 
@@ -15496,6 +15573,7 @@ void test_nghttp2_conn_rate_limit(void) {
         .type = NGHTTP2_FRAME_WINDOW_UPDATE,
         .stream_id = 0x01,
       },
+    .window_size_inc = 10,
   };
 
   nghttp2_buf_reset(&buf);
