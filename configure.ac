@@ -196,8 +196,6 @@ AC_PROG_MKDIR_P
 
 PKG_PROG_PKG_CONFIG([0.20])
 
-AM_PATH_PYTHON([3.8],, [:])
-
 if [test "x$request_lib_only" = "xyes"]; then
   request_app=no
   request_http3=no
@@ -1231,9 +1229,6 @@ AC_MSG_NOTICE([summary of build options:
       Static:         ${enable_static}
     Libtool:
       LIBTOOL_LDFLAGS: ${LIBTOOL_LDFLAGS}
-    Python:
-      Python:         ${PYTHON}
-      PYTHON_VERSION: ${PYTHON_VERSION}
     Test:
       Failmalloc:     ${enable_failmalloc}
     Libs:
