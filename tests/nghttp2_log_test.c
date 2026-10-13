@@ -37,8 +37,7 @@ static const MunitTest tests[] = {
   munit_void_test(test_nghttp2_log_fr_data),
   munit_void_test(test_nghttp2_log_fr_headers),
   munit_void_test(test_nghttp2_log_fr_rst_stream),
-  munit_void_test(test_nghttp2_log_fr_rx_settings),
-  munit_void_test(test_nghttp2_log_fr_tx_settings),
+  munit_void_test(test_nghttp2_log_fr_settings),
   munit_void_test(test_nghttp2_log_fr_ping),
   munit_void_test(test_nghttp2_log_fr_goaway),
   munit_void_test(test_nghttp2_log_fr_window_update),
@@ -199,65 +198,7 @@ void test_nghttp2_log_fr_rst_stream(void) {
   nghttp2_log_tx_rst_stream(&log, &fr);
 }
 
-void test_nghttp2_log_fr_rx_settings(void) {
-  static const nghttp2_proto_settings settings = {
-    .hpack_max_dtable_capacity = 1000000009,
-    .max_concurrent_streams = 328232323,
-    .initial_max_stream_data = INT32_MAX,
-    .max_field_section_size = 123456789,
-    .enable_connect_protocol = 1,
-  };
-  static const nghttp2_frame_settings fr = {
-    .hd =
-      {
-        .len = 1000000007,
-        .type = NGHTTP2_FRAME_SETTINGS,
-      },
-    .settings = (nghttp2_proto_settings *)&settings,
-  };
-  static const nghttp2_frame_settings ack = {
-    .hd =
-      {
-        .len = 1000000007,
-        .flags = NGHTTP2_SETTINGS_FLAG_ACK,
-        .type = NGHTTP2_FRAME_SETTINGS,
-      },
-  };
-  log_data ld;
-  nghttp2_log log;
-
-  ld = (log_data){
-    .expected =
-      {
-        "I00001123 0x00000000deadbeef frm rx SETTINGS(0x4) len=1000000007 "
-        "flags=(none)(0x0) SETTINGS_HEADER_TABLE_SIZE(0x1)=1000000009",
-        "I00001123 0x00000000deadbeef frm rx SETTINGS(0x4) len=1000000007 "
-        "flags=(none)(0x0) SETTINGS_MAX_CONCURRENT_STREAMS(0x3)=328232323",
-        "I00001123 0x00000000deadbeef frm rx SETTINGS(0x4) len=1000000007 "
-        "flags=(none)(0x0) SETTINGS_INITIAL_WINDOW_SIZE(0x4)=2147483647",
-        "I00001123 0x00000000deadbeef frm rx SETTINGS(0x4) len=1000000007 "
-        "flags=(none)(0x0) SETTINGS_MAX_HEADER_LIST_SIZE(0x6)=123456789",
-        "I00001123 0x00000000deadbeef frm rx SETTINGS(0x4) len=1000000007 "
-        "flags=(none)(0x0) SETTINGS_ENABLE_CONNECT_PROTOCOL(0x8)=1",
-      },
-  };
-
-  log_init(&log, &ld);
-
-  nghttp2_log_rx_settings(&log, &fr);
-
-  ld = (log_data){
-    .expected =
-      {
-        "I00001123 0x00000000deadbeef frm rx SETTINGS(0x4) len=1000000007 "
-        "flags=ACK(0x1)",
-      },
-  };
-
-  nghttp2_log_rx_settings(&log, &ack);
-}
-
-void test_nghttp2_log_fr_tx_settings(void) {
+void test_nghttp2_log_fr_settings(void) {
   static const nghttp2_settings_entry iv[] = {
     {
       .id = NGHTTP2_SETTINGS_HEADER_TABLE_SIZE,

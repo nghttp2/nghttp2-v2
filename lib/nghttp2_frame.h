@@ -112,11 +112,8 @@ typedef struct nghttp2_frame_rst_stream {
 
 typedef struct nghttp2_frame_settings {
   nghttp2_frame_hd hd;
-  /* iv and niv are only used when sending the frame. */
   nghttp2_settings_entry *iv;
   size_t niv;
-  /* settings is only used for reception. */
-  nghttp2_proto_settings *settings;
 } nghttp2_frame_settings;
 
 #define NGHTTP2_PING_FLAG_ACK 0x01U

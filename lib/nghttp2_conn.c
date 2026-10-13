@@ -1321,8 +1321,7 @@ static int conn_recv_settings_hd(nghttp2_conn *conn, nghttp2_frame_settings *fr,
     return rv;
   }
 
-  fr->settings = &conn->rx.frrd.scratch.settings.data;
-  *fr->settings = conn->remote.settings;
+  conn->rx.frrd.scratch.settings.data = conn->remote.settings;
   conn->rx.frrd.scratch.settings.min_dtable_capacity = UINT32_MAX;
 
   return 0;
@@ -1393,8 +1392,16 @@ static int conn_recv_settings_ack(nghttp2_conn *conn,
 static int conn_recv_settings_entry(nghttp2_conn *conn,
                                     nghttp2_frame_settings *fr, uint16_t id,
                                     uint32_t value) {
-  nghttp2_proto_settings *settings = fr->settings;
+  nghttp2_proto_settings *settings = &conn->rx.frrd.scratch.settings.data;
   int rv;
+
+  fr->iv = &(nghttp2_settings_entry){
+    .id = id,
+    .value = value,
+  };
+  fr->niv = 1;
+
+  nghttp2_log_rx_settings(&conn->log, fr);
 
   rv = conn_call_recv_settings_entry(conn, id, value);
   if (rv != 0) {
@@ -1467,16 +1474,21 @@ static int stream_apply_tx_initial_max_stream_data(void *data, void *ptr) {
   return 0;
 }
 
-static int conn_recv_settings(nghttp2_conn *conn,
-                              const nghttp2_frame_settings *fr,
+static int conn_recv_settings(nghttp2_conn *conn, nghttp2_frame_settings *fr,
                               nghttp2_tstamp ts) {
   nghttp2_proto_settings *settings = &conn->remote.settings;
-  const nghttp2_proto_settings *new_settings = fr->settings;
+  const nghttp2_proto_settings *new_settings =
+    &conn->rx.frrd.scratch.settings.data;
   uint64_t delta;
   uint32_t min_dtable_capacity;
   int rv;
 
-  nghttp2_log_rx_settings(&conn->log, fr);
+  if (fr->hd.len == 0) {
+    fr->iv = NULL;
+    fr->niv = 0;
+
+    nghttp2_log_rx_settings(&conn->log, fr);
+  }
 
   if (settings->hpack_max_dtable_capacity !=
       new_settings->hpack_max_dtable_capacity) {
