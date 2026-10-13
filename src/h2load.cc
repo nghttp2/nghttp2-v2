@@ -2626,13 +2626,13 @@ void write_result(const std::string &path,
 } // namespace
 
 namespace {
-void print_version() { std::println("h2load nghttp2/" NGHTTP2_VERSION); }
+void print_version() { std::println("h2load nghttp2-v2/" NGHTTP2_VERSION); }
 } // namespace
 
 namespace {
 void print_usage(std::ostream &out) {
   out << R"(Usage: h2load [OPTIONS]... [URI]...
-benchmarking tool for HTTP/2 server)"
+benchmarking tool for HTTP/3, HTTP/2, and HTTP/1 servers)"
       << std::endl;
 }
 } // namespace
