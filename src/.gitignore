@@ -1,7 +1,5 @@
 # programs
-deflatehd
 h2load
-inflatehd
 nghttp
 nghttpd
 nghttpx

@@ -743,7 +743,7 @@ if test "x${have_libbrotlienc}" = "xyes" &&
             [Define to 1 if you have `libbrotlienc` and `libbrotlidec` libraries.])
 fi
 
-# jansson (for src/nghttp, src/deflatehd and src/inflatehd)
+# jansson (for src/nghttp)
 have_jansson=no
 if test "x${request_jansson}" != "xno"; then
   PKG_CHECK_MODULES([JANSSON], [jansson >= 2.5],
