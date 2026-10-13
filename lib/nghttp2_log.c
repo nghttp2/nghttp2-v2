@@ -220,40 +220,6 @@ static const char *strsettingsflags(const nghttp2_frame_settings *fr) {
   }
 }
 
-static void log_rx_fr_settings(nghttp2_log *log,
-                               const nghttp2_frame_settings *fr) {
-  const nghttp2_proto_settings *settings = fr->settings;
-
-#define NGHTTP2_LOG_SETTINGS_HD(FR)                                            \
-  "rx SETTINGS(0x", hex((FR)->hd.type), ") len=", fr->hd.len,                  \
-    " flags=", strsettingsflags(fr), "(0x", hex(fr->hd.flags), ")"
-
-  if (fr->hd.len == 0 || (fr->hd.flags & NGHTTP2_SETTINGS_FLAG_ACK)) {
-    nghttp2_log_infof_raw(log, NGHTTP2_LOG_EVENT_FRM,
-                          NGHTTP2_LOG_SETTINGS_HD(fr));
-
-    return;
-  }
-
-  nghttp2_log_infof_raw(
-    log, NGHTTP2_LOG_EVENT_FRM, NGHTTP2_LOG_SETTINGS_HD(fr),
-    " SETTINGS_HEADER_TABLE_SIZE(0x1)=", settings->hpack_max_dtable_capacity);
-  nghttp2_log_infof_raw(
-    log, NGHTTP2_LOG_EVENT_FRM, NGHTTP2_LOG_SETTINGS_HD(fr),
-    " SETTINGS_MAX_CONCURRENT_STREAMS(0x3)=", settings->max_concurrent_streams);
-  nghttp2_log_infof_raw(
-    log, NGHTTP2_LOG_EVENT_FRM, NGHTTP2_LOG_SETTINGS_HD(fr),
-    " SETTINGS_INITIAL_WINDOW_SIZE(0x4)=", settings->initial_max_stream_data);
-  nghttp2_log_infof_raw(
-    log, NGHTTP2_LOG_EVENT_FRM, NGHTTP2_LOG_SETTINGS_HD(fr),
-    " SETTINGS_MAX_HEADER_LIST_SIZE(0x6)=", settings->max_field_section_size);
-  nghttp2_log_infof_raw(log, NGHTTP2_LOG_EVENT_FRM, NGHTTP2_LOG_SETTINGS_HD(fr),
-                        " SETTINGS_ENABLE_CONNECT_PROTOCOL(0x8)=",
-                        settings->enable_connect_protocol);
-
-#undef NGHTTP2_LOG_SETTINGS_HD
-}
-
 static const char *strsettings(uint16_t id) {
   switch (id) {
   case NGHTTP2_SETTINGS_HEADER_TABLE_SIZE:
@@ -277,13 +243,13 @@ static const char *strsettings(uint16_t id) {
   }
 }
 
-static void log_tx_fr_settings(nghttp2_log *log,
-                               const nghttp2_frame_settings *fr) {
+static void log_fr_settings(nghttp2_log *log, const nghttp2_frame_settings *fr,
+                            const char *dir) {
   const nghttp2_settings_entry *iv = fr->iv;
   size_t i;
 
 #define NGHTTP2_LOG_SETTINGS_HD(FR)                                            \
-  "tx SETTINGS(0x", hex((FR)->hd.type), ") len=", fr->hd.len,                  \
+  dir, " SETTINGS(0x", hex((FR)->hd.type), ") len=", fr->hd.len,               \
     " flags=", strsettingsflags(fr), "(0x", hex(fr->hd.flags), ")"
 
   if (fr->hd.len == 0 || (fr->hd.flags & NGHTTP2_SETTINGS_FLAG_ACK)) {
@@ -388,7 +354,7 @@ void nghttp2_log_rx_settings(nghttp2_log *log,
     return;
   }
 
-  log_rx_fr_settings(log, fr);
+  log_fr_settings(log, fr, "rx");
 }
 
 void nghttp2_log_rx_ping(nghttp2_log *log, const nghttp2_frame_ping *fr) {
@@ -474,7 +440,7 @@ void nghttp2_log_tx_settings(nghttp2_log *log,
     return;
   }
 
-  log_tx_fr_settings(log, fr);
+  log_fr_settings(log, fr, "tx");
 }
 
 void nghttp2_log_tx_ping(nghttp2_log *log, const nghttp2_frame_ping *fr) {
