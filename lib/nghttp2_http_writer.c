@@ -431,8 +431,11 @@ int nghttp2_http_writer_write_data(nghttp2_http_writer *hw, nghttp2_buf *dest,
   stream->sched.unscheduled_nwrite += nwrite;
   hw->field_left -= nwrite;
 
-  if (hw->data_idx == hw->datacnt) {
+  if (hw->field_left == 0) {
     hw->flags &= ~NGHTTP2_HTTP_WRITER_FLAG_INPROGRESS;
+  }
+
+  if (hw->data_idx == hw->datacnt) {
     hw->datacnt = 0;
 
     if (hw->flags & NGHTTP2_HTTP_WRITER_FLAG_DATA_EOF) {
