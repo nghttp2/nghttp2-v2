@@ -1383,6 +1383,23 @@ void test_nghttp2_conn_submit_request(void) {
   };
 
   setup_default_client_with_options(&conn, opts);
+  read_server_preface(conn, NULL, 0, ts);
+  fr.window_update = (nghttp2_frame_window_update){
+    .hd =
+      {
+        .len = 4,
+        .type = NGHTTP2_FRAME_WINDOW_UPDATE,
+      },
+    .window_size_inc = 1,
+  };
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_window_update(&buf, &fr.window_update);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
 
   stream_id =
     nghttp2_conn_submit_request(conn, reqnva, nghttp2_arraylen(reqnva),
@@ -1412,9 +1429,37 @@ void test_nghttp2_conn_submit_request(void) {
   assert_true(stream->flags & NGHTTP2_STREAM_FLAG_FC_BLOCKED);
   assert_true(stream->flags & NGHTTP2_STREAM_FLAG_SHUT_WR);
   assert_false(nghttp2_http_writer_empty(&stream->tx.hw));
+  assert_false(nghttp2_http_writer_inprogress(&stream->tx.hw));
 
-  conn->tx.max_offset += 65537;
-  stream->tx.max_offset += 65537;
+  fr.window_update = (nghttp2_frame_window_update){
+    .hd =
+      {
+        .len = 4,
+        .type = NGHTTP2_FRAME_WINDOW_UPDATE,
+      },
+    .window_size_inc = 65536,
+  };
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_window_update(&buf, &fr.window_update);
+
+  assert_int(0, ==, rv);
+
+  fr.window_update = (nghttp2_frame_window_update){
+    .hd =
+      {
+        .len = 4,
+        .type = NGHTTP2_FRAME_WINDOW_UPDATE,
+        .stream_id = stream_id,
+      },
+    .window_size_inc = 65537,
+  };
+  rv = nghttp2_frame_encode_window_update(&buf, &fr.window_update);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
 
   for (;;) {
     nghttp2_buf_reset(&buf);
