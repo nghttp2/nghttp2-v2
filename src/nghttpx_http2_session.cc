@@ -1302,7 +1302,7 @@ std::expected<void, Error> Http2Session::connection_made() {
     http2conf.downstream.decoder_dynamic_table_size;
 
   if (auto rv =
-        nghttp2_conn_client_new(&h2conn_, &callbacks, &settings, NULL, this);
+        nghttp2_conn_client_new(&h2conn_, &callbacks, &settings, nullptr, this);
       rv != 0) {
     return std::unexpected{Error::HTTP2};
   }
