@@ -1056,7 +1056,7 @@ std::expected<void, Error> Http2Handler::connection_made() {
       as_unsigned(config.encoder_header_table_size);
   }
 
-  rv = nghttp2_conn_server_new(&conn_, &callbacks, &settings, NULL, this);
+  rv = nghttp2_conn_server_new(&conn_, &callbacks, &settings, nullptr, this);
   if (rv != 0) {
     std::println(stderr, "nghttp2_conn_server_new: {}", nghttp2_strerror(rv));
     return std::unexpected{Error::HTTP2};
