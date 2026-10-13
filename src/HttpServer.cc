@@ -96,9 +96,29 @@ void delete_handler(Http2Handler *handler) {
 }
 } // namespace
 
-void FileEntry::map_file() {
-  map = mmap(NULL, static_cast<size_t>(length), PROT_READ, MAP_PRIVATE, fd, 0);
-  assert(map != MAP_FAILED);
+std::expected<void, Error> FileEntry::map_file() {
+  if (!length) {
+    return {};
+  }
+
+  auto p =
+    mmap(nullptr, static_cast<size_t>(length), PROT_READ, MAP_PRIVATE, fd, 0);
+  if (p == MAP_FAILED) {
+    return std::unexpected{Error::SYSCALL};
+  }
+
+  map = p;
+
+  return {};
+}
+
+void FileEntry::unmap_file() {
+  if (!map) {
+    return;
+  }
+
+  munmap(map, static_cast<size_t>(length));
+  map = nullptr;
 }
 
 namespace {
@@ -267,7 +287,7 @@ public:
           !validate_file_entry(ent.get(), now)) {
         if (ent->usecount == 0) {
           fd_cache_lru_.remove(ent.get());
-          munmap(ent->map, static_cast<size_t>(ent->length));
+          ent->unmap_file();
           close(ent->fd);
           it = fd_cache_.erase(it);
           continue;
@@ -296,7 +316,7 @@ public:
         break;
       }
       fd_cache_lru_.remove(ent);
-      munmap(ent->map, static_cast<size_t>(ent->length));
+      ent->unmap_file();
       close(ent->fd);
       fd_cache_.erase(ent->it);
     }
@@ -308,7 +328,7 @@ public:
 
     if (target->usecount == 0 && target->stale) {
       fd_cache_lru_.remove(target);
-      munmap(target->map, static_cast<size_t>(target->length));
+      target->unmap_file();
       close(target->fd);
       fd_cache_.erase(target->it);
       return;
@@ -327,7 +347,7 @@ public:
       }
 
       fd_cache_lru_.remove(ent.get());
-      munmap(ent->map, static_cast<size_t>(ent->length));
+      ent->unmap_file();
       close(ent->fd);
       i = fd_cache_.erase(i);
     }
@@ -503,6 +523,16 @@ int recv_data(nghttp2_conn *conn, int64_t stream_id, const uint8_t *data,
               size_t datalen, void *user_data, void *stream_user_data) {
   auto hd = static_cast<Http2Handler *>(user_data);
 
+  if (auto rv = nghttp2_conn_extend_max_stream_offset(conn, stream_id, datalen);
+      rv != 0 && nghttp2_err_is_fatal(rv)) {
+    return NGHTTP2_ERR_CALLBACK_FAILURE;
+  }
+
+  if (auto rv = nghttp2_conn_extend_max_offset(conn, datalen);
+      rv != 0 && nghttp2_err_is_fatal(rv)) {
+    return NGHTTP2_ERR_CALLBACK_FAILURE;
+  }
+
   auto stream = hd->get_stream(stream_id);
   if (!stream) {
     return 0;
@@ -527,6 +557,7 @@ int recv_data(nghttp2_conn *conn, int64_t stream_id, const uint8_t *data,
       }
       datalen -= as_unsigned(n);
       data += n;
+      stream->file_ent->length += n;
     }
   }
 
@@ -1414,6 +1445,13 @@ std::expected<void, Error> prepare_response(Stream *stream, Http2Handler *hd) {
 
   if (stream->echo_upload) {
     assert(stream->file_ent);
+
+    if (!stream->file_ent->map_file()) {
+      nghttp2_conn_shutdown_stream(hd->get_conn(), 0x00, stream->stream_id,
+                                   NGHTTP2_INTERNAL_ERROR);
+      return {};
+    }
+
     return prepare_echo_response(stream, hd);
   }
 
@@ -1459,7 +1497,14 @@ std::expected<void, Error> prepare_response(Stream *stream, Http2Handler *hd) {
     file_ent = sessions->cache_fd(
       file_path, FileEntry(file_path, buf.st_size, buf.st_mtime, file,
                            content_type, std::chrono::steady_clock::now()));
-    file_ent->map_file();
+    if (!file_ent->map_file()) {
+      file_ent->stale = true;
+      sessions->release_fd(file_ent);
+      nghttp2_conn_shutdown_stream(hd->get_conn(), 0x00, stream->stream_id,
+                                   NGHTTP2_INTERNAL_ERROR);
+
+      return {};
+    }
   }
 
   stream->file_ent = file_ent;
@@ -1682,7 +1727,9 @@ FileEntry make_status_body(uint32_t status, uint16_t port) {
   }
 
   auto ent = FileEntry(util::utos(status), nwrite, 0, fd, nullptr, {});
-  ent.map_file();
+  auto rv = ent.map_file();
+  (void)rv;
+  assert(rv);
 
   return ent;
 }

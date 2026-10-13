@@ -111,7 +111,8 @@ struct FileEntry {
       content_type(content_type),
       fd(fd),
       stale(stale) {}
-  void map_file();
+  std::expected<void, Error> map_file();
+  void unmap_file();
   std::string path;
   std::unordered_multimap<std::string, std::unique_ptr<FileEntry>>::iterator it;
   void *map{};
@@ -215,6 +216,8 @@ public:
   std::expected<void, Error> tls_handshake();
   std::expected<void, Error> read_tls();
   std::expected<void, Error> write_tls();
+
+  nghttp2_conn *get_conn() const { return conn_; }
 
   struct ev_loop *get_loop() const;
 
