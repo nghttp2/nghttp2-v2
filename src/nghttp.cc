@@ -1903,14 +1903,16 @@ int run(char **uris, int n) {
       }
     }
 
-    data_map = mmap(nullptr, static_cast<size_t>(data_stat.st_size), PROT_READ,
-                    MAP_SHARED, data_fd, 0);
-    if (data_map == MAP_FAILED) {
-      std::println(stderr, "[ERROR] Could not map file");
-      return 1;
-    }
+    if (data_stat.st_size) {
+      data_map = mmap(nullptr, static_cast<size_t>(data_stat.st_size),
+                      PROT_READ, MAP_SHARED, data_fd, 0);
+      if (data_map == MAP_FAILED) {
+        std::println(stderr, "[ERROR] Could not map file");
+        return 1;
+      }
 
-    data_maplen = static_cast<size_t>(data_stat.st_size);
+      data_maplen = static_cast<size_t>(data_stat.st_size);
+    }
   }
   std::vector<
     std::tuple<std::string, const nghttp2_data_reader *, int64_t, nghttp2_pri>>
@@ -1957,7 +1959,7 @@ int run(char **uris, int n) {
     }
   }
 
-  if (data_fd != -1) {
+  if (data_map) {
     munmap(data_map, data_maplen);
     data_map = nullptr;
     data_maplen = 0;
