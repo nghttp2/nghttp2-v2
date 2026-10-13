@@ -326,7 +326,7 @@ submit_request(HttpClient *client, const Headers &headers, Request *req) {
                                {":path", req->make_reqpath()},
                                {":scheme", std::string{scheme}},
                                {":authority", client->hostport},
-                               {"priority", http2::encode_extpri(req->pri)},
+                               {"priority", http2::encode_pri(req->pri)},
                                {"accept", "*/*"},
                                {"accept-encoding", "gzip, deflate"},
                                {"user-agent", "nghttp2/" NGHTTP2_VERSION}};
@@ -2031,15 +2031,13 @@ Options:
   -m, --multiply=<N>
               Request each URI <N> times.  By default, same URI is not
               requested twice.  This option disables it too.
-  --extpri=<PRI>
-              Sets RFC 9218 priority of  given URI.  <PRI> must be the
+  --pri=<PRI> Sets RFC 9218 priority of  given URI.  <PRI> must be the
               wire format  of priority  header field  (e.g., "u=3,i").
-              This  option  can  be  used  multiple  times,  and  N-th
-              --extpri option sets priority of N-th URI in the command
-              line.  If  the number  of this option  is less  than the
-              number of  URI, the last  option value is  repeated.  If
-              there  is   no  --extpri  option,  urgency   is  3,  and
-              incremental is false.
+              This option can  be used multiple times,  and N-th --pri
+              option sets  priority of N-th  URI in the  command line.
+              If the number of this option  is less than the number of
+              URI, the last option value  is repeated.  If there is no
+              --pri option, urgency is 3, and incremental is false.
   -M, --peer-max-concurrent-streams=<N>
               Use  <N>  as  SETTINGS_MAX_CONCURRENT_STREAMS  value  of
               remote endpoint as if it  is received in SETTINGS frame.
@@ -2116,7 +2114,7 @@ int main(int argc, char **argv) {
       {"expect-continue", no_argument, &flag, 13},
       {"encoder-header-table-size", required_argument, &flag, 14},
       {"ktls", no_argument, &flag, 15},
-      {"extpri", required_argument, &flag, 17},
+      {"pri", required_argument, &flag, 17},
       {nullptr, 0, nullptr, 0}};
     int option_index = 0;
     int c = getopt_long(argc, argv, "M:Oac:d:m:nr:hH:vst:w:yW:", long_options,
@@ -2325,7 +2323,7 @@ int main(int argc, char **argv) {
         config.ktls = true;
         break;
       case 17: {
-        // extpri option
+        // pri option
         nghttp2_pri pri{
           .urgency = NGHTTP2_DEFAULT_URGENCY,
         };
@@ -2333,7 +2331,7 @@ int main(int argc, char **argv) {
         if (nghttp2_pri_parse_priority(
               &pri, reinterpret_cast<const uint8_t *>(optarg),
               strlen(optarg)) != 0) {
-          std::println(stderr, "--extpri: Bad option value: {}", optarg);
+          std::println(stderr, "--pri: Bad option value: {}", optarg);
           exit(EXIT_FAILURE);
         }
 

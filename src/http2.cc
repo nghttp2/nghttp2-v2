@@ -1346,11 +1346,11 @@ bool check_transfer_encoding(std::string_view s) {
   }
 }
 
-std::string encode_extpri(const nghttp2_pri &extpri) {
+std::string encode_pri(const nghttp2_pri &pri) {
   std::string res = "u=";
 
-  res += static_cast<char>(extpri.urgency) + '0';
-  if (extpri.inc) {
+  res += static_cast<char>(pri.urgency) + '0';
+  if (pri.inc) {
     res += ",i";
   }
 
