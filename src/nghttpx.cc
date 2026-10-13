@@ -1843,7 +1843,7 @@ void fill_default_config(Config *config) {
 
 namespace {
 void print_version() {
-  std::println("nghttpx nghttp2/" NGHTTP2_VERSION
+  std::println("nghttpx nghttp2-v2/" NGHTTP2_VERSION
 #ifdef ENABLE_HTTP3
                " ngtcp2/" NGTCP2_VERSION " nghttp3/" NGHTTP3_VERSION
 #endif // ENABLE_HTTP3
@@ -1854,7 +1854,7 @@ void print_version() {
 namespace {
 void print_usage(FILE *out) {
   std::println(out, R"(Usage: nghttpx [OPTIONS]... [<PRIVATE_KEY> <CERT>]
-A reverse proxy for HTTP/3, HTTP/2, and HTTP/1.)");
+A reverse proxy for HTTP/3, HTTP/2, and HTTP/1)");
 }
 } // namespace
 

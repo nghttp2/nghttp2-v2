@@ -30,9 +30,12 @@ are all you need.  Use ``--enable-lib-only`` to ensure that only
 libnghttp2v2 is built.  This avoids potential build errors related to
 building bundled applications.
 
-To build and run the application programs (``nghttp``, ``nghttpd``,
-``nghttpx``, and ``h2load``) in the ``src`` directory, a C++23
-compliant compiler is required.  The following packages are also
+To build and run the application programs (`nghttp
+<https://nghttp2.org/v2/nghttp.1.html>`_, `nghttpd
+<https://nghttp2.org/v2/nghttpd.1.html>`_, `nghttpx
+<https://nghttp2.org/v2/nghttpx.1.html>`_, and `h2load
+<https://nghttp2.org/v2/h2load.1.html>`_) in the ``src`` directory, a
+C++23 compliant compiler is required.  The following packages are also
 required:
 
 - OpenSSL >= 1.1.1; or wolfSSL >= 5.7.0; or LibreSSL >= 3.8.1; or
@@ -166,7 +169,7 @@ libnghttp2v2 implements the following HTTP/2 specification:
 
 It also implements HPACK, the header compression for HTTP/2:
 
-- `RFC 7541 HPACK <https://datatracker.ietf.org/doc/html/rfc7541>`_.
+- `RFC 7541 HPACK <https://datatracker.ietf.org/doc/html/rfc7541>`_
 
 Note that libnghttp2v2 does not implement server push, which is
 largely regarded as useless.

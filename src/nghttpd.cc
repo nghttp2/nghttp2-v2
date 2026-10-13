@@ -48,7 +48,7 @@
 namespace nghttp2 {
 
 namespace {
-void print_version() { std::println("nghttpd nghttp2/" NGHTTP2_VERSION); }
+void print_version() { std::println("nghttpd nghttp2-v2/" NGHTTP2_VERSION); }
 } // namespace
 
 namespace {

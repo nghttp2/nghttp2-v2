@@ -1970,7 +1970,7 @@ int run(char **uris, int n) {
 } // namespace
 
 namespace {
-void print_version() { std::println("nghttp nghttp2/" NGHTTP2_VERSION); }
+void print_version() { std::println("nghttp nghttp2-v2/" NGHTTP2_VERSION); }
 } // namespace
 
 namespace {
