@@ -1652,6 +1652,10 @@ static int conn_recv_window_update(nghttp2_conn *conn,
 
   nghttp2_log_rx_window_update(&conn->log, fr);
 
+  if (fr->window_size_inc == 0) {
+    return NGHTTP2_ERR_PROTO;
+  }
+
   if (fr->hd.stream_id == 0) {
     max_offset = conn->tx.max_offset + fr->window_size_inc;
     if (max_offset - conn->tx.offset > NGHTTP2_MAX_WINDOW_SIZE) {
