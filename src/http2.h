@@ -369,8 +369,8 @@ bool legacy_http1(int major, int minor);
 // list elements.
 bool check_transfer_encoding(std::string_view s);
 
-// Encodes |extpri| in the wire format.
-std::string encode_extpri(const nghttp2_pri &extpri);
+// Encodes |pri| in the wire format.
+std::string encode_pri(const nghttp2_pri &pri);
 
 } // namespace http2
 
