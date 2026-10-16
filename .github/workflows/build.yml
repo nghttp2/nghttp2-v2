@@ -110,7 +110,7 @@ jobs:
           autoconf \
           automake \
           libtool \
-          openssl
+          openssl@4
     - name: Build libbpf
       if: steps.cache-libbpf.outputs.cache-hit != 'true' && runner.os == 'Linux'
       run: |
@@ -297,7 +297,7 @@ jobs:
       run: |
         brew install \
           libev \
-          openssl \
+          openssl@4 \
           autoconf \
           automake \
           libtool
