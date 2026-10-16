@@ -441,6 +441,12 @@ jobs:
         path: ngtcp2-awslc/build
         key: ${{ matrix.os }}-ngtcp2-${{ env.NGTCP2_VERSION }}-awslc-${{ env.AWSLC_VERSION }}
         fail-on-cache-miss: true
+    - name: Setup MacOS OpenSSL variables
+      if: runner.os == 'macOS' && matrix.openssl == 'openssl'
+      run: |
+        PKG_CONFIG_PATH="$(brew --prefix openssl@4)/lib/pkgconfig:$PKG_CONFIG_PATH"
+
+        echo 'PKG_CONFIG_PATH='"$PKG_CONFIG_PATH" >> $GITHUB_ENV
     - name: Setup extra environment variables
       if: matrix.http3 == 'no-http3'
       run: |
