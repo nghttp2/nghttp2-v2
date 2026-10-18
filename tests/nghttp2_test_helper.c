@@ -39,8 +39,8 @@ void write_settings(nghttp2_buf *dest, const nghttp2_settings_entry *iv,
   p = nghttp2_put_uint32be(p, 0);
 
   for (i = 0; i < ivlen; ++i) {
-    p = nghttp2_put_uint16be(p, iv[0].id);
-    p = nghttp2_put_uint32be(p, iv[0].value);
+    p = nghttp2_put_uint16be(p, iv[i].id);
+    p = nghttp2_put_uint32be(p, iv[i].value);
   }
 
   nghttp2_put_uint24be(
