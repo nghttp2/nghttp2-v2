@@ -513,6 +513,7 @@ jobs:
       if: matrix.buildtool != 'distcheck'
       with:
         go-version: "1.26"
+        cache: false
     - name: Integration test
       # Integration tests for nghttpx; autotools erases build
       # artifacts.
