@@ -66,6 +66,7 @@ typedef struct nghttp2_frame_reader {
   nghttp2_frame fr;
   struct {
     struct {
+      size_t uncompressed_field_blocklen;
       size_t num_continuations;
     } headers;
     struct {

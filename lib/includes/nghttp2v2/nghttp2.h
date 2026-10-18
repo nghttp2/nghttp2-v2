@@ -1025,6 +1025,12 @@ typedef struct nghttp2_settings {
    */
   size_t hpack_encoder_max_dtable_capacity;
   /**
+   * :member:`max_field_section_size` is the maximum field block
+   * length, counted by the uncompressed name and value length plus 32
+   * bytes overhead per field that the local endpoint can accept.
+   */
+  size_t max_field_section_size;
+  /**
    * :member:`max_concurrent_streams_local` is the number of
    * concurrent streams that a local endpoint can open until the
    * actual limit is known.  When SETTINGS frame is received from the
@@ -1105,6 +1111,8 @@ typedef struct nghttp2_settings {
  * - :member:`hpack_encoder_max_dtable_capacity
  *   <nghttp2_settings.hpack_encoder_max_dtable_capacity>` =
  *   :macro:`NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY`
+ * - :member:`max_field_section_size
+     <nghttp2_settings.max_field_section_size>` = 65536
  * - :member:`max_concurrent_streams_local
  *   <nghttp2_settings.max_concurrent_streams_local>` = 100
  * - :member:`initial_max_stream_data
@@ -2254,6 +2262,8 @@ NGHTTP2_EXTERN int nghttp2_conn_get_stream_priority(const nghttp2_conn *conn,
  *
  * :macro:`NGHTTP2_ERR_NOMEM`
  *     Out of memory.
+ * :macro:`NGHTTP2_ERR_INVALID_ARGUMENT`
+ *     |datalen| is too large.
  */
 NGHTTP2_EXTERN int nghttp2_conn_set_client_stream_priority(nghttp2_conn *conn,
                                                            int64_t stream_id,

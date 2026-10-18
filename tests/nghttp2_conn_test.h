@@ -86,5 +86,6 @@ munit_void_test_decl(test_nghttp2_conn_get_settings)
 munit_void_test_decl(test_nghttp2_conn_get_headers_field_blocklen)
 munit_void_test_decl(test_nghttp2_conn_get_remote_settings)
 munit_void_test_decl(test_nghttp2_conn_extra_settings)
+munit_void_test_decl(test_nghttp2_conn_max_field_section_size)
 
 #endif /* !defined(NGHTTP2_CONN_TEST_H) */
