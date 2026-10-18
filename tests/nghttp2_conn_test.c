@@ -14724,6 +14724,64 @@ void test_nghttp2_conn_client_priority_update(void) {
   assert_size(0, ==, nghttp2_buf_len(&obuf));
 
   nghttp2_conn_del(conn);
+
+  /* Priority field is too large */
+  setup_default_client(&conn);
+  write_preface(conn, ts);
+  read_server_preface(conn, NULL, 0, ts);
+  write_settings_ack(conn, ts);
+
+  stream_id = nghttp2_conn_submit_request(conn, reqnva,
+                                          nghttp2_arraylen(reqnva), NULL, NULL);
+
+  assert_int64(0x01, ==, stream_id);
+
+  rv =
+    nghttp2_conn_set_client_stream_priority(conn, stream_id, nulldata, 16372);
+
+  assert_int(NGHTTP2_ERR_INVALID_ARGUMENT, ==, rv);
+
+  nghttp2_conn_del(conn);
+
+  /* Write the maximum sized PRIORITY_UPDATE */
+  setup_default_client(&conn);
+  write_preface(conn, ts);
+  read_server_preface(conn, NULL, 0, ts);
+  write_settings_ack(conn, ts);
+
+  stream_id = nghttp2_conn_submit_request(conn, reqnva,
+                                          nghttp2_arraylen(reqnva), NULL, NULL);
+
+  assert_int64(0x01, ==, stream_id);
+
+  nwrite = nghttp2_conn_write(conn, outbuf, sizeof(outbuf), ++ts);
+
+  assert_ptrdiff(0, <, nwrite);
+
+  rv =
+    nghttp2_conn_set_client_stream_priority(conn, stream_id, nulldata, 16371);
+
+  assert_int(0, ==, rv);
+
+  nghttp2_buf_reset(&obuf);
+  nwrite = nghttp2_conn_write(conn, obuf.last, nghttp2_buf_left(&obuf), ++ts);
+
+  assert_ptrdiff(NGHTTP2_DEFAULT_MAX_FRAME_SIZE, ==, nwrite);
+
+  obuf.last += nwrite;
+
+  rv = nghttp2_frd_decode_buf(&frd, &fr, &obuf);
+
+  assert_int(0, ==, rv);
+  assert_uint32(4 + 16371, ==, fr.meta.hd.len);
+  assert_uint8(NGHTTP2_FRAME_PRIORITY_UPDATE, ==, fr.meta.hd.type);
+  assert_int64(0x00, ==, fr.priority_update.hd.stream_id);
+  assert_uint32((uint32_t)stream_id, ==,
+                fr.priority_update.prioritized_stream_id);
+  assert_size(16371, ==, fr.priority_update.prilen);
+  assert_size(0, ==, nghttp2_buf_len(&obuf));
+
+  nghttp2_conn_del(conn);
 }
 
 void test_nghttp2_conn_server_priority_update(void) {

@@ -2262,6 +2262,8 @@ NGHTTP2_EXTERN int nghttp2_conn_get_stream_priority(const nghttp2_conn *conn,
  *
  * :macro:`NGHTTP2_ERR_NOMEM`
  *     Out of memory.
+ * :macro:`NGHTTP2_ERR_INVALID_ARGUMENT`
+ *     |datalen| is too large.
  */
 NGHTTP2_EXTERN int nghttp2_conn_set_client_stream_priority(nghttp2_conn *conn,
                                                            int64_t stream_id,

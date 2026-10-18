@@ -3865,6 +3865,11 @@ int nghttp2_conn_set_client_stream_priority(nghttp2_conn *conn,
 
   assert(!conn->server);
 
+  if (datalen > NGHTTP2_DEFAULT_MAX_FRAME_SIZE ||
+      NGHTTP2_FRAME_HDLEN + 4 > NGHTTP2_DEFAULT_MAX_FRAME_SIZE - datalen) {
+    return NGHTTP2_ERR_INVALID_ARGUMENT;
+  }
+
   stream = nghttp2_conn_find_stream(conn, stream_id);
   if (!stream) {
     return 0;
