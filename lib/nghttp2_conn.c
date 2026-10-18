@@ -2387,8 +2387,6 @@ static int conn_read(nghttp2_conn *conn, nghttp2_context ctx,
       }
 
       if (frrd->left == 0) {
-        assert(fr->headers.padlen == 0);
-
         if (fr->headers.hd.flags & NGHTTP2_HEADERS_FLAG_END_HEADERS) {
           rv = conn_recv_headers(conn, ctx, &fr->headers);
           if (rv != 0) {
