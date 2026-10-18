@@ -1085,8 +1085,8 @@ static int hpack_context_add_dtable(nghttp2_hpack_context *ctx,
   }
 
   if (room > ctx->max_dtable_capacity) {
-    /* The entry taking more than NGHTTP2_HPACK_MAX_BUFFER_SIZE is
-       immediately evicted.  So we don't allocate memory for it. */
+    /* The entry taking more than the table capacity is immediately
+       evicted.  So we don't allocate memory for it. */
     return 0;
   }
 
