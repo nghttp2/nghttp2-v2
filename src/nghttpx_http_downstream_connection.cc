@@ -940,7 +940,7 @@ int htp_hdrs_completecb(llhttp_t *htp) {
   resp.http_major = htp->http_major;
   resp.http_minor = htp->http_minor;
 
-  if (resp.http_major > 1 || req.http_minor > 1) {
+  if (resp.http_major > 1 || resp.http_minor > 1) {
     resp.http_major = 1;
     resp.http_minor = 1;
     return -1;
