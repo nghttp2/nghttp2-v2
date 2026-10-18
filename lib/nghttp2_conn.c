@@ -2442,8 +2442,6 @@ static int conn_read(nghttp2_conn *conn, nghttp2_context ctx,
         return NGHTTP2_ERR_EXCESSIVE_LOAD;
       }
 
-      ++frrd->scratch.headers.num_continuations;
-
       len = nghttp2_int_reader_read(ird, p, (size_t)(end - p), 3);
 
       p += len;
@@ -2457,6 +2455,8 @@ static int conn_read(nghttp2_conn *conn, nghttp2_context ctx,
       if (frrd->left > NGHTTP2_DEFAULT_MAX_FRAME_SIZE) {
         return nghttp2_conn_handle_error(conn, NGHTTP2_ERR_FRAME_SIZE);
       }
+
+      ++frrd->scratch.headers.num_continuations;
 
       /* We treat HEADERS + CONTINUATIONS... as a one big HEADERS. */
       fr->headers.hd.len += (uint32_t)frrd->left;
