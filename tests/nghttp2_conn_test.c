@@ -86,6 +86,7 @@ static const MunitTest tests[] = {
   munit_void_test(test_nghttp2_conn_get_headers_field_blocklen),
   munit_void_test(test_nghttp2_conn_get_remote_settings),
   munit_void_test(test_nghttp2_conn_extra_settings),
+  munit_void_test(test_nghttp2_conn_max_field_section_size),
   munit_test_end(),
 };
 
@@ -1344,13 +1345,16 @@ void test_nghttp2_conn_submit_request(void) {
   assert_uint8(NGHTTP2_FRAME_SETTINGS, ==, fr.meta.hd.type);
   assert_uint8(0x00U, ==, fr.settings.hd.flags);
   assert_int64(0, ==, fr.settings.hd.stream_id);
-  assert_size(2, ==, fr.settings.niv);
+  assert_size(3, ==, fr.settings.niv);
   assert_uint16(NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, ==,
                 fr.settings.iv[0].id);
   assert_uint32(0, ==, fr.settings.iv[0].value);
   assert_uint16(NGHTTP2_SETTINGS_NO_RFC7540_PRIORITIES, ==,
                 fr.settings.iv[1].id);
   assert_uint32(1, ==, fr.settings.iv[1].value);
+  assert_uint16(NGHTTP2_SETTINGS_MAX_HEADER_LIST_SIZE, ==,
+                fr.settings.iv[2].id);
+  assert_uint32(65536, ==, fr.settings.iv[2].value);
 
   rv = nghttp2_frd_decode_buf(&frd, &fr, &buf);
 
@@ -1519,13 +1523,16 @@ void test_nghttp2_conn_submit_request(void) {
   assert_uint8(NGHTTP2_FRAME_SETTINGS, ==, fr.meta.hd.type);
   assert_uint8(0x00U, ==, fr.settings.hd.flags);
   assert_int64(0, ==, fr.settings.hd.stream_id);
-  assert_size(2, ==, fr.settings.niv);
+  assert_size(3, ==, fr.settings.niv);
   assert_uint16(NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, ==,
                 fr.settings.iv[0].id);
   assert_uint32(0, ==, fr.settings.iv[0].value);
   assert_uint16(NGHTTP2_SETTINGS_NO_RFC7540_PRIORITIES, ==,
                 fr.settings.iv[1].id);
   assert_uint32(1, ==, fr.settings.iv[1].value);
+  assert_uint16(NGHTTP2_SETTINGS_MAX_HEADER_LIST_SIZE, ==,
+                fr.settings.iv[2].id);
+  assert_uint32(65536, ==, fr.settings.iv[2].value);
 
   rv = nghttp2_frd_decode_buf(&frd, &fr, &buf);
 
@@ -16322,7 +16329,142 @@ void test_nghttp2_conn_extra_settings(void) {
 
   ++i;
 
+  assert_uint16(NGHTTP2_SETTINGS_MAX_HEADER_LIST_SIZE, ==,
+                fr.settings.iv[i].id);
+  assert_uint32(65536, ==, fr.settings.iv[i].value);
+
+  ++i;
+
   assert_size(i, ==, fr.settings.niv);
 
   nghttp2_conn_del(conn);
+}
+
+void test_nghttp2_conn_max_field_section_size(void) {
+  const nghttp2_mem *mem = nghttp2_mem_default();
+  nghttp2_conn *conn;
+  nghttp2_settings settings;
+  uint8_t rawbuf[16384];
+  nghttp2_buf buf, hbuf;
+  nghttp2_tstamp ts = 0;
+  nghttp2_frame fr;
+  nghttp2_hpack_encoder enc;
+  nghttp2_stream *stream;
+  conn_options opts;
+  size_t uncompressed_field_blocklen = 0;
+  size_t i;
+  int rv;
+
+  nghttp2_buf_wrap_init(&buf, rawbuf, sizeof(rawbuf));
+  nghttp2_buf_init(&hbuf);
+
+  for (i = 0; i < nghttp2_arraylen(reqnva); ++i) {
+    uncompressed_field_blocklen += reqnva[i].namelen + reqnva[i].valuelen + 32;
+  }
+
+  /* Receive a header block that exceeds max_field_section_size */
+  server_default_settings(&settings);
+  settings.max_field_section_size = uncompressed_field_blocklen - 1;
+
+  opts = (conn_options){
+    .settings = &settings,
+  };
+
+  setup_default_server_with_options(&conn, opts);
+  read_client_preface(conn, NULL, 0, ts);
+  nghttp2_hpack_encoder_init(&enc, NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY, mem);
+
+  nghttp2_buf_reset(&hbuf);
+  rv =
+    nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
+
+  assert_int(0, ==, rv);
+
+  fr.headers = (nghttp2_frame_headers){
+    .hd =
+      {
+        .type = NGHTTP2_FRAME_HEADERS,
+        .flags =
+          NGHTTP2_HEADERS_FLAG_END_HEADERS | NGHTTP2_HEADERS_FLAG_END_STREAM,
+        .stream_id = 0x01,
+      },
+    .field_block = hbuf.pos,
+    .field_blocklen = nghttp2_buf_len(&hbuf),
+  };
+
+  fr.headers.hd.len =
+    (uint32_t)nghttp2_frame_encode_headers_payloadlen(&fr.headers);
+
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
+              ==, conn->rx.frrd.state);
+
+  stream = nghttp2_conn_find_stream(conn, 0x01);
+
+  assert_not_null(stream);
+  assert_true(stream->flags & NGHTTP2_STREAM_FLAG_RST_STREAM);
+
+  nghttp2_hpack_encoder_free(&enc);
+  nghttp2_conn_del(conn);
+
+  /* Receive a header block that is exactly max_field_section_size */
+  server_default_settings(&settings);
+  settings.max_field_section_size = uncompressed_field_blocklen;
+
+  opts = (conn_options){
+    .settings = &settings,
+  };
+
+  setup_default_server_with_options(&conn, opts);
+  read_client_preface(conn, NULL, 0, ts);
+  nghttp2_hpack_encoder_init(&enc, NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY, mem);
+
+  nghttp2_buf_reset(&hbuf);
+  rv =
+    nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
+
+  assert_int(0, ==, rv);
+
+  fr.headers = (nghttp2_frame_headers){
+    .hd =
+      {
+        .type = NGHTTP2_FRAME_HEADERS,
+        .flags =
+          NGHTTP2_HEADERS_FLAG_END_HEADERS | NGHTTP2_HEADERS_FLAG_END_STREAM,
+        .stream_id = 0x01,
+      },
+    .field_block = hbuf.pos,
+    .field_blocklen = nghttp2_buf_len(&hbuf),
+  };
+
+  fr.headers.hd.len =
+    (uint32_t)nghttp2_frame_encode_headers_payloadlen(&fr.headers);
+
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
+              ==, conn->rx.frrd.state);
+
+  stream = nghttp2_conn_find_stream(conn, 0x01);
+
+  assert_not_null(stream);
+  assert_false(stream->flags & NGHTTP2_STREAM_FLAG_RST_STREAM);
+
+  nghttp2_hpack_encoder_free(&enc);
+  nghttp2_conn_del(conn);
+
+  nghttp2_buf_free(&hbuf, mem);
 }

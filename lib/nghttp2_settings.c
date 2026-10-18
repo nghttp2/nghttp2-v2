@@ -28,6 +28,7 @@ void nghttp2_settings_default(nghttp2_settings *settings) {
   *settings = (nghttp2_settings){
     .hpack_max_dtable_capacity = NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY,
     .hpack_encoder_max_dtable_capacity = NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY,
+    .max_field_section_size = 65536,
     .max_concurrent_streams_local = 100,
     .initial_max_stream_data = NGHTTP2_INITIAL_WINDOW_SIZE,
     .initial_max_data = NGHTTP2_INITIAL_WINDOW_SIZE,

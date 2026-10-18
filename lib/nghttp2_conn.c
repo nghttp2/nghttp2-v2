@@ -1008,6 +1008,7 @@ static int conn_recv_headers_hd(nghttp2_conn *conn, nghttp2_context ctx,
 
   fr->padlen = 0;
   fr->field_blocklen = 0;
+  conn->rx.frrd.scratch.headers.uncompressed_field_blocklen = 0;
   conn->rx.frrd.scratch.headers.num_continuations = 0;
 
   if (!conn->server) {
@@ -1146,6 +1147,7 @@ int nghttp2_conn_decode_field_block(nghttp2_conn *conn, int64_t stream_id,
   nghttp2_hpack_nv nv;
   nghttp2_buf buf;
   nghttp2_recv_field recv_header = NULL;
+  size_t fieldlen;
   int request = 0;
   int trailers = 0;
   int rv;
@@ -1202,6 +1204,22 @@ int nghttp2_conn_decode_field_block(nghttp2_conn *conn, int64_t stream_id,
 
         continue;
       }
+
+      fieldlen = nv.name->len + nv.value->len + 32;
+      if (fieldlen > conn->settings.max_field_section_size ||
+          conn->rx.frrd.scratch.headers.uncompressed_field_blocklen >
+            conn->settings.max_field_section_size - fieldlen) {
+        nghttp2_conn_shutdown_stream(conn, 0x00, stream->stream_id,
+                                     NGHTTP2_PROTOCOL_ERROR);
+        stream = NULL;
+
+        nghttp2_rcbuf_decref(nv.name);
+        nghttp2_rcbuf_decref(nv.value);
+
+        continue;
+      }
+
+      conn->rx.frrd.scratch.headers.uncompressed_field_blocklen += fieldlen;
 
       rv = nghttp2_http_on_header(&stream->rx.http, &nv, request, trailers,
                                   conn->server &&
@@ -3142,7 +3160,7 @@ int nghttp2_conn_write_stream_flow_controlled(nghttp2_conn *conn,
 int nghttp2_conn_write_settings(nghttp2_conn *conn, nghttp2_buf *dest,
                                 nghttp2_tstamp ts) {
   const nghttp2_settings *settings = &conn->settings;
-  nghttp2_settings_entry rawiv[5];
+  nghttp2_settings_entry rawiv[6];
   nghttp2_settings_entry *iv;
   size_t niv;
   nghttp2_frame_settings fr;
@@ -3171,6 +3189,10 @@ int nghttp2_conn_write_settings(nghttp2_conn *conn, nghttp2_buf *dest,
   iv[niv++] = (nghttp2_settings_entry){
     .id = NGHTTP2_SETTINGS_NO_RFC7540_PRIORITIES,
     .value = 1,
+  };
+  iv[niv++] = (nghttp2_settings_entry){
+    .id = NGHTTP2_SETTINGS_MAX_HEADER_LIST_SIZE,
+    .value = (uint32_t)settings->max_field_section_size,
   };
 
   if (settings->hpack_max_dtable_capacity !=
