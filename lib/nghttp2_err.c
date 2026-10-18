@@ -98,6 +98,7 @@ uint32_t nghttp2_err_infer_http2_error_code(int liberr) {
   case NGHTTP2_ERR_SETTINGS_TIMEOUT:
     return NGHTTP2_SETTINGS_TIMEOUT;
   case NGHTTP2_ERR_FRAME_SIZE:
+  case NGHTTP2_ERR_FRAME_ENCODING:
     return NGHTTP2_FRAME_SIZE_ERROR;
   case NGHTTP2_ERR_INTERNAL:
   case NGHTTP2_ERR_NOMEM:

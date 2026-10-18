@@ -1426,7 +1426,7 @@ static int conn_recv_settings_entry(nghttp2_conn *conn,
     break;
   case NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE:
     if (value > NGHTTP2_MAX_WINDOW_SIZE) {
-      return NGHTTP2_ERR_PROTO;
+      return NGHTTP2_ERR_FLOW_CONTROL;
     }
 
     settings->initial_max_stream_data = value;

@@ -2336,7 +2336,7 @@ void test_nghttp2_conn_recv_headers(void) {
   assert_int(0, ==, rv);
   assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_CLOSING, ==,
               conn->rx.frrd.state);
-  assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, conn->tx.goaway.error_code);
+  assert_uint32(NGHTTP2_FRAME_SIZE_ERROR, ==, conn->tx.goaway.error_code);
 
   nghttp2_conn_del(conn);
 
@@ -2368,7 +2368,7 @@ void test_nghttp2_conn_recv_headers(void) {
   assert_int(0, ==, rv);
   assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_CLOSING, ==,
               conn->rx.frrd.state);
-  assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, conn->tx.goaway.error_code);
+  assert_uint32(NGHTTP2_FRAME_SIZE_ERROR, ==, conn->tx.goaway.error_code);
 
   nghttp2_conn_del(conn);
 
@@ -2397,7 +2397,7 @@ void test_nghttp2_conn_recv_headers(void) {
   assert_int(0, ==, rv);
   assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_CLOSING, ==,
               conn->rx.frrd.state);
-  assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, conn->tx.goaway.error_code);
+  assert_uint32(NGHTTP2_FRAME_SIZE_ERROR, ==, conn->tx.goaway.error_code);
 
   nghttp2_conn_del(conn);
 
@@ -2426,7 +2426,7 @@ void test_nghttp2_conn_recv_headers(void) {
   assert_int(0, ==, rv);
   assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_CLOSING, ==,
               conn->rx.frrd.state);
-  assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, conn->tx.goaway.error_code);
+  assert_uint32(NGHTTP2_FRAME_SIZE_ERROR, ==, conn->tx.goaway.error_code);
 
   nghttp2_conn_del(conn);
 
@@ -2456,7 +2456,7 @@ void test_nghttp2_conn_recv_headers(void) {
   assert_int(0, ==, rv);
   assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_CLOSING, ==,
               conn->rx.frrd.state);
-  assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, conn->tx.goaway.error_code);
+  assert_uint32(NGHTTP2_FRAME_SIZE_ERROR, ==, conn->tx.goaway.error_code);
 
   nghttp2_conn_del(conn);
 
@@ -2504,7 +2504,7 @@ void test_nghttp2_conn_recv_headers(void) {
   assert_int(0, ==, rv);
   assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_CLOSING, ==,
               conn->rx.frrd.state);
-  assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, conn->tx.goaway.error_code);
+  assert_uint32(NGHTTP2_FRAME_SIZE_ERROR, ==, conn->tx.goaway.error_code);
 
   nghttp2_conn_del(conn);
 
@@ -2537,7 +2537,7 @@ void test_nghttp2_conn_recv_headers(void) {
   assert_int(0, ==, rv);
   assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_CLOSING, ==,
               conn->rx.frrd.state);
-  assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, conn->tx.goaway.error_code);
+  assert_uint32(NGHTTP2_FRAME_SIZE_ERROR, ==, conn->tx.goaway.error_code);
 
   nghttp2_conn_del(conn);
 
@@ -4410,7 +4410,7 @@ void test_nghttp2_conn_recv_data(void) {
   assert_int(0, ==, rv);
   assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_CLOSING, ==,
               conn->rx.frrd.state);
-  assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, conn->tx.goaway.error_code);
+  assert_uint32(NGHTTP2_FRAME_SIZE_ERROR, ==, conn->tx.goaway.error_code);
 
   nghttp2_hpack_encoder_free(&enc);
   nghttp2_conn_del(conn);
@@ -4465,7 +4465,7 @@ void test_nghttp2_conn_recv_data(void) {
   assert_int(0, ==, rv);
   assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_CLOSING, ==,
               conn->rx.frrd.state);
-  assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, conn->tx.goaway.error_code);
+  assert_uint32(NGHTTP2_FRAME_SIZE_ERROR, ==, conn->tx.goaway.error_code);
 
   nghttp2_hpack_encoder_free(&enc);
   nghttp2_conn_del(conn);
@@ -4939,7 +4939,7 @@ void test_nghttp2_conn_recv_rst_stream(void) {
   assert_int(0, ==, rv);
   assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_CLOSING, ==,
               conn->rx.frrd.state);
-  assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, conn->tx.goaway.error_code);
+  assert_uint32(NGHTTP2_FRAME_SIZE_ERROR, ==, conn->tx.goaway.error_code);
 
   nghttp2_conn_del(conn);
 
@@ -5419,7 +5419,7 @@ void test_nghttp2_conn_recv_settings(void) {
   assert_int(0, ==, rv);
   assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_CLOSING, ==,
               conn->rx.frrd.state);
-  assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, conn->tx.goaway.error_code);
+  assert_uint32(NGHTTP2_FLOW_CONTROL_ERROR, ==, conn->tx.goaway.error_code);
 
   nghttp2_conn_del(conn);
 
@@ -5600,7 +5600,7 @@ void test_nghttp2_conn_recv_settings(void) {
   assert_int(0, ==, rv);
   assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_CLOSING, ==,
               conn->rx.frrd.state);
-  assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, conn->tx.goaway.error_code);
+  assert_uint32(NGHTTP2_FRAME_SIZE_ERROR, ==, conn->tx.goaway.error_code);
 
   nghttp2_conn_del(conn);
 
@@ -5626,7 +5626,7 @@ void test_nghttp2_conn_recv_settings(void) {
   assert_int(0, ==, rv);
   assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_CLOSING, ==,
               conn->rx.frrd.state);
-  assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, conn->tx.goaway.error_code);
+  assert_uint32(NGHTTP2_FRAME_SIZE_ERROR, ==, conn->tx.goaway.error_code);
 
   nghttp2_conn_del(conn);
 
@@ -6042,7 +6042,7 @@ void test_nghttp2_conn_recv_ping(void) {
   assert_int(0, ==, rv);
   assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_CLOSING, ==,
               conn->rx.frrd.state);
-  assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, conn->tx.goaway.error_code);
+  assert_uint32(NGHTTP2_FRAME_SIZE_ERROR, ==, conn->tx.goaway.error_code);
 
   nghttp2_conn_del(conn);
 
@@ -6300,7 +6300,7 @@ void test_nghttp2_conn_recv_goaway(void) {
   assert_int(0, ==, rv);
   assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_CLOSING, ==,
               conn->rx.frrd.state);
-  assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, conn->tx.goaway.error_code);
+  assert_uint32(NGHTTP2_FRAME_SIZE_ERROR, ==, conn->tx.goaway.error_code);
   assert_false(conn->flags & NGHTTP2_CONN_FLAG_GOAWAY_RECVED);
 
   nghttp2_conn_del(conn);
@@ -6724,7 +6724,7 @@ void test_nghttp2_conn_recv_window_update(void) {
   assert_int(0, ==, rv);
   assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_CLOSING, ==,
               conn->rx.frrd.state);
-  assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, conn->tx.goaway.error_code);
+  assert_uint32(NGHTTP2_FRAME_SIZE_ERROR, ==, conn->tx.goaway.error_code);
 
   nghttp2_conn_del(conn);
 
@@ -7196,7 +7196,7 @@ void test_nghttp2_conn_recv_priority_update(void) {
   assert_int(0, ==, rv);
   assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_CLOSING, ==,
               conn->rx.frrd.state);
-  assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, conn->tx.goaway.error_code);
+  assert_uint32(NGHTTP2_FRAME_SIZE_ERROR, ==, conn->tx.goaway.error_code);
 
   nghttp2_hpack_encoder_free(&enc);
   nghttp2_conn_del(conn);
