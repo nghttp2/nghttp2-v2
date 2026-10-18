@@ -33,15 +33,15 @@
 void nghttp2_stream_init(nghttp2_stream *stream, int64_t stream_id,
                          const nghttp2_stream_callbacks *callbacks,
                          uint32_t flags, uint64_t max_rx_offset,
-                         uint64_t max_tx_offset, void *user_data,
-                         const nghttp2_mem *mem) {
+                         uint64_t unsent_max_rx_offset, uint64_t max_tx_offset,
+                         void *user_data, const nghttp2_mem *mem) {
   *stream = (nghttp2_stream){
     .mem = mem,
     .stream_id = stream_id,
     .rx =
       {
         .max_offset = max_rx_offset,
-        .unsent_max_offset = max_rx_offset,
+        .unsent_max_offset = unsent_max_rx_offset,
         .http =
           {
             .status_code = -1,

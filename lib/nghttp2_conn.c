@@ -618,6 +618,7 @@ int nghttp2_conn_create_stream(nghttp2_conn *conn, nghttp2_stream **pstream,
       .write_stream_data_offset = conn->callbacks.write_stream_data_offset,
     },
     NGHTTP2_STREAM_FLAG_NONE, conn->rx.stream_window,
+    nghttp2_min(conn->rx.stream_window, conn->settings.initial_max_stream_data),
     conn->remote.settings.initial_max_stream_data, stream_user_data, conn->mem);
 
   if (conn->server) {
@@ -1363,11 +1364,6 @@ static int stream_apply_rx_initial_max_stream_data(void *data, void *ptr) {
   }
 
   stream->rx.unsent_max_offset += arg->delta;
-
-  if (stream->rx.max_offset > max_offset) {
-    stream->rx.unsent_max_offset += arg->delta;
-  }
-
   stream->rx.max_offset = max_offset;
 
   return 0;
@@ -3720,8 +3716,7 @@ int nghttp2_conn_extend_max_stream_offset(nghttp2_conn *conn, int64_t stream_id,
   }
 
   if (max_offset - stream->rx.max_offset > NGHTTP2_MAX_WINDOW_SIZE) {
-    /* unsent_max_offset is still "negative" or smaller than
-       max_offset.  */
+    /* unsent_max_offset is still smaller than max_offset.  */
     stream->rx.unsent_max_offset = max_offset;
 
     return 0;

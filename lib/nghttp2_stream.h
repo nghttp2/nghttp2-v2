@@ -184,8 +184,8 @@ typedef struct nghttp2_stream {
 void nghttp2_stream_init(nghttp2_stream *stream, int64_t stream_id,
                          const nghttp2_stream_callbacks *callbacks,
                          uint32_t flags, uint64_t max_rx_offset,
-                         uint64_t max_tx_offset, void *user_data,
-                         const nghttp2_mem *mem);
+                         uint64_t unsent_max_rx_offset, uint64_t max_tx_offset,
+                         void *user_data, const nghttp2_mem *mem);
 
 void nghttp2_stream_free(nghttp2_stream *stream);
 
