@@ -29,7 +29,7 @@
 int nghttp2_gzip_inflate_new(nghttp2_gzip **inflater_ptr) {
   int rv;
   *inflater_ptr = calloc(1, sizeof(nghttp2_gzip));
-  if (*inflater_ptr == NULL) {
+  if (!*inflater_ptr) {
     return -1;
   }
   rv = inflateInit2(&(*inflater_ptr)->zst, 47);
@@ -41,7 +41,7 @@ int nghttp2_gzip_inflate_new(nghttp2_gzip **inflater_ptr) {
 }
 
 void nghttp2_gzip_inflate_del(nghttp2_gzip *inflater) {
-  if (inflater != NULL) {
+  if (inflater) {
     inflateEnd(&inflater->zst);
     free(inflater);
   }

@@ -59,7 +59,7 @@ int nghttp2_buf_reserve(nghttp2_buf *buf, size_t size, const nghttp2_mem *mem) {
   last_offset = buf->last - buf->begin;
 
   p = nghttp2_mem_realloc(mem, buf->begin, size);
-  if (p == NULL) {
+  if (!p) {
     return NGHTTP2_ERR_NOMEM;
   }
 

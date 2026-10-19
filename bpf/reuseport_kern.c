@@ -517,12 +517,12 @@ int select_reuseport(struct sk_reuseport_md *reuse_md) {
   }
 
   pnum_socks = bpf_map_lookup_elem(&sk_info, &zero);
-  if (pnum_socks == NULL) {
+  if (!pnum_socks) {
     return SK_DROP;
   }
 
   aes_ctx = bpf_map_lookup_elem(&aes_key, &zero);
-  if (aes_ctx == NULL) {
+  if (!aes_ctx) {
     return SK_DROP;
   }
 
@@ -539,7 +539,7 @@ int select_reuseport(struct sk_reuseport_md *reuse_md) {
       AES_ECB_decrypt(aes_ctx, worker_id);
 
       psk_index = bpf_map_lookup_elem(&worker_id_map, worker_id);
-      if (psk_index != NULL) {
+      if (psk_index) {
         sk_index = *psk_index;
 
         break;
@@ -559,7 +559,7 @@ int select_reuseport(struct sk_reuseport_md *reuse_md) {
     AES_ECB_decrypt(aes_ctx, worker_id);
 
     psk_index = bpf_map_lookup_elem(&worker_id_map, worker_id);
-    if (psk_index == NULL) {
+    if (!psk_index) {
       sk_index = sk_index_from_dcid(&qhd, reuse_md, *pnum_socks);
 
       break;

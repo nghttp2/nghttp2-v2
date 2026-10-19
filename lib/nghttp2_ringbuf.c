@@ -46,7 +46,7 @@ int nghttp2_ringbuf_init(nghttp2_ringbuf *rb, size_t nmemb, size_t size,
     assert(ispow2(nmemb));
 
     buf = nghttp2_mem_malloc(mem, nmemb * size);
-    if (buf == NULL) {
+    if (!buf) {
       return NGHTTP2_ERR_NOMEM;
     }
   } else {
@@ -69,7 +69,7 @@ void nghttp2_ringbuf_buf_init(nghttp2_ringbuf *rb, size_t nmemb, size_t size,
 }
 
 void nghttp2_ringbuf_free(nghttp2_ringbuf *rb) {
-  if (rb == NULL) {
+  if (!rb) {
     return;
   }
 
@@ -134,11 +134,11 @@ int nghttp2_ringbuf_reserve(nghttp2_ringbuf *rb, size_t nmemb) {
   assert(ispow2(nmemb));
 
   buf = nghttp2_mem_malloc(rb->mem, nmemb * rb->size);
-  if (buf == NULL) {
+  if (!buf) {
     return NGHTTP2_ERR_NOMEM;
   }
 
-  if (rb->buf != NULL) {
+  if (rb->buf) {
     if (rb->first + rb->len <= current_nmemb) {
       memcpy(buf, rb->buf + rb->first * rb->size, rb->len * rb->size);
       rb->first = 0;

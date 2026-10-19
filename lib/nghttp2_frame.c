@@ -758,7 +758,7 @@ int nghttp2_nva_copy(nghttp2_nv **pnva, const nghttp2_nv *nva, size_t nvlen,
 
   *pnva = nghttp2_mem_malloc(mem, buflen);
 
-  if (*pnva == NULL) {
+  if (!*pnva) {
     return NGHTTP2_ERR_NOMEM;
   }
 
