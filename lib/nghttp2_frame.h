@@ -574,6 +574,8 @@ nghttp2_ssize nghttp2_frame_decode_priority_update_payload(
  *
  * NGHTTP2_ERR_NOMEM
  *     Out of memory.
+ * NGHTTP2_ERR_INVALID_ARGUMENT
+ *     The required memory for |nva| of length |nvlen| is too large.
  */
 int nghttp2_nva_copy(nghttp2_nv **pnva, const nghttp2_nv *nva, size_t nvlen,
                      const nghttp2_mem *mem);

@@ -730,17 +730,31 @@ int nghttp2_nva_copy(nghttp2_nv **pnva, const nghttp2_nv *nva, size_t nvlen,
     return 0;
   }
 
+  if (sizeof(nghttp2_nv) > SIZE_MAX / nvlen) {
+    return NGHTTP2_ERR_INVALID_ARGUMENT;
+  }
+
+  buflen = sizeof(nghttp2_nv) * nvlen;
+
   for (i = 0; i < nvlen; ++i) {
     /* + 1 for null-termination */
     if ((nva[i].flags & NGHTTP2_NV_FLAG_NO_COPY_NAME) == 0) {
+      if (nva[i].namelen > SIZE_MAX - 1 ||
+          buflen > SIZE_MAX - nva[i].namelen - 1) {
+        return NGHTTP2_ERR_INVALID_ARGUMENT;
+      }
+
       buflen += nva[i].namelen + 1;
     }
     if ((nva[i].flags & NGHTTP2_NV_FLAG_NO_COPY_VALUE) == 0) {
+      if (nva[i].valuelen > SIZE_MAX - 1 ||
+          buflen > SIZE_MAX - nva[i].valuelen - 1) {
+        return NGHTTP2_ERR_INVALID_ARGUMENT;
+      }
+
       buflen += nva[i].valuelen + 1;
     }
   }
-
-  buflen += sizeof(nghttp2_nv) * nvlen;
 
   *pnva = nghttp2_mem_malloc(mem, buflen);
 
