@@ -767,30 +767,28 @@ int nghttp2_nva_copy(nghttp2_nv **pnva, const nghttp2_nv *nva, size_t nvlen,
 
   for (i = 0; i < nvlen; ++i) {
     p->flags = nva[i].flags;
+    p->namelen = nva[i].namelen;
+    p->valuelen = nva[i].valuelen;
 
     if (nva[i].flags & NGHTTP2_NV_FLAG_NO_COPY_NAME) {
       p->name = nva[i].name;
-      p->namelen = nva[i].namelen;
     } else {
       if (nva[i].namelen) {
         memcpy(data, nva[i].name, nva[i].namelen);
         nghttp2_downcase(data, nva[i].namelen);
       }
       p->name = data;
-      p->namelen = nva[i].namelen;
       data[p->namelen] = '\0';
       data += nva[i].namelen + 1;
     }
 
     if (nva[i].flags & NGHTTP2_NV_FLAG_NO_COPY_VALUE) {
       p->value = nva[i].value;
-      p->valuelen = nva[i].valuelen;
     } else {
       if (nva[i].valuelen) {
         memcpy(data, nva[i].value, nva[i].valuelen);
       }
       p->value = data;
-      p->valuelen = nva[i].valuelen;
       data[p->valuelen] = '\0';
       data += nva[i].valuelen + 1;
     }
