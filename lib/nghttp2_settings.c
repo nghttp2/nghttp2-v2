@@ -24,7 +24,10 @@
  */
 #include "nghttp2_settings.h"
 
-void nghttp2_settings_default(nghttp2_settings *settings) {
+void nghttp2_settings_default_versioned(int settings_version,
+                                        nghttp2_settings *settings) {
+  (void)settings_version;
+
   *settings = (nghttp2_settings){
     .hpack_max_dtable_capacity = NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY,
     .hpack_encoder_max_dtable_capacity = NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY,

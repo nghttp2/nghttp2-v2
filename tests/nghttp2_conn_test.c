@@ -14842,9 +14842,9 @@ void test_nghttp2_conn_server_priority_update(void) {
   assert_true(stream->sched.pri.inc);
 
   rv = nghttp2_conn_set_server_stream_priority(conn, 0x01,
-                                               &(nghttp2_pri){
+                                               (&(nghttp2_pri){
                                                  .urgency = 7,
-                                               });
+                                               }));
 
   assert_int(0, ==, rv);
   assert_uint32(7, ==, stream->sched.pri.urgency);
@@ -14924,16 +14924,16 @@ void test_nghttp2_conn_server_priority_update(void) {
 
   rv =
     nghttp2_conn_set_server_stream_priority(conn, 0x01,
-                                            &(nghttp2_pri){
+                                            (&(nghttp2_pri){
                                               .urgency = NGHTTP2_URGENCY_LEVELS,
-                                            });
+                                            }));
 
   assert_int(NGHTTP2_ERR_INVALID_ARGUMENT, ==, rv);
 
   rv = nghttp2_conn_set_server_stream_priority(conn, 0x01,
-                                               &(nghttp2_pri){
+                                               (&(nghttp2_pri){
                                                  .inc = 2,
-                                               });
+                                               }));
 
   assert_int(NGHTTP2_ERR_INVALID_ARGUMENT, ==, rv);
 
