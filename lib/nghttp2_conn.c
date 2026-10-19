@@ -3898,8 +3898,10 @@ int nghttp2_conn_set_server_stream_priority(nghttp2_conn *conn,
   nghttp2_stream *stream;
 
   assert(conn->server);
-  assert(pri->urgency < NGHTTP2_URGENCY_LEVELS);
-  assert(pri->inc == 0 || pri->inc == 1);
+
+  if (pri->urgency >= NGHTTP2_URGENCY_LEVELS || pri->inc > 1) {
+    return NGHTTP2_ERR_INVALID_ARGUMENT;
+  }
 
   stream = nghttp2_conn_find_stream(conn, stream_id);
   if (!stream) {
