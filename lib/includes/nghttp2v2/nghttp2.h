@@ -2287,6 +2287,9 @@ NGHTTP2_EXTERN int nghttp2_conn_set_client_stream_priority(nghttp2_conn *conn,
  *
  * :macro:`NGHTTP2_ERR_NOMEM`
  *     Out of memory.
+ * :macro:`NGHTTP2_ERR_INVALID_ARGUMENT`
+ *      |pri|->urgency >= :macro:`NGHTTP2_URGENCY_LEVELS` or
+ *      |pri|->inc is neither 0 nor 1.
  */
 NGHTTP2_EXTERN int
 nghttp2_conn_set_server_stream_priority(nghttp2_conn *conn, int64_t stream_id,

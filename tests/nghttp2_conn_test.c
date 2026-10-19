@@ -14885,6 +14885,61 @@ void test_nghttp2_conn_server_priority_update(void) {
   nghttp2_hpack_encoder_free(&enc);
   nghttp2_conn_del(conn);
 
+  /* invalid priority values */
+  setup_default_server(&conn);
+  write_preface(conn, ts);
+  read_client_preface(conn, NULL, 0, ts);
+  write_settings_ack(conn, ts);
+
+  nghttp2_hpack_encoder_init(&enc, NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY, mem);
+  nghttp2_buf_reset(&hbuf);
+  rv =
+    nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
+
+  assert_int(0, ==, rv);
+
+  fr.headers = (nghttp2_frame_headers){
+    .hd =
+      {
+        .type = NGHTTP2_FRAME_HEADERS,
+        .flags = NGHTTP2_HEADERS_FLAG_END_HEADERS,
+        .stream_id = 0x01,
+      },
+    .field_block = hbuf.pos,
+    .field_blocklen = nghttp2_buf_len(&hbuf),
+  };
+
+  fr.headers.hd.len =
+    (uint32_t)nghttp2_frame_encode_headers_payloadlen(&fr.headers);
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
+              ==, conn->rx.frrd.state);
+
+  rv =
+    nghttp2_conn_set_server_stream_priority(conn, 0x01,
+                                            &(nghttp2_pri){
+                                              .urgency = NGHTTP2_URGENCY_LEVELS,
+                                            });
+
+  assert_int(NGHTTP2_ERR_INVALID_ARGUMENT, ==, rv);
+
+  rv = nghttp2_conn_set_server_stream_priority(conn, 0x01,
+                                               &(nghttp2_pri){
+                                                 .inc = 2,
+                                               });
+
+  assert_int(NGHTTP2_ERR_INVALID_ARGUMENT, ==, rv);
+
+  nghttp2_hpack_encoder_free(&enc);
+  nghttp2_conn_del(conn);
+
   nghttp2_buf_free(&hbuf, mem);
 }
 
