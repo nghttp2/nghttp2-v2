@@ -78,7 +78,7 @@ int nghttp2_pq_push(nghttp2_pq *pq, nghttp2_pq_entry *item) {
 
     nq = nghttp2_mem_realloc(pq->mem, pq->q,
                              ncapacity * sizeof(nghttp2_pq_entry *));
-    if (nq == NULL) {
+    if (!nq) {
       return NGHTTP2_ERR_NOMEM;
     }
 

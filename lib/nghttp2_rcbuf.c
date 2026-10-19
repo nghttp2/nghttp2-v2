@@ -34,7 +34,7 @@ int nghttp2_rcbuf_new(nghttp2_rcbuf **rcbuf_ptr, size_t size,
   uint8_t *p;
 
   p = nghttp2_mem_malloc(mem, sizeof(nghttp2_rcbuf) + size);
-  if (p == NULL) {
+  if (!p) {
     return NGHTTP2_ERR_NOMEM;
   }
 
@@ -86,7 +86,7 @@ void nghttp2_rcbuf_incref(nghttp2_rcbuf *rcbuf) {
 }
 
 void nghttp2_rcbuf_decref(nghttp2_rcbuf *rcbuf) {
-  if (rcbuf == NULL || rcbuf->ref == -1) {
+  if (!rcbuf || rcbuf->ref == -1) {
     return;
   }
 

@@ -195,7 +195,7 @@ static int map_resize(nghttp2_map *map, size_t new_hashbits) {
   buf = nghttp2_mem_calloc(map->mem, tablelen,
                            sizeof(nghttp2_map_key_type) + sizeof(void *) +
                              sizeof(uint8_t));
-  if (buf == NULL) {
+  if (!buf) {
     return NGHTTP2_ERR_NOMEM;
   }
 

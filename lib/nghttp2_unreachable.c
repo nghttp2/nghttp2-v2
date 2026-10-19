@@ -51,7 +51,7 @@ void nghttp2_unreachable_fail(const char *file, int line, const char *func) {
   /* here we explicitly use system malloc */
   buflen = (size_t)rv + 1;
   buf = malloc(buflen);
-  if (buf == NULL) {
+  if (!buf) {
     abort();
   }
 

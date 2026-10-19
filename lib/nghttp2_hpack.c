@@ -591,7 +591,7 @@ static void hpack_map_insert(nghttp2_hpack_map *map, nghttp2_hpack_entry *ent) {
 
   bucket = &map->table[ent->hash & (HD_MAP_SIZE - 1)];
 
-  if (*bucket == NULL) {
+  if (!*bucket) {
     *bucket = ent;
     return;
   }
@@ -1091,7 +1091,7 @@ static int hpack_context_add_dtable(nghttp2_hpack_context *ctx,
   }
 
   new_ent = nghttp2_mem_malloc(mem, sizeof(nghttp2_hpack_entry));
-  if (new_ent == NULL) {
+  if (!new_ent) {
     return NGHTTP2_ERR_NOMEM;
   }
 
@@ -1173,7 +1173,7 @@ static search_result hpack_context_search_dtable(
     return search_static_table(nv, token, name_only);
   }
 
-  if (ent == NULL) {
+  if (!ent) {
     return res;
   }
 
