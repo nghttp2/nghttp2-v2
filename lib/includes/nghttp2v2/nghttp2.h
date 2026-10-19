@@ -981,6 +981,9 @@ typedef struct nghttp2_settings_entry {
   uint32_t value;
 } nghttp2_settings_entry;
 
+#define NGHTTP2_SETTINGS_V1 1
+#define NGHTTP2_SETTINGS_VERSION NGHTTP2_SETTINGS_V1
+
 /**
  * @struct
  *
@@ -1127,7 +1130,12 @@ typedef struct nghttp2_settings {
  * - :member:`glitch_ratelim_rate
  *   <nghttp2_settings.glitch_ratelim_rate>` = 330
  */
-NGHTTP2_EXTERN void nghttp2_settings_default(nghttp2_settings *settings);
+NGHTTP2_EXTERN void
+nghttp2_settings_default_versioned(int settings_version,
+                                   nghttp2_settings *settings);
+
+#define NGHTTP2_PROTO_SETTINGS_V1 1
+#define NGHTTP2_PROTO_SETTINGS_VERSION NGHTTP2_PROTO_SETTINGS_V1
 
 /**
  * @struct
@@ -1450,6 +1458,9 @@ typedef int (*nghttp2_recv_ping_ack)(nghttp2_conn *conn,
 typedef int (*nghttp2_shutdown)(nghttp2_conn *conn, int64_t last_stream_id,
                                 uint32_t error_code, void *conn_user_data);
 
+#define NGHTTP2_CALLBACKS_V1 1
+#define NGHTTP2_CALLBACKS_VERSION NGHTTP2_CALLBACKS_V1
+
 /**
  * @struct
  *
@@ -1672,11 +1683,10 @@ typedef struct nghttp2_data_reader {
  * :macro:`NGHTTP2_ERR_NOMEM`
  *     Out of memory.
  */
-NGHTTP2_EXTERN int nghttp2_conn_server_new(nghttp2_conn **pconn,
-                                           const nghttp2_callbacks *callbacks,
-                                           const nghttp2_settings *settings,
-                                           const nghttp2_mem *mem,
-                                           void *user_data);
+NGHTTP2_EXTERN int nghttp2_conn_server_new_versioned(
+  nghttp2_conn **pconn, int callbacks_version,
+  const nghttp2_callbacks *callbacks, int settings_version,
+  const nghttp2_settings *settings, const nghttp2_mem *mem, void *user_data);
 
 /**
  * @function
@@ -1697,11 +1707,10 @@ NGHTTP2_EXTERN int nghttp2_conn_server_new(nghttp2_conn **pconn,
  * :macro:`NGHTTP2_ERR_NOMEM`
  *     Out of memory.
  */
-NGHTTP2_EXTERN int nghttp2_conn_client_new(nghttp2_conn **pconn,
-                                           const nghttp2_callbacks *callbacks,
-                                           const nghttp2_settings *settings,
-                                           const nghttp2_mem *mem,
-                                           void *user_data);
+NGHTTP2_EXTERN int nghttp2_conn_client_new_versioned(
+  nghttp2_conn **pconn, int callbacks_version,
+  const nghttp2_callbacks *callbacks, int settings_version,
+  const nghttp2_settings *settings, const nghttp2_mem *mem, void *user_data);
 
 /**
  * @function
@@ -2191,6 +2200,9 @@ nghttp2_conn_get_remote_settings(const nghttp2_conn *conn);
  */
 #define NGHTTP2_URGENCY_LEVELS (NGHTTP2_URGENCY_LOW + 1)
 
+#define NGHTTP2_PRI_V1 1
+#define NGHTTP2_PRI_VERSION NGHTTP2_PRI_V1
+
 /**
  * @struct
  *
@@ -2231,8 +2243,10 @@ typedef struct NGHTTP2_ALIGN(8) nghttp2_pri {
  * :macro:`NGHTTP2_ERR_INVALID_ARGUMENT`
  *     Failed to parse the header field value.
  */
-NGHTTP2_EXTERN int nghttp2_pri_parse_priority(nghttp2_pri *dest,
-                                              const uint8_t *value, size_t len);
+NGHTTP2_EXTERN int nghttp2_pri_parse_priority_versioned(int pri_version,
+                                                        nghttp2_pri *dest,
+                                                        const uint8_t *value,
+                                                        size_t len);
 
 /**
  * @function
@@ -2250,9 +2264,10 @@ NGHTTP2_EXTERN int nghttp2_pri_parse_priority(nghttp2_pri *dest,
  * :macro:`NGHTTP2_ERR_STREAM_NOT_FOUND`
  *     Stream not found.
  */
-NGHTTP2_EXTERN int nghttp2_conn_get_stream_priority(const nghttp2_conn *conn,
-                                                    nghttp2_pri *dest,
-                                                    int64_t stream_id);
+NGHTTP2_EXTERN int
+nghttp2_conn_get_stream_priority_versioned(const nghttp2_conn *conn,
+                                           int pri_version, nghttp2_pri *dest,
+                                           int64_t stream_id);
 
 /**
  * @function
@@ -2299,9 +2314,9 @@ NGHTTP2_EXTERN int nghttp2_conn_set_client_stream_priority(nghttp2_conn *conn,
  *      |pri|->urgency >= :macro:`NGHTTP2_URGENCY_LEVELS` or
  *      |pri|->inc is neither 0 nor 1.
  */
-NGHTTP2_EXTERN int
-nghttp2_conn_set_server_stream_priority(nghttp2_conn *conn, int64_t stream_id,
-                                        const nghttp2_pri *pri);
+NGHTTP2_EXTERN int nghttp2_conn_set_server_stream_priority_versioned(
+  nghttp2_conn *conn, int64_t stream_id, int pri_version,
+  const nghttp2_pri *pri);
 
 /**
  * @function
@@ -2567,6 +2582,65 @@ nghttp2_hpack_decoder_set_max_dtable_capacity(nghttp2_hpack_decoder *dec,
  */
 NGHTTP2_EXTERN int32_t nghttp2_hpack_lookup_token(const uint8_t *name,
                                                   size_t namelen);
+
+/*
+ * Versioned function wrappers
+ */
+
+/*
+ * `nghttp2_settings_default` is a wrapper around
+ * `nghttp2_settings_default_versioned` to set the correct struct
+ * version.
+ */
+#define nghttp2_settings_default(SETTINGS)                                     \
+  nghttp2_settings_default_versioned(NGHTTP2_SETTINGS_VERSION, (SETTINGS))
+
+/*
+ * `nghttp2_conn_server_new` is a wrapper around
+ * `nghttp2_conn_server_new_versioned` to set the correct struct
+ * version.
+ */
+#define nghttp2_conn_server_new(PCONN, CALLBACKS, SETTINGS, MEM, USER_DATA)    \
+  nghttp2_conn_server_new_versioned((PCONN), NGHTTP2_CALLBACKS_VERSION,        \
+                                    (CALLBACKS), NGHTTP2_SETTINGS_VERSION,     \
+                                    (SETTINGS), (MEM), (USER_DATA))
+
+/*
+ * `nghttp2_conn_client_new` is a wrapper around
+ * `nghttp2_conn_client_new_versioned` to set the correct struct
+ * version.
+ */
+#define nghttp2_conn_client_new(PCONN, CALLBACKS, SETTINGS, MEM, USER_DATA)    \
+  nghttp2_conn_client_new_versioned((PCONN), NGHTTP2_CALLBACKS_VERSION,        \
+                                    (CALLBACKS), NGHTTP2_SETTINGS_VERSION,     \
+                                    (SETTINGS), (MEM), (USER_DATA))
+
+/*
+ * `nghttp2_pri_parse_priority` is a wrapper around
+ * `nghttp2_pri_parse_priority_versioned` to set the correct struct
+ * version.
+ */
+#define nghttp2_pri_parse_priority(DEST, VALUE, LEN)                           \
+  nghttp2_pri_parse_priority_versioned(NGHTTP2_PRI_VERSION, (DEST), (VALUE),   \
+                                       (LEN))
+
+/*
+ * `nghttp2_conn_get_stream_priority` is a wrapper around
+ * `nghttp2_conn_get_stream_priority_versioned` to set the correct
+ * struct version.
+ */
+#define nghttp2_conn_get_stream_priority(CONN, DEST, STREAM_ID)                \
+  nghttp2_conn_get_stream_priority_versioned((CONN), NGHTTP2_PRI_VERSION,      \
+                                             (DEST), (STREAM_ID))
+
+/*
+ * `nghttp2_conn_set_server_stream_priority` is a wrapper around
+ * `nghttp2_conn_set_server_stream_priority_versioned` to set the
+ * correct struct version.
+ */
+#define nghttp2_conn_set_server_stream_priority(CONN, STREAM_ID, PRI)          \
+  nghttp2_conn_set_server_stream_priority_versioned(                           \
+    (CONN), (STREAM_ID), NGHTTP2_PRI_VERSION, (PRI))
 
 #ifdef _MSC_VER
 #  pragma warning(pop)

@@ -182,8 +182,10 @@ int nghttp2_http_parse_priority(nghttp2_pri *dest, const uint8_t *value,
   return 0;
 }
 
-int nghttp2_pri_parse_priority(nghttp2_pri *dest, const uint8_t *value,
-                               size_t valuelen) {
+int nghttp2_pri_parse_priority_versioned(int pri_version, nghttp2_pri *dest,
+                                         const uint8_t *value,
+                                         size_t valuelen) {
+  (void)pri_version;
   return nghttp2_http_parse_priority(dest, value, valuelen);
 }
 

@@ -369,7 +369,8 @@ static int conn_update_glitch_ratelim(nghttp2_conn *conn, uint64_t tokens,
   return 0;
 }
 
-static int conn_new(nghttp2_conn **pconn, const nghttp2_callbacks *callbacks,
+static int conn_new(nghttp2_conn **pconn, int callbacks_version,
+                    const nghttp2_callbacks *callbacks, int settings_version,
                     const nghttp2_settings *settings, const nghttp2_mem *mem,
                     void *user_data, int server) {
   uint8_t *ptr;
@@ -379,6 +380,8 @@ static int conn_new(nghttp2_conn **pconn, const nghttp2_callbacks *callbacks,
   nghttp2_settings_entry *extra_settings;
   size_t extra_settingslen;
   size_t i;
+  (void)callbacks_version;
+  (void)settings_version;
 
   assert(callbacks);
   assert(callbacks->rand);
@@ -493,20 +496,26 @@ static int conn_new(nghttp2_conn **pconn, const nghttp2_callbacks *callbacks,
   return 0;
 }
 
-int nghttp2_conn_server_new(nghttp2_conn **pconn,
-                            const nghttp2_callbacks *callbacks,
-                            const nghttp2_settings *settings,
-                            const nghttp2_mem *mem, void *user_data) {
-  return conn_new(pconn, callbacks, settings, mem, user_data, /* server = */ 1);
+int nghttp2_conn_server_new_versioned(nghttp2_conn **pconn,
+                                      int callbacks_version,
+                                      const nghttp2_callbacks *callbacks,
+                                      int settings_version,
+                                      const nghttp2_settings *settings,
+                                      const nghttp2_mem *mem, void *user_data) {
+  return conn_new(pconn, callbacks_version, callbacks, settings_version,
+                  settings, mem, user_data, /* server = */ 1);
 }
 
-int nghttp2_conn_client_new(nghttp2_conn **pconn,
-                            const nghttp2_callbacks *callbacks,
-                            const nghttp2_settings *settings,
-                            const nghttp2_mem *mem, void *user_data) {
+int nghttp2_conn_client_new_versioned(nghttp2_conn **pconn,
+                                      int callbacks_version,
+                                      const nghttp2_callbacks *callbacks,
+                                      int settings_version,
+                                      const nghttp2_settings *settings,
+                                      const nghttp2_mem *mem, void *user_data) {
   int rv;
 
-  rv = conn_new(pconn, callbacks, settings, mem, user_data, /* server = */ 0);
+  rv = conn_new(pconn, callbacks_version, callbacks, settings_version, settings,
+                mem, user_data, /* server = */ 0);
   if (rv != 0) {
     return rv;
   }
@@ -3892,10 +3901,12 @@ int nghttp2_conn_set_client_stream_priority(nghttp2_conn *conn,
   return 0;
 }
 
-int nghttp2_conn_set_server_stream_priority(nghttp2_conn *conn,
-                                            int64_t stream_id,
-                                            const nghttp2_pri *pri) {
+int nghttp2_conn_set_server_stream_priority_versioned(nghttp2_conn *conn,
+                                                      int64_t stream_id,
+                                                      int pri_version,
+                                                      const nghttp2_pri *pri) {
   nghttp2_stream *stream;
+  (void)pri_version;
 
   assert(conn->server);
 
@@ -3913,9 +3924,12 @@ int nghttp2_conn_set_server_stream_priority(nghttp2_conn *conn,
   return conn_update_stream_priority(conn, stream, pri);
 }
 
-int nghttp2_conn_get_stream_priority(const nghttp2_conn *conn,
-                                     nghttp2_pri *dest, int64_t stream_id) {
+int nghttp2_conn_get_stream_priority_versioned(const nghttp2_conn *conn,
+                                               int pri_version,
+                                               nghttp2_pri *dest,
+                                               int64_t stream_id) {
   nghttp2_stream *stream;
+  (void)pri_version;
 
   assert(conn->server);
   assert(stream_id & 0x1);
