@@ -1954,6 +1954,8 @@ nghttp2_conn_get_next_stream_id(const nghttp2_conn *conn);
  *     Connection is shutting down, and no new stream is allowed.
  * :macro:`NGHTTP2_ERR_STREAM_ID_BLOCKED`
  *     The remote endpoint does not allow |stream_id| yet.
+ * :macro:`NGHTTP2_ERR_INVALID_ARGUMENT`
+ *     The required memory for |nva| of length |nvlen| is too large.
  */
 NGHTTP2_EXTERN int64_t nghttp2_conn_submit_request(
   nghttp2_conn *conn, const nghttp2_nv *nva, size_t nvlen,
@@ -1977,6 +1979,8 @@ NGHTTP2_EXTERN int64_t nghttp2_conn_submit_request(
  *     The final response headers have already been submitted.
  * :macro:`NGHTTP2_ERR_STREAM_SHUT_WR`
  *     The send side of the stream has been closed.
+ * :macro:`NGHTTP2_ERR_INVALID_ARGUMENT`
+ *     The required memory for |nva| of length |nvlen| is too large.
  */
 NGHTTP2_EXTERN int nghttp2_conn_submit_info(nghttp2_conn *conn,
                                             int64_t stream_id,
@@ -2003,6 +2007,8 @@ NGHTTP2_EXTERN int nghttp2_conn_submit_info(nghttp2_conn *conn,
  *     The final response headers have already been submitted.
  * :macro:`NGHTTP2_ERR_STREAM_SHUT_WR`
  *     The send side of the stream has been closed.
+ * :macro:`NGHTTP2_ERR_INVALID_ARGUMENT`
+ *     The required memory for |nva| of length |nvlen| is too large.
  */
 NGHTTP2_EXTERN int nghttp2_conn_submit_response(nghttp2_conn *conn,
                                                 int64_t stream_id,
@@ -2029,6 +2035,8 @@ NGHTTP2_EXTERN int nghttp2_conn_submit_response(nghttp2_conn *conn,
  *     The final response headers have not been submitted yet.
  * :macro:`NGHTTP2_ERR_STREAM_SHUT_WR`
  *     The send side of the stream has been closed.
+ * :macro:`NGHTTP2_ERR_INVALID_ARGUMENT`
+ *     The required memory for |nva| of length |nvlen| is too large.
  */
 NGHTTP2_EXTERN int nghttp2_conn_submit_trailers(nghttp2_conn *conn,
                                                 int64_t stream_id,
