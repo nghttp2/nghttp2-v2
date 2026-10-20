@@ -96,7 +96,7 @@ extern "C" {
  * :macro:`NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY` is the default
  * maximum HPACK dynamic header table capacity.
  */
-#define NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY ((size_t)(1U << 12))
+#define NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY (1U << 12)
 
 /**
  * @macro
@@ -104,7 +104,7 @@ extern "C" {
  * :macro:`NGHTTP2_INITIAL_WINDOW_SIZE` is the default initial window
  * size for both connection and stream-level flow control.
  */
-#define NGHTTP2_INITIAL_WINDOW_SIZE ((size_t)((1U << 16) - 1))
+#define NGHTTP2_INITIAL_WINDOW_SIZE ((1U << 16) - 1)
 
 /**
  * @macro
