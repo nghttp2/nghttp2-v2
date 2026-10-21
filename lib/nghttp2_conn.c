@@ -623,7 +623,7 @@ int nghttp2_conn_create_stream(nghttp2_conn *conn, nghttp2_stream **pstream,
   nghttp2_stream_init(
     stream, stream_id,
     &(nghttp2_stream_callbacks){
-      .local_end_stream = conn->callbacks.local_end_stream,
+      .end_stream_local = conn->callbacks.end_stream_local,
       .write_stream_data_offset = conn->callbacks.write_stream_data_offset,
     },
     NGHTTP2_STREAM_FLAG_NONE, conn->rx.stream_window,

@@ -208,7 +208,7 @@ typedef struct userdata {
   struct {
     size_t ncalled;
     int64_t stream_id;
-  } local_end_stream;
+  } end_stream_local;
   struct {
     size_t ncalled;
     int64_t stream_id;
@@ -406,14 +406,14 @@ static int recv_data(nghttp2_conn *conn, int64_t stream_id, const uint8_t *data,
   return 0;
 }
 
-static int local_end_stream(nghttp2_conn *conn, int64_t stream_id,
+static int end_stream_local(nghttp2_conn *conn, int64_t stream_id,
                             void *conn_user_data, void *stream_user_data) {
   userdata *ud = conn_user_data;
   (void)conn;
   (void)stream_user_data;
 
-  ++ud->local_end_stream.ncalled;
-  ud->local_end_stream.stream_id = stream_id;
+  ++ud->end_stream_local.ncalled;
+  ud->end_stream_local.stream_id = stream_id;
 
   return 0;
 }
@@ -9449,7 +9449,7 @@ void test_nghttp2_conn_http_writer(void) {
 
   /* Write HEADERS in chunks */
   client_default_callbacks(&callbacks);
-  callbacks.local_end_stream = local_end_stream;
+  callbacks.end_stream_local = end_stream_local;
 
   opts = (conn_options){
     .callbacks = &callbacks,
@@ -9481,8 +9481,8 @@ void test_nghttp2_conn_http_writer(void) {
     obuf.last += nwrite;
   }
 
-  assert_size(1, ==, ud.local_end_stream.ncalled);
-  assert_int64(stream_id, ==, ud.local_end_stream.stream_id);
+  assert_size(1, ==, ud.end_stream_local.ncalled);
+  assert_int64(stream_id, ==, ud.end_stream_local.stream_id);
 
   rv = nghttp2_frd_decode_buf(&frd, &fr, &obuf);
 
@@ -9507,7 +9507,7 @@ void test_nghttp2_conn_http_writer(void) {
 
   /* Write HEADERS and DATA in chunks */
   client_default_callbacks(&callbacks);
-  callbacks.local_end_stream = local_end_stream;
+  callbacks.end_stream_local = end_stream_local;
 
   opts = (conn_options){
     .callbacks = &callbacks,
@@ -9543,8 +9543,8 @@ void test_nghttp2_conn_http_writer(void) {
     obuf.last += nwrite;
   }
 
-  assert_size(1, ==, ud.local_end_stream.ncalled);
-  assert_int64(stream_id, ==, ud.local_end_stream.stream_id);
+  assert_size(1, ==, ud.end_stream_local.ncalled);
+  assert_int64(stream_id, ==, ud.end_stream_local.stream_id);
 
   rv = nghttp2_frd_decode_buf(&frd, &fr, &obuf);
 
@@ -9565,7 +9565,7 @@ void test_nghttp2_conn_http_writer(void) {
 
   /* Write HEADERS, DATA, and HEADERS in chunks */
   client_default_callbacks(&callbacks);
-  callbacks.local_end_stream = local_end_stream;
+  callbacks.end_stream_local = end_stream_local;
 
   opts = (conn_options){
     .callbacks = &callbacks,
@@ -9606,8 +9606,8 @@ void test_nghttp2_conn_http_writer(void) {
     obuf.last += nwrite;
   }
 
-  assert_size(1, ==, ud.local_end_stream.ncalled);
-  assert_int64(stream_id, ==, ud.local_end_stream.stream_id);
+  assert_size(1, ==, ud.end_stream_local.ncalled);
+  assert_int64(stream_id, ==, ud.end_stream_local.stream_id);
 
   rv = nghttp2_frd_decode_buf(&frd, &fr, &obuf);
 

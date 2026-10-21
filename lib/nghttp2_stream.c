@@ -62,7 +62,7 @@ void nghttp2_stream_init(nghttp2_stream *stream, int64_t stream_id,
     .flags = flags,
   };
 
-  nghttp2_http_writer_init(&stream->tx.hw, callbacks->local_end_stream,
+  nghttp2_http_writer_init(&stream->tx.hw, callbacks->end_stream_local,
                            callbacks->write_stream_data_offset, mem);
 }
 

@@ -60,7 +60,7 @@ For end-of-stream events, subscribe to:
 
 - :member:`nghttp2_callbacks.remote_end_stream` when the receiving
   side of the stream closes.
-- :member:`nghttp2_callbacks.local_end_stream` when the sending side
+- :member:`nghttp2_callbacks.end_stream_local` when the sending side
   of the stream closes
 
 For the stream closure event, subscribe to:

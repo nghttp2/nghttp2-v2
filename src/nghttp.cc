@@ -1184,6 +1184,12 @@ std::expected<void, Error> HttpClient::on_write() {
     return {};
   }
 
+  static auto count = 0UZ;
+
+  if (++count == 5) {
+    nghttp2_conn_shutdown_stream(conn, 0x00, 0x01, NGHTTP2_NO_ERROR);
+  }
+
   auto nwrite =
     nghttp2_conn_write(conn, txbuf.data(), txbuf.size(), util::timestamp());
   if (nwrite < 0) {
