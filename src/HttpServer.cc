@@ -570,7 +570,7 @@ int recv_data(nghttp2_conn *conn, int64_t stream_id, const uint8_t *data,
 } // namespace
 
 namespace {
-int remote_end_stream(nghttp2_conn *conn, int64_t stream_id, void *user_data,
+int end_stream_remote(nghttp2_conn *conn, int64_t stream_id, void *user_data,
                       void *stream_user_data) {
   auto hd = static_cast<Http2Handler *>(user_data);
 
@@ -1021,7 +1021,7 @@ std::expected<void, Error> Http2Handler::connection_made() {
     .recv_header = nghttp2::recv_header,
     .end_headers = nghttp2::end_headers,
     .recv_data = nghttp2::recv_data,
-    .remote_end_stream = nghttp2::remote_end_stream,
+    .end_stream_remote = nghttp2::end_stream_remote,
   };
 
   nghttp2_settings settings;

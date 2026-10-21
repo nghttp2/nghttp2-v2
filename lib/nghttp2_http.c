@@ -629,7 +629,7 @@ int nghttp2_http_on_response_headers(nghttp2_http_state *http) {
   return 0;
 }
 
-int nghttp2_http_on_remote_end_stream(const nghttp2_stream *stream) {
+int nghttp2_http_on_end_stream_remote(const nghttp2_stream *stream) {
   if ((stream->rx.http.flags & NGHTTP2_HTTP_FLAG_EXPECT_FINAL_RESPONSE) ||
       (stream->rx.http.content_length != -1 &&
        stream->rx.http.content_length != stream->rx.http.recv_content_length)) {

@@ -107,7 +107,7 @@ int nghttp2_stream_transit_rx_http_state(nghttp2_stream *stream,
       stream->rx.hstate = NGHTTP2_HTTP_STATE_REQ_DATA_BEGIN;
       return 0;
     case NGHTTP2_HTTP_EVENT_MSG_END:
-      rv = nghttp2_http_on_remote_end_stream(stream);
+      rv = nghttp2_http_on_end_stream_remote(stream);
       if (rv != 0) {
         return rv;
       }
@@ -133,7 +133,7 @@ int nghttp2_stream_transit_rx_http_state(nghttp2_stream *stream,
       stream->rx.hstate = NGHTTP2_HTTP_STATE_REQ_TRAILERS_BEGIN;
       return 0;
     case NGHTTP2_HTTP_EVENT_MSG_END:
-      rv = nghttp2_http_on_remote_end_stream(stream);
+      rv = nghttp2_http_on_end_stream_remote(stream);
       if (rv != 0) {
         return rv;
       }
@@ -152,7 +152,7 @@ int nghttp2_stream_transit_rx_http_state(nghttp2_stream *stream,
          spec. */
       return NGHTTP2_ERR_PROTO;
     }
-    rv = nghttp2_http_on_remote_end_stream(stream);
+    rv = nghttp2_http_on_end_stream_remote(stream);
     if (rv != 0) {
       return rv;
     }
@@ -190,7 +190,7 @@ int nghttp2_stream_transit_rx_http_state(nghttp2_stream *stream,
       stream->rx.hstate = NGHTTP2_HTTP_STATE_RESP_DATA_BEGIN;
       return 0;
     case NGHTTP2_HTTP_EVENT_MSG_END:
-      rv = nghttp2_http_on_remote_end_stream(stream);
+      rv = nghttp2_http_on_end_stream_remote(stream);
       if (rv != 0) {
         return rv;
       }
@@ -216,7 +216,7 @@ int nghttp2_stream_transit_rx_http_state(nghttp2_stream *stream,
       stream->rx.hstate = NGHTTP2_HTTP_STATE_RESP_TRAILERS_BEGIN;
       return 0;
     case NGHTTP2_HTTP_EVENT_MSG_END:
-      rv = nghttp2_http_on_remote_end_stream(stream);
+      rv = nghttp2_http_on_end_stream_remote(stream);
       if (rv != 0) {
         return rv;
       }
@@ -233,7 +233,7 @@ int nghttp2_stream_transit_rx_http_state(nghttp2_stream *stream,
     if (event != NGHTTP2_HTTP_EVENT_MSG_END) {
       return NGHTTP2_ERR_PROTO;
     }
-    rv = nghttp2_http_on_remote_end_stream(stream);
+    rv = nghttp2_http_on_end_stream_remote(stream);
     if (rv != 0) {
       return rv;
     }

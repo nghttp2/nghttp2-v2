@@ -141,7 +141,7 @@ std::tuple<nghttp2_conn *, bool> setup_conn(FuzzedDataProvider &fdp,
          void *stream_user_data) {
         return simple_stream_callback(conn, stream_id, user_data);
       },
-    .remote_end_stream =
+    .end_stream_remote =
       [](nghttp2_conn *conn, int64_t stream_id, void *user_data,
          void *stream_user_data) {
         return simple_stream_callback(conn, stream_id, user_data);

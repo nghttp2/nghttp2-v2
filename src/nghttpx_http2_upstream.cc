@@ -518,7 +518,7 @@ Http2Upstream::initiate_downstream(Downstream *downstream) {
 }
 
 namespace {
-int remote_end_stream(nghttp2_conn *conn, int64_t stream_id,
+int end_stream_remote(nghttp2_conn *conn, int64_t stream_id,
                       void *conn_user_data, void *stream_user_data) {
   auto downstream = static_cast<Downstream *>(stream_user_data);
   if (!downstream || downstream->get_stop_reading()) {
@@ -734,7 +734,7 @@ Http2Upstream::Http2Upstream(ClientHandler *handler)
     .recv_trailer = recv_trailer,
     .recv_data = recv_data,
     .end_stream_local = end_stream_local,
-    .remote_end_stream = remote_end_stream,
+    .end_stream_remote = end_stream_remote,
     .shutdown = http2_shutdown,
   };
 
