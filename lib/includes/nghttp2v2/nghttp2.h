@@ -1115,7 +1115,7 @@ typedef struct nghttp2_settings {
  *   <nghttp2_settings.hpack_encoder_max_dtable_capacity>` =
  *   :macro:`NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY`
  * - :member:`max_field_section_size
-     <nghttp2_settings.max_field_section_size>` = 65536
+ *   <nghttp2_settings.max_field_section_size>` = 65536
  * - :member:`max_concurrent_streams_local
  *   <nghttp2_settings.max_concurrent_streams_local>` = 100
  * - :member:`initial_max_stream_data
