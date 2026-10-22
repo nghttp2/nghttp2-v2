@@ -39,46 +39,60 @@
 #define NGHTTP2_STREAM_FLAG_NONE 0x00U
 #define NGHTTP2_STREAM_FLAG_SHUT_RD 0x01U
 #define NGHTTP2_STREAM_FLAG_SHUT_WR 0x02U
-#define NGHTTP2_STREAM_FLAG_ERROR_CODE_SET 0x04U
+/* NGHTTP2_STREAM_FLAG_ERROR_CODE_SET_LOCAL is set when error_code is
+   set by the local endpoint. */
+#define NGHTTP2_STREAM_FLAG_ERROR_CODE_SET_LOCAL 0x04U
+/* NGHTTP2_STREAM_FLAG_ERROR_CODE_SET_REMOTE is set when error_code is
+   set by the remote endpoint. */
+#define NGHTTP2_STREAM_FLAG_ERROR_CODE_SET_REMOTE 0x08U
+/* NGHTTP2_STREAM_FLAG_ERROR_CODE_SET is a bitwise-OR of
+   NGHTTP2_STREAM_FLAG_ERROR_CODE_SET_LOCAL and
+   NGHTTP2_STREAM_FLAG_ERROR_CODE_SET_REMOTE. */
+#define NGHTTP2_STREAM_FLAG_ERROR_CODE_SET                                     \
+  (NGHTTP2_STREAM_FLAG_ERROR_CODE_SET_LOCAL |                                  \
+   NGHTTP2_STREAM_FLAG_ERROR_CODE_SET_REMOTE)
 /* NGHTTP2_STREAM_FLAG_FC_BLOCKED indicates that stream is blocked by
    stream-level flow control. */
-#define NGHTTP2_STREAM_FLAG_FC_BLOCKED 0x08U
+#define NGHTTP2_STREAM_FLAG_FC_BLOCKED 0x10U
 /* NGHTTP2_STREAM_FLAG_READ_DATA_BLOCKED indicates that application is
    temporarily unable to provide data. */
-#define NGHTTP2_STREAM_FLAG_READ_DATA_BLOCKED 0x10U
+#define NGHTTP2_STREAM_FLAG_READ_DATA_BLOCKED 0x20U
 /* NGHTTP2_STREAM_FLAG_HEADERS_SUBMITTED indicates that the header
    field (and data) has been submitted to this stream. */
-#define NGHTTP2_STREAM_FLAG_HEADERS_SUBMITTED 0x20U
+#define NGHTTP2_STREAM_FLAG_HEADERS_SUBMITTED 0x40U
 /* NGHTTP2_STREAM_FLAG_TRAILERS_SUBMITTED indicates that the trailer
    field has been submitted to this stream. */
-#define NGHTTP2_STREAM_FLAG_TRAILERS_SUBMITTED 0x40U
+#define NGHTTP2_STREAM_FLAG_TRAILERS_SUBMITTED 0x80U
 /* NGHTTP2_STREAM_FLAG_SEND_RST_STREAM indicates that RST_STREAM
    should be sent in this stream. */
-#define NGHTTP2_STREAM_FLAG_SEND_RST_STREAM 0x80U
+#define NGHTTP2_STREAM_FLAG_SEND_RST_STREAM 0x0100U
 /* NGHTTP2_STREAM_FLAG_RST_STREAM indicates that RST_STREAM has been
    sent or received. */
-#define NGHTTP2_STREAM_FLAG_RST_STREAM 0x0100U
+#define NGHTTP2_STREAM_FLAG_RST_STREAM 0x0200U
 /* NGHTTP2_STREAM_FLAG_RST_STREAM_RECVED indicates that RST_STREAM has
    been received. */
-#define NGHTTP2_STREAM_FLAG_RST_STREAM_RECVED 0x0200U
+#define NGHTTP2_STREAM_FLAG_RST_STREAM_RECVED 0x0400U
 /* NGHTTP2_STREAM_FLAG_OPENED indicates that some activity has been
    seen in this stream.  RST_STREAM can be sent to this stream. */
-#define NGHTTP2_STREAM_FLAG_OPENED 0x0400U
+#define NGHTTP2_STREAM_FLAG_OPENED 0x0800U
 /* NGHTTP2_STREAM_FLAG_REFUSED indicates that the stream is refused
    and not processed in any way. */
-#define NGHTTP2_STREAM_FLAG_REFUSED 0x0800U
+#define NGHTTP2_STREAM_FLAG_REFUSED 0x1000U
 /* NGHTTP2_STREAM_FLAG_SEND_WINDOW_UPDATE indicates that WINDOW_UPDATE
    should be sent in this stream. */
-#define NGHTTP2_STREAM_FLAG_SEND_WINDOW_UPDATE 0x1000U
+#define NGHTTP2_STREAM_FLAG_SEND_WINDOW_UPDATE 0x2000U
 /* NGHTTP2_STREAM_FLAG_SERVER_PRIORITY_SET is set when server
    overrides stream priority with its own. */
-#define NGHTTP2_STREAM_FLAG_SERVER_PRIORITY_SET 0x2000U
+#define NGHTTP2_STREAM_FLAG_SERVER_PRIORITY_SET 0x4000U
 /* NGHTTP2_STREAM_FLAG_SEND_PRIORITY_UPDATE indicates that
    PRIORITY_UPDATE should be sent for this stream. */
-#define NGHTTP2_STREAM_FLAG_SEND_PRIORITY_UPDATE 0x4000U
+#define NGHTTP2_STREAM_FLAG_SEND_PRIORITY_UPDATE 0x8000U
 /* NGHTTP2_STREAM_FLAG_PRIORITY_UPDATE_RECVED is set when
    PRIORITY_UPDATE frame is received from client */
-#define NGHTTP2_STREAM_FLAG_PRIORITY_UPDATE_RECVED 0x8000U
+#define NGHTTP2_STREAM_FLAG_PRIORITY_UPDATE_RECVED 0x10000U
+/* NGHTTP2_STREAM_FLAG_END_STREAM_LOCAL is set when the local endpoint
+   writes HEADERS or DATA frame that bears END_STREAM flag */
+#define NGHTTP2_STREAM_FLAG_END_STREAM_LOCAL 0x20000U
 
 typedef enum nghttp2_stream_http_state {
   NGHTTP2_HTTP_STATE_NONE,
@@ -194,7 +208,11 @@ int nghttp2_stream_transit_rx_http_state(nghttp2_stream *stream,
 
 int nghttp2_stream_empty_headers_allowed(const nghttp2_stream *stream);
 
-void nghttp2_stream_set_error_code(nghttp2_stream *stream, uint32_t error_code);
+void nghttp2_stream_set_error_code_local(nghttp2_stream *stream,
+                                         uint32_t error_code);
+
+void nghttp2_stream_set_error_code_remote(nghttp2_stream *stream,
+                                          uint32_t error_code);
 
 int nghttp2_stream_require_strmq(const nghttp2_stream *stream);
 

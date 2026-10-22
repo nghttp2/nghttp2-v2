@@ -200,8 +200,22 @@ static int conn_call_stream_close(nghttp2_conn *conn, nghttp2_context ctx,
     return 0;
   }
 
-  if (stream->flags & NGHTTP2_STREAM_FLAG_ERROR_CODE_SET) {
-    flags |= NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET;
+  if (stream->flags & NGHTTP2_STREAM_FLAG_ERROR_CODE_SET_LOCAL) {
+    flags |= NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_LOCAL;
+  } else if (stream->flags & NGHTTP2_STREAM_FLAG_ERROR_CODE_SET_REMOTE) {
+    flags |= NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_REMOTE;
+  }
+
+  if (conn->server) {
+    if (stream->rx.hstate == NGHTTP2_HTTP_STATE_REQ_END) {
+      flags |= NGHTTP2_STREAM_CLOSE_FLAG_END_STREAM_REMOTE;
+    }
+  } else if (stream->rx.hstate == NGHTTP2_HTTP_STATE_RESP_END) {
+    flags |= NGHTTP2_STREAM_CLOSE_FLAG_END_STREAM_REMOTE;
+  }
+
+  if (stream->flags & NGHTTP2_STREAM_FLAG_END_STREAM_LOCAL) {
+    flags |= NGHTTP2_STREAM_CLOSE_FLAG_END_STREAM_LOCAL;
   }
 
   rv = conn->callbacks.stream_close(conn, flags, stream->stream_id,
@@ -1308,7 +1322,7 @@ static int conn_recv_rst_stream(nghttp2_conn *conn, nghttp2_context ctx,
     return NGHTTP2_ERR_PROTO;
   }
 
-  nghttp2_stream_set_error_code(stream, fr->error_code);
+  nghttp2_stream_set_error_code_remote(stream, fr->error_code);
   stream->flags |= NGHTTP2_STREAM_FLAG_RST_STREAM |
                    NGHTTP2_STREAM_FLAG_RST_STREAM_RECVED |
                    NGHTTP2_STREAM_FLAG_SHUT_RD | NGHTTP2_STREAM_FLAG_SHUT_WR;
@@ -3005,7 +3019,7 @@ int nghttp2_conn_write_stream(nghttp2_conn *conn, nghttp2_context ctx,
   if ((stream->flags & NGHTTP2_STREAM_FLAG_OPENED) &&
       !nghttp2_http_writer_inprogress(&stream->tx.hw)) {
     if (stream->flags & NGHTTP2_STREAM_FLAG_SEND_RST_STREAM) {
-      assert(stream->flags & NGHTTP2_STREAM_FLAG_ERROR_CODE_SET);
+      assert(stream->flags & NGHTTP2_STREAM_FLAG_ERROR_CODE_SET_LOCAL);
 
       /* This may be doubly counted, but do not care.  RST_STREAM must
          be severely rate limited. */
@@ -3455,7 +3469,7 @@ static void conn_rst_stream(nghttp2_conn *conn, nghttp2_stream *stream,
                    NGHTTP2_STREAM_FLAG_SEND_RST_STREAM |
                    NGHTTP2_STREAM_FLAG_SHUT_WR;
 
-  nghttp2_stream_set_error_code(stream, error_code);
+  nghttp2_stream_set_error_code_local(stream, error_code);
 
   nghttp2_conn_strmq_push(conn, stream);
 }

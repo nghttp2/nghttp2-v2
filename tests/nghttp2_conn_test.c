@@ -87,6 +87,7 @@ static const MunitTest tests[] = {
   munit_void_test(test_nghttp2_conn_get_remote_settings),
   munit_void_test(test_nghttp2_conn_extra_settings),
   munit_void_test(test_nghttp2_conn_max_field_section_size),
+  munit_void_test(test_nghttp2_conn_stream_close),
   munit_test_end(),
 };
 
@@ -8672,7 +8673,7 @@ void test_nghttp2_conn_shutdown_stream(void) {
   assert_true(stream->flags & NGHTTP2_STREAM_FLAG_RST_STREAM);
   assert_false(stream->flags & NGHTTP2_STREAM_FLAG_SHUT_RD);
   assert_true(stream->flags & NGHTTP2_STREAM_FLAG_SHUT_WR);
-  assert_true(stream->flags & NGHTTP2_STREAM_FLAG_ERROR_CODE_SET);
+  assert_true(stream->flags & NGHTTP2_STREAM_FLAG_ERROR_CODE_SET_LOCAL);
   assert_uint32(NGHTTP2_INTERNAL_ERROR, ==, stream->error_code);
 
   nghttp2_conn_shutdown_stream(conn, 0x00, 0x01, NGHTTP2_INTERNAL_ERROR);
@@ -9075,7 +9076,8 @@ void test_nghttp2_conn_shutdown_stream(void) {
 
   assert_ptrdiff(0, <, nwrite);
   assert_size(1, ==, ud.stream_close.ncalled);
-  assert_true(ud.stream_close.flags & NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET);
+  assert_true(ud.stream_close.flags &
+              NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_LOCAL);
   assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, ud.stream_close.error_code);
 
   obuf.last += nwrite;
@@ -9178,7 +9180,8 @@ void test_nghttp2_conn_shutdown_stream(void) {
 
   assert_ptrdiff(0, <, nwrite);
   assert_size(1, ==, ud.stream_close.ncalled);
-  assert_true(ud.stream_close.flags & NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET);
+  assert_true(ud.stream_close.flags &
+              NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_LOCAL);
   assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, ud.stream_close.error_code);
 
   obuf.last += nwrite;
@@ -9276,7 +9279,8 @@ void test_nghttp2_conn_shutdown_stream(void) {
 
   assert_ptrdiff(0, <, nwrite);
   assert_size(1, ==, ud.stream_close.ncalled);
-  assert_true(ud.stream_close.flags & NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET);
+  assert_true(ud.stream_close.flags &
+              NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_LOCAL);
   assert_uint32(NGHTTP2_INTERNAL_ERROR, ==, ud.stream_close.error_code);
 
   obuf.last += nwrite;
@@ -16575,6 +16579,434 @@ void test_nghttp2_conn_max_field_section_size(void) {
 
   assert_not_null(stream);
   assert_false(stream->flags & NGHTTP2_STREAM_FLAG_RST_STREAM);
+
+  nghttp2_hpack_encoder_free(&enc);
+  nghttp2_conn_del(conn);
+
+  nghttp2_buf_free(&hbuf, mem);
+}
+
+void test_nghttp2_conn_stream_close(void) {
+  const nghttp2_mem *mem = nghttp2_mem_default();
+  nghttp2_conn *conn;
+  nghttp2_callbacks callbacks;
+  conn_options opts;
+  userdata ud;
+  nghttp2_tstamp ts = 0;
+  nghttp2_frame fr;
+  int64_t stream_id;
+  uint8_t outbuf[16384];
+  uint8_t rawbuf[16384];
+  nghttp2_buf buf, hbuf;
+  nghttp2_ssize nwrite;
+  nghttp2_hpack_encoder enc;
+  int rv;
+
+  nghttp2_buf_wrap_init(&buf, rawbuf, sizeof(rawbuf));
+  nghttp2_buf_init(&hbuf);
+
+  /* Shutdown stream locally */
+  client_default_callbacks(&callbacks);
+  callbacks.stream_close = stream_close;
+
+  opts = (conn_options){
+    .callbacks = &callbacks,
+    .user_data = &ud,
+  };
+
+  setup_default_client_with_options(&conn, opts);
+  write_preface(conn, ts);
+  read_server_preface(conn, NULL, 0, ts);
+  write_settings_ack(conn, ts);
+
+  stream_id = nghttp2_conn_submit_request(conn, reqnva,
+                                          nghttp2_arraylen(reqnva), NULL, NULL);
+
+  assert_int64(0x01, ==, stream_id);
+
+  nghttp2_conn_shutdown_stream(conn, 0x00, stream_id, NGHTTP2_INTERNAL_ERROR);
+
+  ud = (userdata){0};
+  nwrite = nghttp2_conn_write(conn, outbuf, sizeof(outbuf), ++ts);
+
+  assert_ptrdiff(0, ==, nwrite);
+  assert_size(1, ==, ud.stream_close.ncalled);
+  assert_int64(stream_id, ==, ud.stream_close.stream_id);
+  assert_uint32(NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_LOCAL, ==,
+                ud.stream_close.flags);
+  assert_uint32(NGHTTP2_INTERNAL_ERROR, ==, ud.stream_close.error_code);
+
+  nghttp2_conn_del(conn);
+
+  /* Shutdown stream locally; the local end is closed */
+  client_default_callbacks(&callbacks);
+  callbacks.stream_close = stream_close;
+
+  opts = (conn_options){
+    .callbacks = &callbacks,
+    .user_data = &ud,
+  };
+
+  setup_default_client_with_options(&conn, opts);
+  write_preface(conn, ts);
+  read_server_preface(conn, NULL, 0, ts);
+  write_settings_ack(conn, ts);
+
+  stream_id = nghttp2_conn_submit_request(conn, reqnva,
+                                          nghttp2_arraylen(reqnva), NULL, NULL);
+
+  assert_int64(0x01, ==, stream_id);
+
+  nwrite = nghttp2_conn_write(conn, outbuf, sizeof(outbuf), ++ts);
+
+  assert_ptrdiff(0, <, nwrite);
+
+  nghttp2_conn_shutdown_stream(conn, 0x00, stream_id, NGHTTP2_INTERNAL_ERROR);
+
+  ud = (userdata){0};
+  nwrite = nghttp2_conn_write(conn, outbuf, sizeof(outbuf), ++ts);
+
+  assert_ptrdiff(0, <, nwrite);
+  assert_size(1, ==, ud.stream_close.ncalled);
+  assert_int64(stream_id, ==, ud.stream_close.stream_id);
+  assert_uint32(NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_LOCAL |
+                  NGHTTP2_STREAM_CLOSE_FLAG_END_STREAM_LOCAL,
+                ==, ud.stream_close.flags);
+  assert_uint32(NGHTTP2_INTERNAL_ERROR, ==, ud.stream_close.error_code);
+
+  nghttp2_conn_del(conn);
+
+  /* Shutdown stream from remote */
+  client_default_callbacks(&callbacks);
+  callbacks.stream_close = stream_close;
+
+  opts = (conn_options){
+    .callbacks = &callbacks,
+    .user_data = &ud,
+  };
+
+  setup_default_client_with_options(&conn, opts);
+  write_preface(conn, ts);
+  read_server_preface(conn, NULL, 0, ts);
+  write_settings_ack(conn, ts);
+
+  stream_id =
+    nghttp2_conn_submit_request(conn, reqnva, nghttp2_arraylen(reqnva),
+                                &(nghttp2_data_reader){
+                                  .read_data = read_data_no_end_stream,
+                                },
+                                NULL);
+
+  assert_int64(0x01, ==, stream_id);
+
+  nwrite = nghttp2_conn_write(conn, outbuf, sizeof(outbuf), ++ts);
+
+  assert_ptrdiff(0, <, nwrite);
+
+  fr.rst_stream = (nghttp2_frame_rst_stream){
+    .hd =
+      {
+        .len = 4,
+        .type = NGHTTP2_FRAME_RST_STREAM,
+        .stream_id = stream_id,
+      },
+    .error_code = NGHTTP2_PROTOCOL_ERROR,
+  };
+
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_rst_stream(&buf, &fr.rst_stream);
+
+  assert_int(0, ==, rv);
+
+  ud = (userdata){0};
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
+              ==, conn->rx.frrd.state);
+  assert_size(1, ==, ud.stream_close.ncalled);
+  assert_int64(stream_id, ==, ud.stream_close.stream_id);
+  assert_uint32(NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_REMOTE, ==,
+                ud.stream_close.flags);
+  assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, ud.stream_close.error_code);
+
+  nghttp2_conn_del(conn);
+
+  /* Shutdown stream from remote; the local end has been closed */
+  client_default_callbacks(&callbacks);
+  callbacks.stream_close = stream_close;
+
+  opts = (conn_options){
+    .callbacks = &callbacks,
+    .user_data = &ud,
+  };
+
+  setup_default_client_with_options(&conn, opts);
+  write_preface(conn, ts);
+  read_server_preface(conn, NULL, 0, ts);
+  write_settings_ack(conn, ts);
+
+  stream_id = nghttp2_conn_submit_request(conn, reqnva,
+                                          nghttp2_arraylen(reqnva), NULL, NULL);
+
+  assert_int64(0x01, ==, stream_id);
+
+  nwrite = nghttp2_conn_write(conn, outbuf, sizeof(outbuf), ++ts);
+
+  assert_ptrdiff(0, <, nwrite);
+
+  fr.rst_stream = (nghttp2_frame_rst_stream){
+    .hd =
+      {
+        .len = 4,
+        .type = NGHTTP2_FRAME_RST_STREAM,
+        .stream_id = stream_id,
+      },
+    .error_code = NGHTTP2_PROTOCOL_ERROR,
+  };
+
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_rst_stream(&buf, &fr.rst_stream);
+
+  assert_int(0, ==, rv);
+
+  ud = (userdata){0};
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
+              ==, conn->rx.frrd.state);
+  assert_size(1, ==, ud.stream_close.ncalled);
+  assert_int64(stream_id, ==, ud.stream_close.stream_id);
+  assert_uint32(NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_REMOTE |
+                  NGHTTP2_STREAM_CLOSE_FLAG_END_STREAM_LOCAL,
+                ==, ud.stream_close.flags);
+  assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, ud.stream_close.error_code);
+
+  nghttp2_conn_del(conn);
+
+  /* Shutdown stream from remote; the remote end has been closed */
+  client_default_callbacks(&callbacks);
+  callbacks.stream_close = stream_close;
+
+  opts = (conn_options){
+    .callbacks = &callbacks,
+    .user_data = &ud,
+  };
+
+  setup_default_client_with_options(&conn, opts);
+  write_preface(conn, ts);
+  read_server_preface(conn, NULL, 0, ts);
+  write_settings_ack(conn, ts);
+
+  stream_id =
+    nghttp2_conn_submit_request(conn, reqnva, nghttp2_arraylen(reqnva),
+                                &(nghttp2_data_reader){
+                                  .read_data = read_data_no_end_stream,
+                                },
+                                NULL);
+
+  assert_int64(0x01, ==, stream_id);
+
+  nwrite = nghttp2_conn_write(conn, outbuf, sizeof(outbuf), ++ts);
+
+  assert_ptrdiff(0, <, nwrite);
+
+  nghttp2_hpack_encoder_init(&enc, NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY, mem);
+  nghttp2_buf_reset(&hbuf);
+  rv = nghttp2_hpack_encoder_write(&enc, &hbuf, respnva,
+                                   nghttp2_arraylen(respnva));
+
+  assert_int(0, ==, rv);
+
+  fr.headers = (nghttp2_frame_headers){
+    .hd =
+      {
+        .type = NGHTTP2_FRAME_HEADERS,
+        .flags =
+          NGHTTP2_HEADERS_FLAG_END_HEADERS | NGHTTP2_HEADERS_FLAG_END_STREAM,
+        .stream_id = stream_id,
+      },
+    .field_block = hbuf.pos,
+    .field_blocklen = nghttp2_buf_len(&hbuf),
+  };
+
+  fr.headers.hd.len =
+    (uint32_t)nghttp2_frame_encode_headers_payloadlen(&fr.headers);
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
+
+  assert_int(0, ==, rv);
+
+  fr.rst_stream = (nghttp2_frame_rst_stream){
+    .hd =
+      {
+        .len = 4,
+        .type = NGHTTP2_FRAME_RST_STREAM,
+        .stream_id = stream_id,
+      },
+    .error_code = NGHTTP2_PROTOCOL_ERROR,
+  };
+
+  rv = nghttp2_frame_encode_rst_stream(&buf, &fr.rst_stream);
+
+  assert_int(0, ==, rv);
+
+  ud = (userdata){0};
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
+              ==, conn->rx.frrd.state);
+  assert_size(1, ==, ud.stream_close.ncalled);
+  assert_int64(stream_id, ==, ud.stream_close.stream_id);
+  assert_uint32(NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_REMOTE |
+                  NGHTTP2_STREAM_CLOSE_FLAG_END_STREAM_REMOTE,
+                ==, ud.stream_close.flags);
+  assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, ud.stream_close.error_code);
+
+  nghttp2_hpack_encoder_free(&enc);
+  nghttp2_conn_del(conn);
+
+  /* Both ends are closed cleanly */
+  client_default_callbacks(&callbacks);
+  callbacks.stream_close = stream_close;
+
+  opts = (conn_options){
+    .callbacks = &callbacks,
+    .user_data = &ud,
+  };
+
+  setup_default_client_with_options(&conn, opts);
+  write_preface(conn, ts);
+  read_server_preface(conn, NULL, 0, ts);
+  write_settings_ack(conn, ts);
+
+  stream_id =
+    nghttp2_conn_submit_request(conn, reqnva, nghttp2_arraylen(reqnva),
+                                &(nghttp2_data_reader){
+                                  .read_data = read_data_4k,
+                                },
+                                NULL);
+
+  assert_int64(0x01, ==, stream_id);
+
+  nwrite = nghttp2_conn_write(conn, outbuf, sizeof(outbuf), ++ts);
+
+  assert_ptrdiff(0, <, nwrite);
+
+  nghttp2_hpack_encoder_init(&enc, NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY, mem);
+  nghttp2_buf_reset(&hbuf);
+  rv = nghttp2_hpack_encoder_write(&enc, &hbuf, respnva,
+                                   nghttp2_arraylen(respnva));
+
+  assert_int(0, ==, rv);
+
+  fr.headers = (nghttp2_frame_headers){
+    .hd =
+      {
+        .type = NGHTTP2_FRAME_HEADERS,
+        .flags =
+          NGHTTP2_HEADERS_FLAG_END_HEADERS | NGHTTP2_HEADERS_FLAG_END_STREAM,
+        .stream_id = stream_id,
+      },
+    .field_block = hbuf.pos,
+    .field_blocklen = nghttp2_buf_len(&hbuf),
+  };
+
+  fr.headers.hd.len =
+    (uint32_t)nghttp2_frame_encode_headers_payloadlen(&fr.headers);
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
+
+  assert_int(0, ==, rv);
+
+  ud = (userdata){0};
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
+              ==, conn->rx.frrd.state);
+  assert_size(1, ==, ud.stream_close.ncalled);
+  assert_int64(stream_id, ==, ud.stream_close.stream_id);
+  assert_uint32(NGHTTP2_STREAM_CLOSE_FLAG_END_STREAM_LOCAL |
+                  NGHTTP2_STREAM_CLOSE_FLAG_END_STREAM_REMOTE,
+                ==, ud.stream_close.flags);
+
+  nghttp2_hpack_encoder_free(&enc);
+  nghttp2_conn_del(conn);
+
+  /* Server shutdowns stream after seeing the remote end close */
+  server_default_callbacks(&callbacks);
+  callbacks.stream_close = stream_close;
+
+  opts = (conn_options){
+    .callbacks = &callbacks,
+    .user_data = &ud,
+  };
+
+  setup_default_server_with_options(&conn, opts);
+  write_preface(conn, ts);
+  read_client_preface(conn, NULL, 0, ts);
+  write_settings_ack(conn, ts);
+
+  nghttp2_hpack_encoder_init(&enc, NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY, mem);
+  nghttp2_buf_reset(&hbuf);
+  rv =
+    nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
+
+  assert_int(0, ==, rv);
+
+  fr.headers = (nghttp2_frame_headers){
+    .hd =
+      {
+        .type = NGHTTP2_FRAME_HEADERS,
+        .flags = NGHTTP2_HEADERS_FLAG_END_HEADERS,
+        .stream_id = 0x01,
+      },
+    .field_block = hbuf.pos,
+    .field_blocklen = nghttp2_buf_len(&hbuf),
+  };
+
+  fr.headers.hd.len =
+    (uint32_t)nghttp2_frame_encode_headers_payloadlen(&fr.headers);
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
+
+  assert_int(0, ==, rv);
+
+  fr.data = (nghttp2_frame_data){
+    .hd =
+      {
+        .type = NGHTTP2_FRAME_DATA,
+        .flags = NGHTTP2_DATA_FLAG_END_STREAM,
+        .stream_id = 0x01,
+      },
+  };
+
+  rv = nghttp2_frame_encode_data(&buf, &fr.data);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
+              ==, conn->rx.frrd.state);
+
+  nghttp2_conn_shutdown_stream(conn, 0x00, 0x01, NGHTTP2_INTERNAL_ERROR);
+
+  assert_int(0, ==, rv);
+
+  ud = (userdata){0};
+  nwrite = nghttp2_conn_write(conn, outbuf, sizeof(outbuf), ++ts);
+
+  assert_ptrdiff(0, <, nwrite);
+  assert_size(1, ==, ud.stream_close.ncalled);
+  assert_int64(stream_id, ==, ud.stream_close.stream_id);
+  assert_uint32(NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_LOCAL |
+                  NGHTTP2_STREAM_CLOSE_FLAG_END_STREAM_REMOTE,
+                ==, ud.stream_close.flags);
 
   nghttp2_hpack_encoder_free(&enc);
   nghttp2_conn_del(conn);

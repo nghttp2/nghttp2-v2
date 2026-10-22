@@ -1264,10 +1264,50 @@ typedef int (*nghttp2_stream_open)(nghttp2_conn *conn, int64_t stream_id,
 /**
  * @macro
  *
- * :macro:`NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET` indicates that
- * error_code parameter is set.
+ * :macro:`NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_LOCAL` indicates
+ * that error_code parameter is set by the local endpoint.
  */
-#define NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET 0x01U
+#define NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_LOCAL 0x01U
+
+/**
+ * @macro
+ *
+ * :macro:`NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_REMOTE` indicates
+ * that error_code parameter is set by the remote endpoint.
+ */
+#define NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_REMOTE 0x02U
+
+/**
+ * @macro
+ *
+ * :macro:`NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET` is a bitwise-OR
+ * of :macro:`NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_LOCAL` and
+ * :macro:`NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_REMOTE`.
+ */
+#define NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET                               \
+  (NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_LOCAL |                            \
+   NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_REMOTE)
+
+/**
+ * @macro
+ *
+ * :macro:`NGHTTP2_STREAM_CLOSE_FLAG_END_STREAM_LOCAL` indicates that
+ * the local endpoint sent HEADERS or DATA frame with END_STREAM set.
+ * Note that this does not guarantee that the remote endpoint received
+ * whole stream data to the end and passed them to the application
+ * because the stream might be reset by the remote endpoint
+ * asynchronously.
+ */
+#define NGHTTP2_STREAM_CLOSE_FLAG_END_STREAM_LOCAL 0x04U
+
+/**
+ * @macro
+ *
+ * :macro:`NGHTTP2_STREAM_CLOSE_FLAG_END_STREAM_REMOTE` indicates that
+ * the local endpoint receives HEADERS or DATA frame with END_STREAM
+ * set.
+ */
+#define NGHTTP2_STREAM_CLOSE_FLAG_END_STREAM_REMOTE 0x08U
 
 /**
  * @functypedef
@@ -1277,8 +1317,9 @@ typedef int (*nghttp2_stream_open)(nghttp2_conn *conn, int64_t stream_id,
  * existing streams are closed.  |flags| is the bitwise-OR of zero or
  * more of :macro:`NGHTTP2_STREAM_CLOSE_FLAG_*
  * <NGHTTP2_STREAM_CLOSE_FLAG_NONE>`.  |error_code| indicates the
- * error code that shut down this stream if
- * :macro:`NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET` is set in
+ * error code that shut down this stream if either
+ * :macro:`NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_LOCAL` or
+ * :macro:`NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_REMOTE` is set in
  * |flags|.  No error code means that a stream is closed cleanly.
  *
  * The implementation of this callback should return 0 if it succeeds.
