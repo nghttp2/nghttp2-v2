@@ -117,9 +117,7 @@ int stream_close(nghttp2_conn *conn, uint32_t flags, int64_t stream_id,
   auto client = static_cast<Client *>(conn_user_data);
 
   client->on_stream_close(stream_id,
-                          (flags & NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET)
-                            ? error_code == NGHTTP2_NO_ERROR
-                            : true);
+                          !(flags & NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET));
 
   return 0;
 }

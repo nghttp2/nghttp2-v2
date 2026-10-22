@@ -256,13 +256,23 @@ int nghttp2_stream_empty_headers_allowed(const nghttp2_stream *stream) {
   }
 }
 
-void nghttp2_stream_set_error_code(nghttp2_stream *stream,
-                                   uint32_t error_code) {
+void nghttp2_stream_set_error_code_local(nghttp2_stream *stream,
+                                         uint32_t error_code) {
   if (stream->flags & NGHTTP2_STREAM_FLAG_ERROR_CODE_SET) {
     return;
   }
 
-  stream->flags |= NGHTTP2_STREAM_FLAG_ERROR_CODE_SET;
+  stream->flags |= NGHTTP2_STREAM_FLAG_ERROR_CODE_SET_LOCAL;
+  stream->error_code = error_code;
+}
+
+void nghttp2_stream_set_error_code_remote(nghttp2_stream *stream,
+                                          uint32_t error_code) {
+  if (stream->flags & NGHTTP2_STREAM_FLAG_ERROR_CODE_SET) {
+    return;
+  }
+
+  stream->flags |= NGHTTP2_STREAM_FLAG_ERROR_CODE_SET_REMOTE;
   stream->error_code = error_code;
 }
 

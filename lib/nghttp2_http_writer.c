@@ -145,6 +145,8 @@ static int http_writer_on_end_headers(nghttp2_http_writer *hw,
   hw->flags &= ~NGHTTP2_HTTP_WRITER_FLAG_INPROGRESS;
 
   if (fr->hd.flags & NGHTTP2_HEADERS_FLAG_END_STREAM) {
+    stream->flags |= NGHTTP2_STREAM_FLAG_END_STREAM_LOCAL;
+
     rv = conn_call_end_stream_local(conn, stream);
   }
 
@@ -273,6 +275,8 @@ static int http_writer_on_end_data(nghttp2_http_writer *hw,
   int rv = 0;
 
   if (hw->flags & NGHTTP2_HTTP_WRITER_FLAG_DATA_END_STREAM) {
+    stream->flags |= NGHTTP2_STREAM_FLAG_END_STREAM_LOCAL;
+
     rv = conn_call_end_stream_local(conn, stream);
   }
 
