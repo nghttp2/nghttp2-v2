@@ -1038,7 +1038,7 @@ int recv_data(nghttp2_conn *conn, int64_t stream_id, const uint8_t *data,
 } // namespace
 
 namespace {
-int remote_end_stream(nghttp2_conn *conn, int64_t stream_id,
+int end_stream_remote(nghttp2_conn *conn, int64_t stream_id,
                       void *conn_user_data, void *stream_user_data) {
   auto client = get_client(conn_user_data);
   auto req = static_cast<Request *>(stream_user_data);
@@ -1110,7 +1110,7 @@ std::expected<void, Error> HttpClient::connection_made() {
     .recv_header = recv_header,
     .end_headers = end_headers,
     .recv_data = recv_data,
-    .remote_end_stream = remote_end_stream,
+    .end_stream_remote = end_stream_remote,
   };
 
   nghttp2_settings settings;
@@ -1182,6 +1182,12 @@ std::expected<void, Error> HttpClient::on_read(std::span<const uint8_t> data) {
 std::expected<void, Error> HttpClient::on_write() {
   if (!tx.data.empty()) {
     return {};
+  }
+
+  static auto count = 0UZ;
+
+  if (++count == 5) {
+    nghttp2_conn_shutdown_stream(conn, 0x00, 0x01, NGHTTP2_NO_ERROR);
   }
 
   auto nwrite =

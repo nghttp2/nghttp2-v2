@@ -47,7 +47,7 @@ typedef struct nghttp2_http_writer {
   const nghttp2_mem *mem;
   nghttp2_ringbuf outq;
   size_t field_left;
-  nghttp2_end_stream local_end_stream;
+  nghttp2_end_stream end_stream_local;
   nghttp2_write_stream_data_offset write_stream_data_offset;
 
   /* Only used by HEADERS frame transmission */
@@ -62,7 +62,7 @@ typedef struct nghttp2_http_writer {
 } nghttp2_http_writer;
 
 void nghttp2_http_writer_init(
-  nghttp2_http_writer *hw, nghttp2_end_stream local_end_stream,
+  nghttp2_http_writer *hw, nghttp2_end_stream end_stream_local,
   nghttp2_write_stream_data_offset write_stream_data_offset,
   const nghttp2_mem *mem);
 

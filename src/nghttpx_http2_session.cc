@@ -1082,7 +1082,7 @@ int end_headers(nghttp2_conn *conn, int64_t stream_id, int fin,
 } // namespace
 
 namespace {
-int remote_end_stream(nghttp2_conn *conn, int64_t stream_id,
+int end_stream_remote(nghttp2_conn *conn, int64_t stream_id,
                       void *conn_user_data, void *stream_user_data) {
   auto sd = static_cast<StreamData *>(stream_user_data);
   if (!sd || !sd->dconn) {
@@ -1279,7 +1279,7 @@ std::expected<void, Error> Http2Session::connection_made() {
     .end_headers = end_headers,
     .recv_trailer = recv_trailer,
     .recv_data = recv_data,
-    .remote_end_stream = remote_end_stream,
+    .end_stream_remote = end_stream_remote,
     .recv_ping_ack = recv_ping_ack,
     .shutdown = http2_shutdown,
   };

@@ -1550,23 +1550,23 @@ typedef struct nghttp2_callbacks {
    */
   nghttp2_recv_data recv_data;
   /**
-   * :member:`local_end_stream` is a callback function which is
+   * :member:`end_stream_local` is a callback function which is
    * invoked when a sending side of stream has been closed.  For
    * server, this callback function is invoked when HTTP response is
    * sent completely.  For client, this callback function is invoked
    * when HTTP request is sent completely.  This callback function is
    * optional.
    */
-  nghttp2_end_stream local_end_stream;
+  nghttp2_end_stream end_stream_local;
   /**
-   * :member:`remote_end_stream` is a callback function which is
+   * :member:`end_stream_remote` is a callback function which is
    * invoked when a receiving side of stream has been closed.  For
    * server, this callback function is invoked when HTTP request is
    * received completely.  For client, this callback function is
    * invoked when HTTP response is received completely.  This callback
    * function is optional.
    */
-  nghttp2_end_stream remote_end_stream;
+  nghttp2_end_stream end_stream_remote;
   /**
    * :member:`recv_ping_ack` is a callback function which is invoked
    * when PING frame with ACK flag set is received.  This callback

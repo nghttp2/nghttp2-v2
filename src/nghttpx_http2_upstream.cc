@@ -518,7 +518,7 @@ Http2Upstream::initiate_downstream(Downstream *downstream) {
 }
 
 namespace {
-int remote_end_stream(nghttp2_conn *conn, int64_t stream_id,
+int end_stream_remote(nghttp2_conn *conn, int64_t stream_id,
                       void *conn_user_data, void *stream_user_data) {
   auto downstream = static_cast<Downstream *>(stream_user_data);
   if (!downstream || downstream->get_stop_reading()) {
@@ -541,7 +541,7 @@ int remote_end_stream(nghttp2_conn *conn, int64_t stream_id,
 } // namespace
 
 namespace {
-int local_end_stream(nghttp2_conn *conn, int64_t stream_id,
+int end_stream_local(nghttp2_conn *conn, int64_t stream_id,
                      void *conn_user_data, void *stream_user_data) {
   // RST_STREAM if request is still incomplete.
   auto downstream = static_cast<Downstream *>(stream_user_data);
@@ -733,8 +733,8 @@ Http2Upstream::Http2Upstream(ClientHandler *handler)
     .end_headers = end_headers,
     .recv_trailer = recv_trailer,
     .recv_data = recv_data,
-    .local_end_stream = local_end_stream,
-    .remote_end_stream = remote_end_stream,
+    .end_stream_local = end_stream_local,
+    .end_stream_remote = end_stream_remote,
     .shutdown = http2_shutdown,
   };
 

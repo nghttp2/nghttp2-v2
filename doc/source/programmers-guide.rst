@@ -34,7 +34,7 @@ callbacks that are useful:
   have ended.
 - :member:`nghttp2_callbacks.recv_data`: Called when the local
   endpoint receives the request or response body.
-- :member:`nghttp2_callbacks.remote_end_stream`: Called when the local
+- :member:`nghttp2_callbacks.end_stream_remote`: Called when the local
   endpoint detects that the receiving side of the stream has closed.
 - :member:`nghttp2_callbacks.stream_close`: Called when a stream is
   closed, that is, both sides of the stream have been closed.

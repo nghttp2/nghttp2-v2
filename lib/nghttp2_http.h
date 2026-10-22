@@ -130,7 +130,7 @@ int nghttp2_http_on_response_headers(nghttp2_http_state *http);
  * NGHTTP2_ERR_MALFORMED_HTTP_MESSAGING
  *     HTTP messaging is violated.
  */
-int nghttp2_http_on_remote_end_stream(const nghttp2_stream *stream);
+int nghttp2_http_on_end_stream_remote(const nghttp2_stream *stream);
 
 /*
  * This function is called when chunk of data is received.  This

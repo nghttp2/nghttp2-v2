@@ -33,13 +33,13 @@
 #include "nghttp2_vec.h"
 
 void nghttp2_http_writer_init(
-  nghttp2_http_writer *hw, nghttp2_end_stream local_end_stream,
+  nghttp2_http_writer *hw, nghttp2_end_stream end_stream_local,
   nghttp2_write_stream_data_offset write_stream_data_offset,
   const nghttp2_mem *mem) {
   hw->mem = mem;
   /* This does not allocate memory, and it always succeeds. */
   nghttp2_ringbuf_init(&hw->outq, 0, sizeof(nghttp2_frame), mem);
-  hw->local_end_stream = local_end_stream;
+  hw->end_stream_local = end_stream_local;
   hw->write_stream_data_offset = write_stream_data_offset;
   nghttp2_buf_init(&hw->header_buf);
   hw->datacnt = 0;
@@ -119,15 +119,15 @@ int nghttp2_http_writer_write(nghttp2_http_writer *hw, nghttp2_buf *dest,
   return 0;
 }
 
-static int conn_call_local_end_stream(nghttp2_conn *conn,
+static int conn_call_end_stream_local(nghttp2_conn *conn,
                                       const nghttp2_stream *stream) {
   int rv;
 
-  if (!conn->callbacks.local_end_stream) {
+  if (!conn->callbacks.end_stream_local) {
     return 0;
   }
 
-  rv = conn->callbacks.local_end_stream(conn, stream->stream_id,
+  rv = conn->callbacks.end_stream_local(conn, stream->stream_id,
                                         conn->user_data, stream->user_data);
   if (rv != 0) {
     return NGHTTP2_ERR_CALLBACK_FAILURE;
@@ -145,7 +145,7 @@ static int http_writer_on_end_headers(nghttp2_http_writer *hw,
   hw->flags &= ~NGHTTP2_HTTP_WRITER_FLAG_INPROGRESS;
 
   if (fr->hd.flags & NGHTTP2_HEADERS_FLAG_END_STREAM) {
-    rv = conn_call_local_end_stream(conn, stream);
+    rv = conn_call_end_stream_local(conn, stream);
   }
 
   nghttp2_buf_reset(&hw->header_buf);
@@ -273,7 +273,7 @@ static int http_writer_on_end_data(nghttp2_http_writer *hw,
   int rv = 0;
 
   if (hw->flags & NGHTTP2_HTTP_WRITER_FLAG_DATA_END_STREAM) {
-    rv = conn_call_local_end_stream(conn, stream);
+    rv = conn_call_end_stream_local(conn, stream);
   }
 
   nghttp2_ringbuf_pop_front(&hw->outq);

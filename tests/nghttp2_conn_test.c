@@ -208,11 +208,11 @@ typedef struct userdata {
   struct {
     size_t ncalled;
     int64_t stream_id;
-  } local_end_stream;
+  } end_stream_local;
   struct {
     size_t ncalled;
     int64_t stream_id;
-  } remote_end_stream;
+  } end_stream_remote;
   struct {
     size_t ncalled;
     uint32_t flags;
@@ -406,26 +406,26 @@ static int recv_data(nghttp2_conn *conn, int64_t stream_id, const uint8_t *data,
   return 0;
 }
 
-static int local_end_stream(nghttp2_conn *conn, int64_t stream_id,
+static int end_stream_local(nghttp2_conn *conn, int64_t stream_id,
                             void *conn_user_data, void *stream_user_data) {
   userdata *ud = conn_user_data;
   (void)conn;
   (void)stream_user_data;
 
-  ++ud->local_end_stream.ncalled;
-  ud->local_end_stream.stream_id = stream_id;
+  ++ud->end_stream_local.ncalled;
+  ud->end_stream_local.stream_id = stream_id;
 
   return 0;
 }
 
-static int remote_end_stream(nghttp2_conn *conn, int64_t stream_id,
+static int end_stream_remote(nghttp2_conn *conn, int64_t stream_id,
                              void *conn_user_data, void *stream_user_data) {
   userdata *ud = conn_user_data;
   (void)conn;
   (void)stream_user_data;
 
-  ++ud->remote_end_stream.ncalled;
-  ud->remote_end_stream.stream_id = stream_id;
+  ++ud->end_stream_remote.ncalled;
+  ud->end_stream_remote.stream_id = stream_id;
 
   return 0;
 }
@@ -858,7 +858,7 @@ void test_nghttp2_conn_read_request(void) {
   callbacks.begin_headers = begin_headers;
   callbacks.recv_header = recv_header;
   callbacks.end_headers = end_headers;
-  callbacks.remote_end_stream = remote_end_stream;
+  callbacks.end_stream_remote = end_stream_remote;
 
   opts = (conn_options){
     .callbacks = &callbacks,
@@ -910,8 +910,8 @@ void test_nghttp2_conn_read_request(void) {
   assert_size(nghttp2_arraylen(reqnva), ==, ud.recv_header.ncalled);
   assert_int64(1, ==, ud.recv_header.stream_id);
   assert_size(nghttp2_arraylen(reqnva), ==, ud.recv_header.expect_offset);
-  assert_size(1, ==, ud.remote_end_stream.ncalled);
-  assert_int64(1, ==, ud.remote_end_stream.stream_id);
+  assert_size(1, ==, ud.end_stream_remote.ncalled);
+  assert_int64(1, ==, ud.end_stream_remote.stream_id);
 
   stream = nghttp2_conn_find_stream(conn, 1);
 
@@ -927,7 +927,7 @@ void test_nghttp2_conn_read_request(void) {
   callbacks.begin_headers = begin_headers;
   callbacks.recv_header = recv_header;
   callbacks.end_headers = end_headers;
-  callbacks.remote_end_stream = remote_end_stream;
+  callbacks.end_stream_remote = end_stream_remote;
   callbacks.recv_data = recv_data;
 
   opts = (conn_options){
@@ -978,7 +978,7 @@ void test_nghttp2_conn_read_request(void) {
   assert_size(nghttp2_arraylen(reqnva), ==, ud.recv_header.ncalled);
   assert_int64(1, ==, ud.recv_header.stream_id);
   assert_size(nghttp2_arraylen(reqnva), ==, ud.recv_header.expect_offset);
-  assert_size(0, ==, ud.remote_end_stream.ncalled);
+  assert_size(0, ==, ud.end_stream_remote.ncalled);
 
   stream = nghttp2_conn_find_stream(conn, 1);
 
@@ -1006,7 +1006,7 @@ void test_nghttp2_conn_read_request(void) {
   assert_size(1, ==, ud.recv_data.ncalled);
   assert_int64(1, ==, ud.recv_data.stream_id);
   assert_size(77, ==, ud.recv_data.datalen);
-  assert_size(0, ==, ud.remote_end_stream.ncalled);
+  assert_size(0, ==, ud.end_stream_remote.ncalled);
 
   stream = nghttp2_conn_find_stream(conn, 1);
 
@@ -1035,8 +1035,8 @@ void test_nghttp2_conn_read_request(void) {
   assert_size(1, ==, ud.recv_data.ncalled);
   assert_int64(1, ==, ud.recv_data.stream_id);
   assert_size(22, ==, ud.recv_data.datalen);
-  assert_size(1, ==, ud.remote_end_stream.ncalled);
-  assert_int64(1, ==, ud.remote_end_stream.stream_id);
+  assert_size(1, ==, ud.end_stream_remote.ncalled);
+  assert_int64(1, ==, ud.end_stream_remote.stream_id);
 
   stream = nghttp2_conn_find_stream(conn, 1);
 
@@ -1055,7 +1055,7 @@ void test_nghttp2_conn_read_request(void) {
   callbacks.begin_trailers = begin_trailers;
   callbacks.recv_trailer = recv_trailer;
   callbacks.end_trailers = end_trailers;
-  callbacks.remote_end_stream = remote_end_stream;
+  callbacks.end_stream_remote = end_stream_remote;
   callbacks.recv_data = recv_data;
 
   opts = (conn_options){
@@ -1106,7 +1106,7 @@ void test_nghttp2_conn_read_request(void) {
   assert_size(nghttp2_arraylen(reqnva), ==, ud.recv_header.ncalled);
   assert_int64(1, ==, ud.recv_header.stream_id);
   assert_size(nghttp2_arraylen(reqnva), ==, ud.recv_header.expect_offset);
-  assert_size(0, ==, ud.remote_end_stream.ncalled);
+  assert_size(0, ==, ud.end_stream_remote.ncalled);
 
   stream = nghttp2_conn_find_stream(conn, 1);
 
@@ -1134,7 +1134,7 @@ void test_nghttp2_conn_read_request(void) {
   assert_size(1, ==, ud.recv_data.ncalled);
   assert_int64(1, ==, ud.recv_data.stream_id);
   assert_size(77, ==, ud.recv_data.datalen);
-  assert_size(0, ==, ud.remote_end_stream.ncalled);
+  assert_size(0, ==, ud.end_stream_remote.ncalled);
 
   stream = nghttp2_conn_find_stream(conn, 1);
 
@@ -1178,8 +1178,8 @@ void test_nghttp2_conn_read_request(void) {
   assert_size(nghttp2_arraylen(trnva), ==, ud.recv_trailer.ncalled);
   assert_int64(1, ==, ud.recv_trailer.stream_id);
   assert_size(nghttp2_arraylen(trnva), ==, ud.recv_trailer.expect_offset);
-  assert_size(1, ==, ud.remote_end_stream.ncalled);
-  assert_int64(1, ==, ud.remote_end_stream.stream_id);
+  assert_size(1, ==, ud.end_stream_remote.ncalled);
+  assert_int64(1, ==, ud.end_stream_remote.stream_id);
 
   stream = nghttp2_conn_find_stream(conn, 1);
 
@@ -1195,7 +1195,7 @@ void test_nghttp2_conn_read_request(void) {
   callbacks.begin_headers = begin_headers;
   callbacks.recv_header = recv_header;
   callbacks.end_headers = end_headers;
-  callbacks.remote_end_stream = remote_end_stream;
+  callbacks.end_stream_remote = end_stream_remote;
 
   opts = (conn_options){
     .callbacks = &callbacks,
@@ -1246,7 +1246,7 @@ void test_nghttp2_conn_read_request(void) {
   assert_size(nghttp2_arraylen(reqnva) - 1, ==, ud.recv_header.ncalled);
   assert_int64(1, ==, ud.recv_header.stream_id);
   assert_size(nghttp2_arraylen(reqnva) - 1, ==, ud.recv_header.expect_offset);
-  assert_size(0, ==, ud.remote_end_stream.ncalled);
+  assert_size(0, ==, ud.end_stream_remote.ncalled);
 
   stream = nghttp2_conn_find_stream(conn, 1);
 
@@ -1283,8 +1283,8 @@ void test_nghttp2_conn_read_request(void) {
   assert_size(1, ==, ud.recv_header.ncalled);
   assert_int64(1, ==, ud.recv_header.stream_id);
   assert_size(1, ==, ud.recv_header.expect_offset);
-  assert_size(1, ==, ud.remote_end_stream.ncalled);
-  assert_int64(1, ==, ud.remote_end_stream.stream_id);
+  assert_size(1, ==, ud.end_stream_remote.ncalled);
+  assert_int64(1, ==, ud.end_stream_remote.stream_id);
 
   stream = nghttp2_conn_find_stream(conn, 1);
 
@@ -3241,7 +3241,7 @@ void test_nghttp2_conn_recv_headers(void) {
   callbacks.begin_headers = begin_headers;
   callbacks.recv_header = recv_header;
   callbacks.end_headers = end_headers;
-  callbacks.remote_end_stream = remote_end_stream;
+  callbacks.end_stream_remote = end_stream_remote;
 
   opts = (conn_options){
     .callbacks = &callbacks,
@@ -3289,7 +3289,7 @@ void test_nghttp2_conn_recv_headers(void) {
   assert_size(1, ==, ud.begin_headers.ncalled);
   assert_size(5, ==, ud.recv_header.ncalled);
   assert_size(1, ==, ud.end_headers.ncalled);
-  assert_size(1, ==, ud.remote_end_stream.ncalled);
+  assert_size(1, ==, ud.end_stream_remote.ncalled);
 
   fr.headers = (nghttp2_frame_headers){
     .hd =
@@ -3318,7 +3318,7 @@ void test_nghttp2_conn_recv_headers(void) {
   assert_size(0, ==, ud.begin_headers.ncalled);
   assert_size(0, ==, ud.recv_header.ncalled);
   assert_size(0, ==, ud.end_headers.ncalled);
-  assert_size(0, ==, ud.remote_end_stream.ncalled);
+  assert_size(0, ==, ud.end_stream_remote.ncalled);
 
   stream = nghttp2_conn_find_stream(conn, 0x01);
 
@@ -3503,7 +3503,7 @@ void test_nghttp2_conn_recv_continuation(void) {
   callbacks.begin_headers = begin_headers;
   callbacks.recv_header = recv_header;
   callbacks.end_headers = end_headers;
-  callbacks.remote_end_stream = remote_end_stream;
+  callbacks.end_stream_remote = end_stream_remote;
 
   opts = (conn_options){
     .callbacks = &callbacks,
@@ -3563,7 +3563,7 @@ void test_nghttp2_conn_recv_continuation(void) {
   assert_size(1, ==, ud.begin_headers.ncalled);
   assert_size(5, ==, ud.recv_header.ncalled);
   assert_size(1, ==, ud.end_headers.ncalled);
-  assert_size(1, ==, ud.remote_end_stream.ncalled);
+  assert_size(1, ==, ud.end_stream_remote.ncalled);
 
   stream = nghttp2_conn_find_stream(conn, 0x01);
 
@@ -3580,7 +3580,7 @@ void test_nghttp2_conn_recv_continuation(void) {
   callbacks.begin_headers = begin_headers;
   callbacks.recv_header = recv_header;
   callbacks.end_headers = end_headers;
-  callbacks.remote_end_stream = remote_end_stream;
+  callbacks.end_stream_remote = end_stream_remote;
 
   opts = (conn_options){
     .callbacks = &callbacks,
@@ -3652,7 +3652,7 @@ void test_nghttp2_conn_recv_continuation(void) {
   assert_size(1, ==, ud.begin_headers.ncalled);
   assert_size(5, ==, ud.recv_header.ncalled);
   assert_size(1, ==, ud.end_headers.ncalled);
-  assert_size(1, ==, ud.remote_end_stream.ncalled);
+  assert_size(1, ==, ud.end_stream_remote.ncalled);
 
   stream = nghttp2_conn_find_stream(conn, 0x01);
 
@@ -3668,7 +3668,7 @@ void test_nghttp2_conn_recv_continuation(void) {
   callbacks.begin_headers = begin_headers;
   callbacks.recv_header = recv_header;
   callbacks.end_headers = end_headers;
-  callbacks.remote_end_stream = remote_end_stream;
+  callbacks.end_stream_remote = end_stream_remote;
 
   opts = (conn_options){
     .callbacks = &callbacks,
@@ -3754,7 +3754,7 @@ void test_nghttp2_conn_recv_continuation(void) {
   assert_size(1, ==, ud.begin_headers.ncalled);
   assert_size(5, ==, ud.recv_header.ncalled);
   assert_size(1, ==, ud.end_headers.ncalled);
-  assert_size(1, ==, ud.remote_end_stream.ncalled);
+  assert_size(1, ==, ud.end_stream_remote.ncalled);
 
   stream = nghttp2_conn_find_stream(conn, 0x01);
 
@@ -3770,7 +3770,7 @@ void test_nghttp2_conn_recv_continuation(void) {
   callbacks.begin_headers = begin_headers;
   callbacks.recv_header = recv_header;
   callbacks.end_headers = end_headers;
-  callbacks.remote_end_stream = remote_end_stream;
+  callbacks.end_stream_remote = end_stream_remote;
 
   opts = (conn_options){
     .callbacks = &callbacks,
@@ -3795,7 +3795,7 @@ void test_nghttp2_conn_recv_continuation(void) {
   assert_size(1, ==, ud.begin_headers.ncalled);
   assert_size(5, ==, ud.recv_header.ncalled);
   assert_size(1, ==, ud.end_headers.ncalled);
-  assert_size(1, ==, ud.remote_end_stream.ncalled);
+  assert_size(1, ==, ud.end_stream_remote.ncalled);
 
   stream = nghttp2_conn_find_stream(conn, 0x01);
 
@@ -9449,7 +9449,7 @@ void test_nghttp2_conn_http_writer(void) {
 
   /* Write HEADERS in chunks */
   client_default_callbacks(&callbacks);
-  callbacks.local_end_stream = local_end_stream;
+  callbacks.end_stream_local = end_stream_local;
 
   opts = (conn_options){
     .callbacks = &callbacks,
@@ -9481,8 +9481,8 @@ void test_nghttp2_conn_http_writer(void) {
     obuf.last += nwrite;
   }
 
-  assert_size(1, ==, ud.local_end_stream.ncalled);
-  assert_int64(stream_id, ==, ud.local_end_stream.stream_id);
+  assert_size(1, ==, ud.end_stream_local.ncalled);
+  assert_int64(stream_id, ==, ud.end_stream_local.stream_id);
 
   rv = nghttp2_frd_decode_buf(&frd, &fr, &obuf);
 
@@ -9507,7 +9507,7 @@ void test_nghttp2_conn_http_writer(void) {
 
   /* Write HEADERS and DATA in chunks */
   client_default_callbacks(&callbacks);
-  callbacks.local_end_stream = local_end_stream;
+  callbacks.end_stream_local = end_stream_local;
 
   opts = (conn_options){
     .callbacks = &callbacks,
@@ -9543,8 +9543,8 @@ void test_nghttp2_conn_http_writer(void) {
     obuf.last += nwrite;
   }
 
-  assert_size(1, ==, ud.local_end_stream.ncalled);
-  assert_int64(stream_id, ==, ud.local_end_stream.stream_id);
+  assert_size(1, ==, ud.end_stream_local.ncalled);
+  assert_int64(stream_id, ==, ud.end_stream_local.stream_id);
 
   rv = nghttp2_frd_decode_buf(&frd, &fr, &obuf);
 
@@ -9565,7 +9565,7 @@ void test_nghttp2_conn_http_writer(void) {
 
   /* Write HEADERS, DATA, and HEADERS in chunks */
   client_default_callbacks(&callbacks);
-  callbacks.local_end_stream = local_end_stream;
+  callbacks.end_stream_local = end_stream_local;
 
   opts = (conn_options){
     .callbacks = &callbacks,
@@ -9606,8 +9606,8 @@ void test_nghttp2_conn_http_writer(void) {
     obuf.last += nwrite;
   }
 
-  assert_size(1, ==, ud.local_end_stream.ncalled);
-  assert_int64(stream_id, ==, ud.local_end_stream.stream_id);
+  assert_size(1, ==, ud.end_stream_local.ncalled);
+  assert_int64(stream_id, ==, ud.end_stream_local.stream_id);
 
   rv = nghttp2_frd_decode_buf(&frd, &fr, &obuf);
 
