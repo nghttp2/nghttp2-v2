@@ -15566,6 +15566,8 @@ void test_nghttp2_conn_rate_limit(void) {
 
     rv = nghttp2_frame_encode_rst_stream(&buf, &fr.rst_stream);
 
+    assert_int(0, ==, rv);
+
     rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
 
     if (rv != 0) {
