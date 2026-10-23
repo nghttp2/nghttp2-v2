@@ -1289,27 +1289,6 @@ typedef int (*nghttp2_stream_open)(nghttp2_conn *conn, int64_t stream_id,
    NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_REMOTE)
 
 /**
- * @macro
- *
- * :macro:`NGHTTP2_STREAM_CLOSE_FLAG_END_STREAM_LOCAL` indicates that
- * the local endpoint sent HEADERS or DATA frame with END_STREAM set.
- * Note that this does not guarantee that the remote endpoint received
- * whole stream data to the end and passed them to the application
- * because the stream might be reset by the remote endpoint
- * asynchronously.
- */
-#define NGHTTP2_STREAM_CLOSE_FLAG_END_STREAM_LOCAL 0x04U
-
-/**
- * @macro
- *
- * :macro:`NGHTTP2_STREAM_CLOSE_FLAG_END_STREAM_REMOTE` indicates that
- * the local endpoint receives HEADERS or DATA frame with END_STREAM
- * set.
- */
-#define NGHTTP2_STREAM_CLOSE_FLAG_END_STREAM_REMOTE 0x08U
-
-/**
  * @functypedef
  *
  * :type:`nghttp2_stream_close` is invoked when a stream is closed.

@@ -90,9 +90,6 @@
 /* NGHTTP2_STREAM_FLAG_PRIORITY_UPDATE_RECVED is set when
    PRIORITY_UPDATE frame is received from client */
 #define NGHTTP2_STREAM_FLAG_PRIORITY_UPDATE_RECVED 0x10000U
-/* NGHTTP2_STREAM_FLAG_END_STREAM_LOCAL is set when the local endpoint
-   writes HEADERS or DATA frame that bears END_STREAM flag */
-#define NGHTTP2_STREAM_FLAG_END_STREAM_LOCAL 0x20000U
 
 typedef enum nghttp2_stream_http_state {
   NGHTTP2_HTTP_STATE_NONE,
