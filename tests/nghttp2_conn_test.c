@@ -16793,9 +16793,8 @@ void test_nghttp2_conn_stream_close(void) {
   assert_ptrdiff(0, <, nwrite);
   assert_size(1, ==, ud.stream_close.ncalled);
   assert_int64(stream_id, ==, ud.stream_close.stream_id);
-  assert_uint32(NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_LOCAL |
-                  NGHTTP2_STREAM_CLOSE_FLAG_END_STREAM_LOCAL,
-                ==, ud.stream_close.flags);
+  assert_uint32(NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_LOCAL, ==,
+                ud.stream_close.flags);
   assert_uint32(NGHTTP2_INTERNAL_ERROR, ==, ud.stream_close.error_code);
 
   nghttp2_conn_del(conn);
@@ -16902,9 +16901,8 @@ void test_nghttp2_conn_stream_close(void) {
               ==, conn->rx.frrd.state);
   assert_size(1, ==, ud.stream_close.ncalled);
   assert_int64(stream_id, ==, ud.stream_close.stream_id);
-  assert_uint32(NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_REMOTE |
-                  NGHTTP2_STREAM_CLOSE_FLAG_END_STREAM_LOCAL,
-                ==, ud.stream_close.flags);
+  assert_uint32(NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_REMOTE, ==,
+                ud.stream_close.flags);
   assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, ud.stream_close.error_code);
 
   nghttp2_conn_del(conn);
@@ -16984,9 +16982,8 @@ void test_nghttp2_conn_stream_close(void) {
               ==, conn->rx.frrd.state);
   assert_size(1, ==, ud.stream_close.ncalled);
   assert_int64(stream_id, ==, ud.stream_close.stream_id);
-  assert_uint32(NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_REMOTE |
-                  NGHTTP2_STREAM_CLOSE_FLAG_END_STREAM_REMOTE,
-                ==, ud.stream_close.flags);
+  assert_uint32(NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_REMOTE, ==,
+                ud.stream_close.flags);
   assert_uint32(NGHTTP2_PROTOCOL_ERROR, ==, ud.stream_close.error_code);
 
   nghttp2_hpack_encoder_free(&enc);
@@ -17053,9 +17050,7 @@ void test_nghttp2_conn_stream_close(void) {
               ==, conn->rx.frrd.state);
   assert_size(1, ==, ud.stream_close.ncalled);
   assert_int64(stream_id, ==, ud.stream_close.stream_id);
-  assert_uint32(NGHTTP2_STREAM_CLOSE_FLAG_END_STREAM_LOCAL |
-                  NGHTTP2_STREAM_CLOSE_FLAG_END_STREAM_REMOTE,
-                ==, ud.stream_close.flags);
+  assert_uint32(NGHTTP2_STREAM_CLOSE_FLAG_NONE, ==, ud.stream_close.flags);
 
   nghttp2_hpack_encoder_free(&enc);
   nghttp2_conn_del(conn);
@@ -17128,9 +17123,8 @@ void test_nghttp2_conn_stream_close(void) {
   assert_ptrdiff(0, <, nwrite);
   assert_size(1, ==, ud.stream_close.ncalled);
   assert_int64(stream_id, ==, ud.stream_close.stream_id);
-  assert_uint32(NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_LOCAL |
-                  NGHTTP2_STREAM_CLOSE_FLAG_END_STREAM_REMOTE,
-                ==, ud.stream_close.flags);
+  assert_uint32(NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_LOCAL, ==,
+                ud.stream_close.flags);
 
   nghttp2_hpack_encoder_free(&enc);
   nghttp2_conn_del(conn);

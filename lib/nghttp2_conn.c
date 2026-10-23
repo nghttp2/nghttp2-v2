@@ -206,18 +206,6 @@ static int conn_call_stream_close(nghttp2_conn *conn, nghttp2_context ctx,
     flags |= NGHTTP2_STREAM_CLOSE_FLAG_ERROR_CODE_SET_REMOTE;
   }
 
-  if (conn->server) {
-    if (stream->rx.hstate == NGHTTP2_HTTP_STATE_REQ_END) {
-      flags |= NGHTTP2_STREAM_CLOSE_FLAG_END_STREAM_REMOTE;
-    }
-  } else if (stream->rx.hstate == NGHTTP2_HTTP_STATE_RESP_END) {
-    flags |= NGHTTP2_STREAM_CLOSE_FLAG_END_STREAM_REMOTE;
-  }
-
-  if (stream->flags & NGHTTP2_STREAM_FLAG_END_STREAM_LOCAL) {
-    flags |= NGHTTP2_STREAM_CLOSE_FLAG_END_STREAM_LOCAL;
-  }
-
   rv = conn->callbacks.stream_close(conn, flags, stream->stream_id,
                                     stream->error_code, conn->user_data,
                                     stream->user_data);
