@@ -720,8 +720,8 @@ nghttp2_ssize nghttp2_frame_decode_priority_update_payload(
 int nghttp2_nva_copy(nghttp2_nv **pnva, const nghttp2_nv *nva, size_t nvlen,
                      const nghttp2_mem *mem) {
   size_t i;
-  uint8_t *data = NULL;
-  size_t buflen = 0;
+  uint8_t *data;
+  size_t buflen;
   nghttp2_nv *p;
 
   if (nvlen == 0) {
