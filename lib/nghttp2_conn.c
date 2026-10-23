@@ -3731,11 +3731,14 @@ int nghttp2_conn_extend_max_stream_offset(nghttp2_conn *conn, int64_t stream_id,
 
   max_offset = stream->rx.unsent_max_offset + datalen;
 
-  if (stream->rx.unsent_max_offset - stream->rx.max_offset <=
-      NGHTTP2_MAX_WINDOW_SIZE) {
-    if (max_offset - stream->rx.max_offset > NGHTTP2_MAX_WINDOW_SIZE) {
-      return NGHTTP2_ERR_FLOW_CONTROL;
-    }
+  if (stream->rx.unsent_max_offset - stream->rx.offset <=
+        NGHTTP2_MAX_WINDOW_SIZE &&
+      max_offset - stream->rx.offset +
+          (conn->settings.initial_max_stream_data > conn->rx.stream_window
+             ? conn->settings.initial_max_stream_data - conn->rx.stream_window
+             : 0) >
+        NGHTTP2_MAX_WINDOW_SIZE) {
+    return NGHTTP2_ERR_FLOW_CONTROL;
   }
 
   if (max_offset - stream->rx.max_offset > NGHTTP2_MAX_WINDOW_SIZE) {

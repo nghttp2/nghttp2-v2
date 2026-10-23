@@ -7783,41 +7783,12 @@ void test_nghttp2_conn_recv_settings_ack(void) {
 
   assert_int(0, ==, rv);
 
+  /* Flow control error is detected because we take into account the
+     delta that SETTINGS ACK can cause. */
   rv = nghttp2_conn_extend_max_stream_offset(
     conn, 0x01, NGHTTP2_MAX_WINDOW_SIZE - NGHTTP2_INITIAL_WINDOW_SIZE);
 
-  assert_int(0, ==, rv);
-
-  nghttp2_buf_reset(&obuf);
-  nwrite = nghttp2_conn_write(conn, obuf.last, nghttp2_buf_left(&obuf), ++ts);
-
-  assert_ptrdiff(0, <, nwrite);
-
-  stream = nghttp2_conn_find_stream(conn, 0x01);
-
-  assert_not_null(stream);
-  assert_uint64(NGHTTP2_MAX_WINDOW_SIZE, ==, stream->rx.max_offset);
-
-  fr.settings = (nghttp2_frame_settings){
-    .hd =
-      {
-        .type = NGHTTP2_FRAME_SETTINGS,
-        .flags = NGHTTP2_SETTINGS_FLAG_ACK,
-      },
-  };
-
-  nghttp2_buf_reset(&buf);
-  rv = nghttp2_frame_encode_settings(&buf, &fr.settings);
-
-  assert_int(0, ==, rv);
-
-  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
-
-  assert_int(0, ==, rv);
-  assert_false(conn->flags & NGHTTP2_CONN_FLAG_EXPECT_SETTINGS_ACK);
-  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_CLOSING, ==,
-              conn->rx.frrd.state);
-  assert_uint32(NGHTTP2_FLOW_CONTROL_ERROR, ==, conn->tx.goaway.error_code);
+  assert_int(NGHTTP2_ERR_FLOW_CONTROL, ==, rv);
 
   nghttp2_hpack_encoder_free(&enc);
   nghttp2_conn_del(conn);
@@ -7987,6 +7958,10 @@ void test_nghttp2_conn_recv_settings_ack(void) {
 
   assert_not_null(stream);
   assert_null(stream->strmq_prev);
+  assert_uint64(8193, ==, stream->rx.unsent_max_offset);
+  assert_uint64(NGHTTP2_INITIAL_WINDOW_SIZE, ==, stream->rx.max_offset);
+  assert_uint64(8193, ==, stream->rx.offset);
+  assert_size(NGHTTP2_INITIAL_WINDOW_SIZE, ==, conn->rx.stream_window);
 
   fr.settings = (nghttp2_frame_settings){
     .hd =
@@ -8013,6 +7988,7 @@ void test_nghttp2_conn_recv_settings_ack(void) {
   assert_not_null(stream);
   assert_uint64((uint64_t)-57342, ==, stream->rx.unsent_max_offset);
   assert_uint64(0, ==, stream->rx.max_offset);
+  assert_uint64(8193, ==, stream->rx.offset);
   assert_size(0, ==, conn->rx.stream_window);
   assert_null(stream->strmq_prev);
 
@@ -8026,6 +8002,152 @@ void test_nghttp2_conn_recv_settings_ack(void) {
 
   assert_int(0, ==, rv);
   assert_uint64(0, ==, stream->rx.unsent_max_offset);
+  assert_null(stream->strmq_prev);
+
+  nghttp2_hpack_encoder_free(&enc);
+  nghttp2_conn_del(conn);
+
+  /* After sending WINDOW_UPDATE, increase flow control limit */
+  server_default_settings(&settings);
+  settings.initial_max_stream_data = 1 << 17;
+
+  opts = (conn_options){
+    .settings = &settings,
+  };
+
+  setup_default_server_with_options(&conn, opts);
+  write_preface(conn, ts);
+  read_client_preface(conn, NULL, 0, ts);
+  write_settings_ack(conn, ts);
+
+  nghttp2_hpack_encoder_init(&enc, NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY, mem);
+
+  nghttp2_buf_reset(&hbuf);
+  rv =
+    nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
+
+  fr.headers = (nghttp2_frame_headers){
+    .hd =
+      {
+        .type = NGHTTP2_FRAME_HEADERS,
+        .flags = NGHTTP2_HEADERS_FLAG_END_HEADERS,
+        .stream_id = 0x01,
+      },
+    .field_block = hbuf.pos,
+    .field_blocklen = nghttp2_buf_len(&hbuf),
+  };
+
+  fr.headers.hd.len =
+    (uint32_t)nghttp2_frame_encode_headers_payloadlen(&fr.headers);
+
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
+
+  assert_int(0, ==, rv);
+
+  fr.data = (nghttp2_frame_data){
+    .hd =
+      {
+        .type = NGHTTP2_FRAME_DATA,
+        .stream_id = 0x01,
+      },
+    .data = nulldata,
+    .datalen = 8193,
+  };
+
+  fr.data.hd.len = (uint32_t)nghttp2_frame_encode_data_payloadlen(&fr.data);
+
+  rv = nghttp2_frame_encode_data(&buf, &fr.data);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
+              ==, conn->rx.frrd.state);
+
+  rv = nghttp2_conn_extend_max_stream_offset(conn, 0x01, 8193);
+
+  assert_int(0, ==, rv);
+
+  fr.data = (nghttp2_frame_data){
+    .hd =
+      {
+        .type = NGHTTP2_FRAME_DATA,
+        .stream_id = 0x01,
+      },
+    .data = nulldata,
+    .datalen = 8191,
+  };
+
+  fr.data.hd.len = (uint32_t)nghttp2_frame_encode_data_payloadlen(&fr.data);
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_data(&buf, &fr.data);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
+              ==, conn->rx.frrd.state);
+
+  rv = nghttp2_conn_extend_max_stream_offset(conn, 0x01, 8191);
+
+  assert_int(0, ==, rv);
+
+  stream = nghttp2_conn_find_stream(conn, 0x01);
+
+  assert_not_null(stream);
+  assert_not_null(stream->strmq_prev);
+  assert_uint64(NGHTTP2_INITIAL_WINDOW_SIZE + 16384, ==,
+                stream->rx.unsent_max_offset);
+  assert_uint64(NGHTTP2_INITIAL_WINDOW_SIZE, ==, stream->rx.max_offset);
+  assert_uint64(16384, ==, stream->rx.offset);
+  assert_size(NGHTTP2_INITIAL_WINDOW_SIZE, ==, conn->rx.stream_window);
+
+  nghttp2_buf_reset(&obuf);
+  nwrite = nghttp2_conn_write(conn, obuf.last, nghttp2_buf_left(&obuf), ++ts);
+
+  assert_ptrdiff(0, <, nwrite);
+
+  obuf.last += nwrite;
+
+  rv = nghttp2_frd_decode_buf(&frd, &fr, &obuf);
+
+  assert_int(0, ==, rv);
+  assert_uint8(NGHTTP2_FRAME_WINDOW_UPDATE, ==, fr.meta.hd.type);
+  assert_uint32(16384, ==, fr.window_update.window_size_inc);
+  assert_size(0, ==, nghttp2_buf_len(&obuf));
+
+  fr.settings = (nghttp2_frame_settings){
+    .hd =
+      {
+        .type = NGHTTP2_FRAME_SETTINGS,
+        .flags = NGHTTP2_SETTINGS_FLAG_ACK,
+      },
+  };
+
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_settings(&buf, &fr.settings);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+  assert_false(conn->flags & NGHTTP2_CONN_FLAG_EXPECT_SETTINGS_ACK);
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
+              ==, conn->rx.frrd.state);
+
+  stream = nghttp2_conn_find_stream(conn, 0x01);
+
+  assert_not_null(stream);
+  assert_uint64((1 << 17) + 16384, ==, stream->rx.unsent_max_offset);
+  assert_uint64((1 << 17) + 16384, ==, stream->rx.max_offset);
+  assert_uint64(16384, ==, stream->rx.offset);
+  assert_size(1 << 17, ==, conn->rx.stream_window);
   assert_null(stream->strmq_prev);
 
   nghttp2_hpack_encoder_free(&enc);
@@ -8286,8 +8408,8 @@ void test_nghttp2_conn_stream_rx_flow_control(void) {
 
   assert_int(0, ==, rv);
 
-  rv =
-    nghttp2_conn_extend_max_stream_offset(conn, 0x01, NGHTTP2_MAX_WINDOW_SIZE);
+  rv = nghttp2_conn_extend_max_stream_offset(
+    conn, 0x01, NGHTTP2_MAX_WINDOW_SIZE - NGHTTP2_INITIAL_WINDOW_SIZE);
 
   assert_int(0, ==, rv);
 
