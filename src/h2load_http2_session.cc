@@ -95,6 +95,12 @@ int recv_data(nghttp2_conn *conn, int64_t stream_id, const uint8_t *data,
   auto client = static_cast<Client *>(conn_user_data);
   client->record_ttfb();
   client->worker->stats.bytes_body += datalen;
+
+  if (nghttp2_conn_extend_max_stream_offset(conn, stream_id, datalen) != 0 ||
+      nghttp2_conn_extend_max_offset(conn, datalen) != 0) {
+    return NGHTTP2_ERR_CALLBACK_FAILURE;
+  }
+
   return 0;
 }
 } // namespace
