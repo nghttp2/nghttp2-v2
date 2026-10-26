@@ -306,13 +306,17 @@ int nghttp2_http_writer_write_data(nghttp2_http_writer *hw, nghttp2_buf *dest,
     datacnt = fr->dr.read_data(conn, stream->stream_id, hw->data,
                                nghttp2_arraylen(hw->data), &flags,
                                conn->user_data, stream->user_data);
-    if (datacnt < 0 || (size_t)datacnt > nghttp2_arraylen(hw->data)) {
+    if (datacnt < 0) {
       if (datacnt == NGHTTP2_ERR_WOULDBLOCK) {
         stream->flags |= NGHTTP2_STREAM_FLAG_READ_DATA_BLOCKED;
         return 0;
       }
 
       return (int)datacnt;
+    }
+
+    if ((size_t)datacnt > nghttp2_arraylen(hw->data)) {
+      return NGHTTP2_ERR_CALLBACK_FAILURE;
     }
 
     if (nghttp2_vec_len_max_int(&left, hw->data, (size_t)datacnt) != 0) {
