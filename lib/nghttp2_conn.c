@@ -2905,22 +2905,22 @@ static int conn_write(nghttp2_conn *conn, nghttp2_context ctx,
     return rv;
   }
 
-  for (; conn->strmq_head;) {
-    stream = conn->strmq_head;
-
-    rv = nghttp2_conn_write_stream(conn, ctx, dest, stream, ts);
-    if (rv != 0) {
-      return rv;
-    }
-
-    /* stream might be deleted.  Do not touch it. */
-
-    if (conn->sched.stream_inprogress) {
-      return 0;
-    }
-  }
-
   for (;;) {
+    for (; conn->strmq_head;) {
+      stream = conn->strmq_head;
+
+      rv = nghttp2_conn_write_stream(conn, ctx, dest, stream, ts);
+      if (rv != 0) {
+        return rv;
+      }
+
+      /* stream might be deleted.  Do not touch it. */
+
+      if (conn->sched.stream_inprogress) {
+        return 0;
+      }
+    }
+
     if (conn->tx.max_offset <= conn->tx.offset) {
       return 0;
     }
