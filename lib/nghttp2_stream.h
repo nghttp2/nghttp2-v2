@@ -220,7 +220,8 @@ int nghttp2_stream_schedule(nghttp2_stream *stream, nghttp2_pq *pq,
 
 void nghttp2_stream_unschedule(nghttp2_stream *stream, nghttp2_pq *pq);
 
-int nghttp2_stream_add_tx_max_offset(nghttp2_stream *stream, uint64_t delta);
+int nghttp2_stream_add_tx_max_offset(nghttp2_stream *stream, uint64_t delta,
+                                     size_t write_stream_data_thresh);
 
 void nghttp2_stream_free_client_pri(nghttp2_stream *stream);
 

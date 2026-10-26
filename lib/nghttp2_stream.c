@@ -334,7 +334,8 @@ void nghttp2_stream_unschedule(nghttp2_stream *stream, nghttp2_pq *pq) {
   stream->sched.pe.index = NGHTTP2_PQ_BAD_INDEX;
 }
 
-int nghttp2_stream_add_tx_max_offset(nghttp2_stream *stream, uint64_t delta) {
+int nghttp2_stream_add_tx_max_offset(nghttp2_stream *stream, uint64_t delta,
+                                     size_t write_stream_data_thresh) {
   uint64_t max_offset;
 
   max_offset = stream->tx.max_offset + delta;
@@ -346,7 +347,7 @@ int nghttp2_stream_add_tx_max_offset(nghttp2_stream *stream, uint64_t delta) {
   stream->tx.max_offset = max_offset;
 
   if ((stream->flags & NGHTTP2_STREAM_FLAG_FC_BLOCKED) &&
-      stream->tx.max_offset > stream->tx.offset) {
+      stream->tx.max_offset > stream->tx.offset + write_stream_data_thresh) {
     stream->flags &= ~NGHTTP2_STREAM_FLAG_FC_BLOCKED;
   }
 

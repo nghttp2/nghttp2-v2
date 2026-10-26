@@ -33,6 +33,7 @@
 #include "nghttp2_conn.h"
 #include "nghttp2_test_helper.h"
 #include "nghttp2_str.h"
+#include "nghttp2_settings.h"
 
 static const MunitTest tests[] = {
   munit_void_test(test_nghttp2_conn_read_request),
@@ -238,6 +239,9 @@ typedef struct userdata {
   struct {
     size_t ncalled;
     size_t block_after;
+    size_t *seq;
+    size_t nseq;
+    size_t seq_idx;
   } read_data;
 } userdata;
 
@@ -631,6 +635,33 @@ read_data_shutdown_stream(nghttp2_conn *conn, int64_t stream_id,
   nghttp2_conn_shutdown_stream(conn, 0x00, stream_id, NGHTTP2_INTERNAL_ERROR);
 
   return 0;
+}
+
+static nghttp2_ssize read_data_seq(nghttp2_conn *conn, int64_t stream_id,
+                                   nghttp2_vec *vec, size_t veccnt,
+                                   uint32_t *pflags, void *conn_user_data,
+                                   void *stream_user_data) {
+  userdata *ud = conn_user_data;
+  (void)conn;
+  (void)stream_id;
+  (void)veccnt;
+  (void)stream_user_data;
+
+  if (ud->read_data.seq_idx == ud->read_data.nseq) {
+    *pflags = NGHTTP2_READ_DATA_FLAG_EOF;
+    return 0;
+  }
+
+  vec[0] = (nghttp2_vec){
+    .base = nulldata,
+    .len = ud->read_data.seq[ud->read_data.seq_idx++],
+  };
+
+  if (ud->read_data.seq_idx == ud->read_data.nseq) {
+    *pflags = NGHTTP2_READ_DATA_FLAG_EOF;
+  }
+
+  return 1;
 }
 
 static size_t server_default_remote_settings(nghttp2_settings_entry *iv) {
@@ -11658,6 +11689,12 @@ void test_nghttp2_conn_tx_flow_control(void) {
       .value = 32767,
     },
   };
+  static const nghttp2_settings_entry iv2[] = {
+    {
+      .id = NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE,
+      .value = 32768 + 255,
+    },
+  };
   nghttp2_conn *conn;
   uint8_t rawbuf[16384];
   uint8_t outbuf[1 << 19];
@@ -11666,8 +11703,12 @@ void test_nghttp2_conn_tx_flow_control(void) {
   nghttp2_frame fr;
   nghttp2_tstamp ts = 0;
   nghttp2_ssize nwrite;
+  nghttp2_settings settings;
   int64_t stream_id;
+  userdata ud;
+  conn_options opts;
   int rv;
+  size_t seq[3];
 
   nghttp2_buf_wrap_init(&buf, rawbuf, sizeof(rawbuf));
   nghttp2_buf_wrap_init(&obuf, outbuf, sizeof(outbuf));
@@ -11866,6 +11907,201 @@ void test_nghttp2_conn_tx_flow_control(void) {
 
   assert_int(0, ==, rv);
   assert_uint32(20, ==, fr.meta.hd.len);
+  assert_uint8(NGHTTP2_FRAME_DATA, ==, fr.meta.hd.type);
+  assert_size(0, ==, nghttp2_buf_len(&obuf));
+
+  nghttp2_conn_del(conn);
+
+  /* stream-level flow control: write_stream_data_thresh */
+  client_default_settings(&settings);
+  settings.write_stream_data_thresh = 255;
+
+  opts = (conn_options){
+    .settings = &settings,
+  };
+
+  setup_default_client_with_options(&conn, opts);
+  write_preface(conn, ts);
+  read_server_preface(conn, iv, nghttp2_arraylen(iv), ts);
+  write_settings_ack(conn, ts);
+
+  stream_id =
+    nghttp2_conn_submit_request(conn, reqnva, nghttp2_arraylen(reqnva),
+                                &(nghttp2_data_reader){
+                                  .read_data = read_data_48k,
+                                },
+                                NULL);
+
+  assert_int64(0x01, ==, stream_id);
+
+  nghttp2_buf_reset(&obuf);
+
+  for (;;) {
+    nwrite = nghttp2_conn_write(conn, obuf.last, nghttp2_buf_left(&obuf), ++ts);
+
+    assert_ptrdiff(0, <=, nwrite);
+
+    if (nwrite == 0) {
+      break;
+    }
+
+    obuf.last += nwrite;
+  }
+
+  rv = nghttp2_frd_decode_buf(&frd, &fr, &obuf);
+
+  assert_int(0, ==, rv);
+  assert_uint8(NGHTTP2_FRAME_HEADERS, ==, fr.meta.hd.type);
+
+  rv = nghttp2_frd_decode_buf(&frd, &fr, &obuf);
+
+  assert_int(0, ==, rv);
+  assert_uint32(16384, ==, fr.meta.hd.len);
+  assert_uint8(NGHTTP2_FRAME_DATA, ==, fr.meta.hd.type);
+
+  rv = nghttp2_frd_decode_buf(&frd, &fr, &obuf);
+
+  assert_int(0, ==, rv);
+  assert_uint32(16383, ==, fr.meta.hd.len);
+  assert_uint8(NGHTTP2_FRAME_DATA, ==, fr.meta.hd.type);
+  assert_size(0, ==, nghttp2_buf_len(&obuf));
+
+  fr.window_update = (nghttp2_frame_window_update){
+    .hd =
+      {
+        .len = 4,
+        .type = NGHTTP2_FRAME_WINDOW_UPDATE,
+        .stream_id = stream_id,
+      },
+    .window_size_inc = 255,
+  };
+
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_window_update(&buf, &fr.window_update);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+
+  nghttp2_buf_reset(&obuf);
+  nwrite = nghttp2_conn_write(conn, obuf.last, nghttp2_buf_left(&obuf), ++ts);
+
+  assert_ptrdiff(0, ==, nwrite);
+
+  fr.window_update = (nghttp2_frame_window_update){
+    .hd =
+      {
+        .len = 4,
+        .type = NGHTTP2_FRAME_WINDOW_UPDATE,
+        .stream_id = stream_id,
+      },
+    .window_size_inc = 1,
+  };
+
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_window_update(&buf, &fr.window_update);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+
+  nghttp2_buf_reset(&obuf);
+  nwrite = nghttp2_conn_write(conn, obuf.last, nghttp2_buf_left(&obuf), ++ts);
+
+  assert_ptrdiff(0, <, nwrite);
+
+  obuf.last += nwrite;
+
+  rv = nghttp2_frd_decode_buf(&frd, &fr, &obuf);
+
+  assert_int(0, ==, rv);
+  assert_uint32(256, ==, fr.meta.hd.len);
+  assert_uint8(NGHTTP2_FRAME_DATA, ==, fr.meta.hd.type);
+  assert_size(0, ==, nghttp2_buf_len(&obuf));
+
+  nghttp2_conn_del(conn);
+
+  /* stream-level flow control: write is done even through it equals
+     to write_stream_data_thresh because the remaining data also
+     equals to it */
+  client_default_settings(&settings);
+  settings.write_stream_data_thresh = 255;
+
+  opts = (conn_options){
+    .settings = &settings,
+    .user_data = &ud,
+  };
+
+  setup_default_client_with_options(&conn, opts);
+  write_preface(conn, ts);
+  read_server_preface(conn, iv2, nghttp2_arraylen(iv2), ts);
+  write_settings_ack(conn, ts);
+
+  seq[0] = iv2[0].value;
+  seq[1] = 0;
+
+  ud = (userdata){
+    .read_data =
+      {
+        .seq = seq,
+        .nseq = 2,
+      },
+  };
+
+  stream_id =
+    nghttp2_conn_submit_request(conn, reqnva, nghttp2_arraylen(reqnva),
+                                &(nghttp2_data_reader){
+                                  .read_data = read_data_seq,
+                                },
+                                NULL);
+
+  assert_int64(0x01, ==, stream_id);
+
+  nghttp2_buf_reset(&obuf);
+
+  for (;;) {
+    nwrite = nghttp2_conn_write(conn, obuf.last, nghttp2_buf_left(&obuf), ++ts);
+
+    assert_ptrdiff(0, <=, nwrite);
+
+    if (nwrite == 0) {
+      break;
+    }
+
+    obuf.last += nwrite;
+  }
+
+  rv = nghttp2_frd_decode_buf(&frd, &fr, &obuf);
+
+  assert_int(0, ==, rv);
+  assert_uint8(NGHTTP2_FRAME_HEADERS, ==, fr.meta.hd.type);
+
+  rv = nghttp2_frd_decode_buf(&frd, &fr, &obuf);
+
+  assert_int(0, ==, rv);
+  assert_uint32(16384, ==, fr.meta.hd.len);
+  assert_uint8(NGHTTP2_FRAME_DATA, ==, fr.meta.hd.type);
+
+  rv = nghttp2_frd_decode_buf(&frd, &fr, &obuf);
+
+  assert_int(0, ==, rv);
+  assert_uint32(16384, ==, fr.meta.hd.len);
+  assert_uint8(NGHTTP2_FRAME_DATA, ==, fr.meta.hd.type);
+
+  rv = nghttp2_frd_decode_buf(&frd, &fr, &obuf);
+
+  assert_int(0, ==, rv);
+  assert_uint32(255, ==, fr.meta.hd.len);
+  assert_uint8(NGHTTP2_FRAME_DATA, ==, fr.meta.hd.type);
+
+  rv = nghttp2_frd_decode_buf(&frd, &fr, &obuf);
+
+  assert_int(0, ==, rv);
+  assert_uint32(0, ==, fr.meta.hd.len);
   assert_uint8(NGHTTP2_FRAME_DATA, ==, fr.meta.hd.type);
   assert_size(0, ==, nghttp2_buf_len(&obuf));
 
