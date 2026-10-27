@@ -9536,6 +9536,7 @@ void test_nghttp2_conn_http_writer(void) {
   nghttp2_hpack_decoder dec;
   nghttp2_hpack_nv nv;
   nghttp2_callbacks callbacks;
+  nghttp2_stream *stream;
   userdata ud;
   conn_options opts;
   uint8_t hflags;
@@ -10440,6 +10441,87 @@ void test_nghttp2_conn_http_writer(void) {
   nwrite = nghttp2_conn_write(conn, outbuf, sizeof(outbuf), ++ts);
 
   assert_ptrdiff(NGHTTP2_ERR_CALLBACK_FAILURE, ==, nwrite);
+
+  nghttp2_conn_del(conn);
+
+  /* end_stream_local should not be called after HEADERS if RST_STREAM
+     is submitted */
+  client_default_callbacks(&callbacks);
+  callbacks.end_stream_local = end_stream_local;
+
+  opts = (conn_options){
+    .callbacks = &callbacks,
+    .user_data = &ud,
+  };
+
+  setup_default_client_with_options(&conn, opts);
+
+  write_preface(conn, ts);
+  read_server_preface(conn, NULL, 0, ts);
+  write_settings_ack(conn, ts);
+
+  stream_id = nghttp2_conn_submit_request(conn, reqnva,
+                                          nghttp2_arraylen(reqnva), NULL, NULL);
+
+  assert_int64(0x01, ==, stream_id);
+
+  nwrite = nghttp2_conn_write(conn, outbuf, NGHTTP2_FRAME_HDLEN, ++ts);
+
+  assert_ptrdiff(0, <, nwrite);
+
+  nghttp2_conn_shutdown_stream(conn, 0x00, stream_id, NGHTTP2_NO_ERROR);
+
+  ud = (userdata){0};
+  nwrite = nghttp2_conn_write(conn, outbuf, sizeof(outbuf), ++ts);
+
+  assert_ptrdiff(0, <, nwrite);
+  assert_size(0, ==, ud.end_stream_local.ncalled);
+  assert_null(nghttp2_conn_find_stream(conn, stream_id));
+
+  nghttp2_conn_del(conn);
+
+  /* end_stream_local should not be called after DATA if RST_STREAM
+     is submitted */
+  client_default_callbacks(&callbacks);
+  callbacks.end_stream_local = end_stream_local;
+
+  opts = (conn_options){
+    .callbacks = &callbacks,
+    .user_data = &ud,
+  };
+
+  setup_default_client_with_options(&conn, opts);
+
+  write_preface(conn, ts);
+  read_server_preface(conn, NULL, 0, ts);
+  write_settings_ack(conn, ts);
+
+  stream_id =
+    nghttp2_conn_submit_request(conn, reqnva, nghttp2_arraylen(reqnva),
+                                &(nghttp2_data_reader){
+                                  .read_data = read_data_4k,
+                                },
+                                NULL);
+
+  assert_int64(0x01, ==, stream_id);
+
+  nwrite = nghttp2_conn_write(conn, outbuf, 4096, ++ts);
+
+  assert_ptrdiff(0, <, nwrite);
+
+  stream = nghttp2_conn_find_stream(conn, stream_id);
+
+  assert_not_null(stream);
+  assert_true(nghttp2_http_writer_inprogress(&stream->tx.hw));
+
+  nghttp2_conn_shutdown_stream(conn, 0x00, stream_id, NGHTTP2_NO_ERROR);
+
+  ud = (userdata){0};
+  nwrite = nghttp2_conn_write(conn, outbuf, sizeof(outbuf), ++ts);
+
+  assert_ptrdiff(0, <, nwrite);
+  assert_size(0, ==, ud.end_stream_local.ncalled);
+  assert_null(nghttp2_conn_find_stream(conn, stream_id));
 
   nghttp2_conn_del(conn);
 
