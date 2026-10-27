@@ -617,6 +617,22 @@ read_data_too_many_veccnt(nghttp2_conn *conn, int64_t stream_id,
   return (nghttp2_ssize)veccnt + 1;
 }
 
+static nghttp2_ssize
+read_data_shutdown_stream(nghttp2_conn *conn, int64_t stream_id,
+                          nghttp2_vec *vec, size_t veccnt, uint32_t *pflags,
+                          void *conn_user_data, void *stream_user_data) {
+  (void)conn;
+  (void)vec;
+  (void)veccnt;
+  (void)pflags;
+  (void)conn_user_data;
+  (void)stream_user_data;
+
+  nghttp2_conn_shutdown_stream(conn, 0x00, stream_id, NGHTTP2_INTERNAL_ERROR);
+
+  return 0;
+}
+
 static size_t server_default_remote_settings(nghttp2_settings_entry *iv) {
   iv[0] = (nghttp2_settings_entry){
     .id = NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS,
@@ -10521,6 +10537,29 @@ void test_nghttp2_conn_http_writer(void) {
 
   assert_ptrdiff(0, <, nwrite);
   assert_size(0, ==, ud.end_stream_local.ncalled);
+  assert_null(nghttp2_conn_find_stream(conn, stream_id));
+
+  nghttp2_conn_del(conn);
+
+  /* Shutdown the stream inside read_data callback */
+  setup_default_client(&conn);
+
+  write_preface(conn, ts);
+  read_server_preface(conn, NULL, 0, ts);
+  write_settings_ack(conn, ts);
+
+  stream_id =
+    nghttp2_conn_submit_request(conn, reqnva, nghttp2_arraylen(reqnva),
+                                &(nghttp2_data_reader){
+                                  .read_data = read_data_shutdown_stream,
+                                },
+                                NULL);
+
+  assert_int64(0x01, ==, stream_id);
+
+  nwrite = nghttp2_conn_write(conn, outbuf, sizeof(outbuf), ++ts);
+
+  assert_ptrdiff(0, <, nwrite);
   assert_null(nghttp2_conn_find_stream(conn, stream_id));
 
   nghttp2_conn_del(conn);

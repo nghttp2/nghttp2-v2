@@ -321,6 +321,10 @@ int nghttp2_http_writer_write_data(nghttp2_http_writer *hw, nghttp2_buf *dest,
       return NGHTTP2_ERR_CALLBACK_FAILURE;
     }
 
+    if (stream->flags & NGHTTP2_STREAM_FLAG_RST_STREAM) {
+      return 0;
+    }
+
     if (nghttp2_vec_len_max_int(&left, hw->data, (size_t)datacnt) != 0) {
       return NGHTTP2_ERR_STREAM_DATA_OVERFLOW;
     }

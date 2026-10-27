@@ -1660,6 +1660,9 @@ typedef struct nghttp2_callbacks {
  * If the callback returns 0 or the sum of length in |vec| is 0, and
  * :macro:`NGHTTP2_READ_DATA_FLAG_EOF` is not set in |*pflags|, it is
  * treated as if :macro:`NGHTTP2_ERR_CALLBACK_FAILURE` is returned.
+ * There is one exception.  If the stream denoted by |stream_id| is
+ * reset inside the callback via `nghttp2_conn_shutdown_stream`,
+ * returning 0 is acceptable.
  *
  * The callback should return the number of objects in |vec| that the
  * application filled if it succeeds, or
