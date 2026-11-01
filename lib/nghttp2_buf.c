@@ -24,13 +24,15 @@
  */
 #include "nghttp2_buf.h"
 
-void nghttp2_buf_init(nghttp2_buf *buf) {
-  buf->begin = buf->end = buf->pos = buf->last = NULL;
-}
+void nghttp2_buf_init(nghttp2_buf *buf) { *buf = (nghttp2_buf){0}; }
 
 void nghttp2_buf_wrap_init(nghttp2_buf *buf, uint8_t *src, size_t len) {
-  buf->begin = buf->pos = buf->last = src;
-  buf->end = buf->begin + len;
+  *buf = (nghttp2_buf){
+    .begin = src,
+    .end = src + len,
+    .pos = src,
+    .last = src,
+  };
 }
 
 void nghttp2_buf_free(nghttp2_buf *buf, const nghttp2_mem *mem) {
