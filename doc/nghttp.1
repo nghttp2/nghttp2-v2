@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "NGHTTP" "1" "Oct 11, 2026" "0.1.0" "nghttp2-v2"
+.TH "NGHTTP" "1" "Nov 03, 2026" "0.2.0" "nghttp2-v2"
 .SH NAME
 nghttp \- HTTP/2 client
 .SH SYNOPSIS
@@ -135,15 +135,14 @@ requested twice.  This option disables it too.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-extpri=<PRI>
+.B \-\-pri=<PRI>
 Sets RFC 9218 priority of  given URI.  <PRI> must be the
 wire format  of priority  header field  (e.g., \(dqu=3,i\(dq).
-This  option  can  be  used  multiple  times,  and  N\-th
-\fB\-\-extpri\fP option sets priority of N\-th URI in the command
-line.  If  the number  of this option  is less  than the
-number of  URI, the last  option value is  repeated.  If
-there  is   no  \fB\-\-extpri\fP  option,  urgency   is  3,  and
-incremental is false.
+This option can  be used multiple times,  and N\-th \fB\-\-pri\fP
+option sets  priority of N\-th  URI in the  command line.
+If the number of this option  is less than the number of
+URI, the last option value  is repeated.  If there is no
+\fB\-\-pri\fP option, urgency is 3, and incremental is false.
 .UNINDENT
 .INDENT 0.0
 .TP

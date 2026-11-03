@@ -14,7 +14,7 @@ SYNOPSIS
 DESCRIPTION
 -----------
 
-benchmarking tool for HTTP/2 server
+benchmarking tool for HTTP/3, HTTP/2, and HTTP/1 servers
 
 .. describe:: <URI>
 

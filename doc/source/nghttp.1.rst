@@ -99,16 +99,15 @@ OPTIONS
     Request each URI <N> times.  By default, same URI is not
     requested twice.  This option disables it too.
 
-.. option:: --extpri=<PRI>
+.. option:: --pri=<PRI>
 
     Sets RFC 9218 priority of  given URI.  <PRI> must be the
     wire format  of priority  header field  (e.g., "u=3,i").
-    This  option  can  be  used  multiple  times,  and  N-th
-    :option:`--extpri` option sets priority of N-th URI in the command
-    line.  If  the number  of this option  is less  than the
-    number of  URI, the last  option value is  repeated.  If
-    there  is   no  :option:`--extpri`  option,  urgency   is  3,  and
-    incremental is false.
+    This option can  be used multiple times,  and N-th :option:`--pri`
+    option sets  priority of N-th  URI in the  command line.
+    If the number of this option  is less than the number of
+    URI, the last option value  is repeated.  If there is no
+    :option:`--pri` option, urgency is 3, and incremental is false.
 
 .. option:: -M, --peer-max-concurrent-streams=<N>
 
