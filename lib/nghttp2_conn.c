@@ -1487,7 +1487,8 @@ static int stream_apply_tx_initial_max_stream_data(void *data, void *ptr) {
   const nghttp2_apply_max_stream_data *arg = ptr;
   int rv;
 
-  rv = nghttp2_stream_add_tx_max_offset(stream, arg->delta);
+  rv = nghttp2_stream_add_tx_max_offset(
+    stream, arg->delta, arg->conn->settings.write_stream_data_thresh);
   if (rv != 0) {
     return rv;
   }
@@ -1713,7 +1714,8 @@ static int conn_recv_window_update(nghttp2_conn *conn,
     return NGHTTP2_ERR_PROTO;
   }
 
-  rv = nghttp2_stream_add_tx_max_offset(stream, fr->window_size_inc);
+  rv = nghttp2_stream_add_tx_max_offset(
+    stream, fr->window_size_inc, conn->settings.write_stream_data_thresh);
   if (rv != 0) {
     return rv;
   }
@@ -2921,7 +2923,8 @@ static int conn_write(nghttp2_conn *conn, nghttp2_context ctx,
       }
     }
 
-    if (conn->tx.max_offset <= conn->tx.offset) {
+    if (conn->tx.max_offset <=
+        conn->tx.offset + conn->settings.write_stream_data_thresh) {
       return 0;
     }
 

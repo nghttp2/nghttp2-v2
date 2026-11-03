@@ -293,6 +293,7 @@ int nghttp2_http_writer_write_data(nghttp2_http_writer *hw, nghttp2_buf *dest,
   uint64_t left;
   size_t conn_fc_limit;
   size_t stream_fc_limit;
+  size_t fc_limit;
   size_t nwrite;
   uint32_t flags;
   int rv;
@@ -367,10 +368,11 @@ int nghttp2_http_writer_write_data(nghttp2_http_writer *hw, nghttp2_buf *dest,
 
     conn_fc_limit = conn_flow_control_limit(conn);
     stream_fc_limit = stream_flow_control_limit(stream);
+    fc_limit = nghttp2_min(conn_fc_limit, stream_fc_limit);
 
-    hw->field_left = (size_t)nghttp2_min(
-      (uint64_t)NGHTTP2_DEFAULT_MAX_FRAME_SIZE,
-      nghttp2_min(left, (uint64_t)nghttp2_min(conn_fc_limit, stream_fc_limit)));
+    hw->field_left =
+      (size_t)nghttp2_min((uint64_t)NGHTTP2_DEFAULT_MAX_FRAME_SIZE,
+                          nghttp2_min(left, (uint64_t)fc_limit));
 
     lfr.hd = fr->hd;
     lfr.hd.len = (uint32_t)hw->field_left;
@@ -378,12 +380,16 @@ int nghttp2_http_writer_write_data(nghttp2_http_writer *hw, nghttp2_buf *dest,
     lfr.datalen = lfr.hd.len;
 
     if (lfr.hd.len == left &&
-        hw->flags & NGHTTP2_HTTP_WRITER_FLAG_DATA_END_STREAM) {
+        (hw->flags & NGHTTP2_HTTP_WRITER_FLAG_DATA_END_STREAM)) {
       lfr.hd.flags = NGHTTP2_DATA_FLAG_END_STREAM;
-    } else if (lfr.hd.len == 0) {
-      if (stream_fc_limit == 0) {
+    } else if (lfr.hd.len == 0 ||
+               (fc_limit <= conn->settings.write_stream_data_thresh &&
+                left > conn->settings.write_stream_data_thresh)) {
+      if (stream_fc_limit <= conn->settings.write_stream_data_thresh) {
         stream->flags |= NGHTTP2_STREAM_FLAG_FC_BLOCKED;
       }
+
+      hw->field_left = 0;
 
       return 0;
     }

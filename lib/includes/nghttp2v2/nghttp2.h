@@ -1084,6 +1084,22 @@ typedef struct nghttp2_settings {
    */
   size_t extra_settingslen;
   /**
+   * :member:`write_stream_data_thresh` is the threshold for the
+   * length of DATA frame payload, excluding padding, that the
+   * endpoint sends.  If there is data more than this value to send,
+   * and the flow control does not allow sending more than this
+   * length, the data is not sent, waiting for the window update from
+   * the remote endpoint.  This effectively means that flow control
+   * credit less than or equal to :member:`write_stream_data_thresh`
+   * is considered 0.  It implies that the connection to the remote
+   * endpoint that only grants less than or equal to
+   * :member:`write_stream_data_thresh` stalls.  But normally the
+   * endpoint offers far more flow control credits.  Those that only
+   * gives small credit are most likely badly configured or
+   * manipulated by an attacker, and no need to be supported.
+   */
+  size_t write_stream_data_thresh;
+  /**
    * :member:`glitch_ratelim_burst` is the maximum number of tokens
    * available to "glitch" rate limiter.  It is clamped to
    * ``UINT64_MAX`` / :macro:`NGHTTP2_SECONDS`.  "glitch" is a
