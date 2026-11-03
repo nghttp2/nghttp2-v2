@@ -459,11 +459,13 @@ int recv_header(nghttp2_conn *conn, int64_t stream_id, int32_t token,
     break;
   case NGHTTP2_HPACK_TOKEN_IF_MODIFIED_SINCE:
     header.ims = as_string_view(valuebuf.base, valuebuf.len);
+    nghttp2_rcbuf_decref(header.rcbuf.ims);
     header.rcbuf.ims = value;
     nghttp2_rcbuf_incref(value);
     break;
   case NGHTTP2_HPACK_TOKEN_EXPECT:
     header.expect = as_string_view(valuebuf.base, valuebuf.len);
+    nghttp2_rcbuf_decref(header.rcbuf.expect);
     header.rcbuf.expect = value;
     nghttp2_rcbuf_incref(value);
     break;
