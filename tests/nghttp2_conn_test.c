@@ -14499,6 +14499,10 @@ void test_nghttp2_conn_http_ignore_content_length(void) {
     MAKE_NV(":status", "200"),
     MAKE_NV("content-length", "0"),
   };
+  static const nghttp2_nv cl_404_resnv[] = {
+    MAKE_NV(":status", "404"),
+    MAKE_NV("content-length", "100"),
+  };
   const nghttp2_mem *mem = nghttp2_mem_default();
   uint8_t outbuf[16384];
   uint8_t rawbuf[16384];
@@ -14661,6 +14665,59 @@ void test_nghttp2_conn_http_ignore_content_length(void) {
 
   assert_not_null(stream);
   assert_int64(-1, ==, stream->rx.http.content_length);
+
+  nghttp2_hpack_encoder_free(&enc);
+  nghttp2_conn_del(conn);
+
+  /* Content-Length in non-2xx response to CONNECT is not ignored */
+  setup_default_client(&conn);
+  write_preface(conn, ts);
+  read_server_preface(conn, NULL, 0, ts);
+
+  stream_id = nghttp2_conn_submit_request(
+    conn, connectcl_reqnva, nghttp2_arraylen(connectcl_reqnva), NULL, NULL);
+
+  assert_int64(0x01, ==, stream_id);
+
+  nwrite = nghttp2_conn_write(conn, outbuf, sizeof(outbuf), ++ts);
+
+  assert_ptrdiff(0, <, nwrite);
+
+  nghttp2_hpack_encoder_init(&enc, NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY, mem);
+  nghttp2_buf_reset(&hbuf);
+  rv = nghttp2_hpack_encoder_write(&enc, &hbuf, cl_404_resnv,
+                                   nghttp2_arraylen(cl_404_resnv));
+
+  assert_int(0, ==, rv);
+
+  fr.headers = (nghttp2_frame_headers){
+    .hd =
+      {
+        .type = NGHTTP2_FRAME_HEADERS,
+        .flags = NGHTTP2_HEADERS_FLAG_END_HEADERS,
+        .stream_id = stream_id,
+      },
+    .field_block = hbuf.pos,
+    .field_blocklen = nghttp2_buf_len(&hbuf),
+  };
+
+  fr.headers.hd.len =
+    (uint32_t)nghttp2_frame_encode_headers_payloadlen(&fr.headers);
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
+              ==, conn->rx.frrd.state);
+
+  stream = nghttp2_conn_find_stream(conn, stream_id);
+
+  assert_not_null(stream);
+  assert_int64(100, ==, stream->rx.http.content_length);
 
   nghttp2_hpack_encoder_free(&enc);
   nghttp2_conn_del(conn);

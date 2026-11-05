@@ -622,8 +622,6 @@ int nghttp2_http_on_response_headers(nghttp2_http_state *http) {
 
   if (!expect_response_body(http)) {
     http->content_length = 0;
-  } else if (http->flags & NGHTTP2_HTTP_FLAG_METH_CONNECT) {
-    http->content_length = -1;
   }
 
   return 0;
