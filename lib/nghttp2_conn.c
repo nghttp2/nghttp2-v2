@@ -1151,8 +1151,8 @@ static int conn_recv_headers_hd(nghttp2_conn *conn, nghttp2_context ctx,
 }
 
 int nghttp2_conn_decode_field_block(nghttp2_conn *conn, int64_t stream_id,
-                                    const uint8_t *src, size_t srclen,
-                                    int fin) {
+                                    const uint8_t *src, size_t srclen, int fin,
+                                    nghttp2_tstamp ts) {
   nghttp2_stream *stream;
   nghttp2_ssize nread;
   nghttp2_hpack_decoder *hdec = &conn->rx.hdec;
@@ -1228,6 +1228,11 @@ int nghttp2_conn_decode_field_block(nghttp2_conn *conn, int64_t stream_id,
         nghttp2_rcbuf_decref(nv.name);
         nghttp2_rcbuf_decref(nv.value);
 
+        rv = conn_update_glitch_ratelim(conn, 1, ts);
+        if (rv != 0) {
+          return rv;
+        }
+
         continue;
       }
 
@@ -1241,6 +1246,11 @@ int nghttp2_conn_decode_field_block(nghttp2_conn *conn, int64_t stream_id,
         nghttp2_rcbuf_decref(nv.value);
 
         if (rv == NGHTTP2_ERR_REMOVE_HTTP_HEADER) {
+          rv = conn_update_glitch_ratelim(conn, 1, ts);
+          if (rv != 0) {
+            return rv;
+          }
+
           continue;
         }
 
@@ -1940,7 +1950,7 @@ static int conn_read(nghttp2_conn *conn, nghttp2_context ctx,
             rv = nghttp2_conn_decode_field_block(
               conn, fr->headers.hd.stream_id, fr->headers.field_block,
               fr->headers.field_blocklen,
-              (fr->headers.hd.flags & NGHTTP2_HEADERS_FLAG_END_HEADERS));
+              (fr->headers.hd.flags & NGHTTP2_HEADERS_FLAG_END_HEADERS), ts);
             if (rv != 0) {
               return nghttp2_conn_handle_error(conn, rv);
             }
@@ -2400,7 +2410,8 @@ static int conn_read(nghttp2_conn *conn, nghttp2_context ctx,
       rv = nghttp2_conn_decode_field_block(
         conn, fr->headers.hd.stream_id, p, len,
         (fr->headers.hd.flags & NGHTTP2_HEADERS_FLAG_END_HEADERS) &&
-          frrd->field_left == len);
+          frrd->field_left == len,
+        ts);
       if (rv != 0) {
         return nghttp2_conn_handle_error(conn, rv);
       }
@@ -2535,7 +2546,7 @@ static int conn_read(nghttp2_conn *conn, nghttp2_context ctx,
         if (fr->headers.hd.flags & NGHTTP2_HEADERS_FLAG_END_HEADERS) {
           rv = nghttp2_conn_decode_field_block(conn, fr->headers.hd.stream_id,
                                                NULL, 0,
-                                               /* fin = */ 1);
+                                               /* fin = */ 1, ts);
           if (rv != 0) {
             return nghttp2_conn_handle_error(conn, rv);
           }

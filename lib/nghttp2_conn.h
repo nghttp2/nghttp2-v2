@@ -211,7 +211,8 @@ int nghttp2_conn_close_stream(nghttp2_conn *conn, nghttp2_context ctx,
                               nghttp2_stream *stream);
 
 int nghttp2_conn_decode_field_block(nghttp2_conn *conn, int64_t stream_id,
-                                    const uint8_t *src, size_t srclen, int fin);
+                                    const uint8_t *src, size_t srclen, int fin,
+                                    nghttp2_tstamp ts);
 
 nghttp2_stream *nghttp2_conn_get_next_tx_stream(nghttp2_conn *conn);
 
