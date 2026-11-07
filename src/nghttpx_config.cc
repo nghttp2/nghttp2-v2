@@ -391,9 +391,9 @@ std::expected<HeaderRef, Error> parse_header(BlockAllocator &balloc,
     as_string_view(std::ranges::begin(name_iov), p),
     make_string_ref(balloc, std::string_view{value, std::ranges::end(optarg)}));
 
-  if (!nghttp2_check_header_name(
+  if (!nghttp2_check_field_name(
         reinterpret_cast<const uint8_t *>(nv.name.data()), nv.name.size()) ||
-      !nghttp2_check_header_value(
+      !nghttp2_check_field_value(
         reinterpret_cast<const uint8_t *>(nv.value.data()), nv.value.size())) {
     return std::unexpected{Error::INVALID_ARGUMENT};
   }
