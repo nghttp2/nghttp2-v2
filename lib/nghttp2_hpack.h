@@ -39,10 +39,12 @@
 
 #define NGHTTP2_HPACK_ENTRY_OVERHEAD 32
 
-/* The maximum length of one name/value pair.  This is the sum of the
-   length of name and value.  This is not specified by the spec. We
-   just chose the arbitrary size */
-#define NGHTTP2_HPACK_MAX_NV 65536
+/* NGHTTP2_HPACK_MAX_NAMELEN is the maximum (estimated uncompressed)
+   length of field name this library can decode. */
+#define NGHTTP2_HPACK_MAX_NAMELEN 256
+/* NGHTTP2_HPACK_MAX_VALUELEN is the maximum (estimated uncompressed)
+   length of field value this library can decode. */
+#define NGHTTP2_HPACK_MAX_VALUELEN 65536
 
 /* Default size of maximum table buffer size for encoder. Even if
    remote decoder notifies larger buffer size for its decoding,

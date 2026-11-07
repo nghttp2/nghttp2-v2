@@ -55,5 +55,6 @@ munit_void_test_decl(test_nghttp2_hpack_bound)
 munit_void_test_decl(test_nghttp2_hpack_decode_length)
 munit_void_test_decl(test_nghttp2_hpack_huffman_encode)
 munit_void_test_decl(test_nghttp2_hpack_huffman_decode)
+munit_void_test_decl(test_nghttp2_hpack_decode_too_long_field)
 
 #endif /* !defined(NGHTTP2_HPACK_TEST_H) */

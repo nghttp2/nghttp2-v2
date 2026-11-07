@@ -50,6 +50,7 @@ static const MunitTest tests[] = {
   munit_void_test(test_nghttp2_hpack_decode_length),
   munit_void_test(test_nghttp2_hpack_huffman_encode),
   munit_void_test(test_nghttp2_hpack_huffman_decode),
+  munit_void_test(test_nghttp2_hpack_decode_too_long_field),
   munit_test_end(),
 };
 
@@ -1383,4 +1384,69 @@ void test_nghttp2_hpack_huffman_decode(void) {
 
   assert_ptrdiff(0, <, nwrite);
   assert_true(nghttp2_hpack_huffman_decode_failure_state(&ctx));
+}
+
+void test_nghttp2_hpack_decode_too_long_field(void) {
+  const nghttp2_mem *mem = nghttp2_mem_default();
+  uint8_t fieldbuf[NGHTTP2_HPACK_MAX_VALUELEN + 1];
+  nghttp2_hpack_encoder enc;
+  nghttp2_hpack_decoder dec;
+  nghttp2_buf buf;
+  nghttp2_nv nv;
+  nghttp2_hpack_nv hnv;
+  nghttp2_ssize nread;
+  int rv;
+  uint8_t flags;
+
+  nghttp2_buf_init(&buf);
+
+  /* Receive too large name */
+  nghttp2_hpack_encoder_init(&enc, NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY, mem);
+  nghttp2_hpack_decoder_init(&dec, mem);
+
+  memset(fieldbuf, 'a', NGHTTP2_HPACK_MAX_NAMELEN + 1);
+
+  nv = (nghttp2_nv){
+    .name = fieldbuf,
+    .namelen = NGHTTP2_HPACK_MAX_NAMELEN + 1,
+  };
+
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_hpack_encoder_write(&enc, &buf, &nv, 1);
+
+  assert_int(0, ==, rv);
+
+  nread = nghttp2_hpack_decoder_read(&dec, &hnv, &flags, buf.pos,
+                                     nghttp2_buf_len(&buf), 1);
+
+  assert_ptrdiff(NGHTTP2_ERR_HPACK_FATAL, ==, nread);
+
+  nghttp2_hpack_decoder_free(&dec);
+  nghttp2_hpack_encoder_free(&enc);
+
+  /* Receive too large value */
+  nghttp2_hpack_encoder_init(&enc, NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY, mem);
+  nghttp2_hpack_decoder_init(&dec, mem);
+
+  memset(fieldbuf, 'a', NGHTTP2_HPACK_MAX_VALUELEN + 1);
+
+  nv = (nghttp2_nv){
+    .value = fieldbuf,
+    .valuelen = NGHTTP2_HPACK_MAX_VALUELEN + 1,
+  };
+
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_hpack_encoder_write(&enc, &buf, &nv, 1);
+
+  assert_int(0, ==, rv);
+
+  nread = nghttp2_hpack_decoder_read(&dec, &hnv, &flags, buf.pos,
+                                     nghttp2_buf_len(&buf), 1);
+
+  assert_ptrdiff(NGHTTP2_ERR_HPACK_FATAL, ==, nread);
+
+  nghttp2_hpack_decoder_free(&dec);
+  nghttp2_hpack_encoder_free(&enc);
+
+  nghttp2_buf_free(&buf, mem);
 }
