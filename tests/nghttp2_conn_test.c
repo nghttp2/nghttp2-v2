@@ -15723,6 +15723,84 @@ void test_nghttp2_conn_rate_limit(void) {
   nghttp2_hpack_encoder_free(&enc);
   nghttp2_conn_del(conn);
 
+  /* Receiving too many padded DATA frames that do not have data
+     without END_STREAM flag set */
+  server_default_settings(&settings);
+  settings.log_write = NULL;
+
+  opts = (conn_options){
+    .settings = &settings,
+  };
+
+  setup_default_server_with_options(&conn, opts);
+  write_preface(conn, ts);
+  read_client_preface(conn, NULL, 0, ts);
+  read_settings_ack(conn, ts);
+  nghttp2_hpack_encoder_init(&enc, NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY, mem);
+  nghttp2_buf_reset(&hbuf);
+  rv =
+    nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
+
+  assert_int(0, ==, rv);
+
+  fr.headers = (nghttp2_frame_headers){
+    .hd =
+      {
+        .type = NGHTTP2_FRAME_HEADERS,
+        .flags = NGHTTP2_HEADERS_FLAG_END_HEADERS,
+        .stream_id = 0x01,
+      },
+    .field_block = hbuf.pos,
+    .field_blocklen = nghttp2_buf_len(&hbuf),
+  };
+
+  fr.headers.hd.len =
+    (uint32_t)nghttp2_frame_encode_headers_payloadlen(&fr.headers);
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
+              ==, conn->rx.frrd.state);
+
+  fr.data = (nghttp2_frame_data){
+    .hd =
+      {
+        .type = NGHTTP2_FRAME_DATA,
+        .flags = NGHTTP2_DATA_FLAG_PADDED,
+        .stream_id = 0x01,
+      },
+    .padlen = 1,
+  };
+
+  nghttp2_buf_reset(&buf);
+  fr.data.hd.len = (uint32_t)nghttp2_frame_encode_data_payloadlen(&fr.data);
+  rv = nghttp2_frame_encode_data(&buf, &fr.data);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
+              ==, conn->rx.frrd.state);
+
+  for (;;) {
+    rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+    if (rv != 0) {
+      assert_int(NGHTTP2_ERR_EXCESSIVE_LOAD, ==, rv);
+      break;
+    }
+  }
+
+  nghttp2_hpack_encoder_free(&enc);
+  nghttp2_conn_del(conn);
+
   /* Refusing too many streams during graceful shutdown */
   server_default_settings(&settings);
   settings.log_write = NULL;

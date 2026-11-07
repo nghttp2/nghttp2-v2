@@ -763,8 +763,9 @@ static int conn_on_data(nghttp2_conn *conn, const nghttp2_frame_data *fr,
 }
 
 static int conn_recv_data(nghttp2_conn *conn, nghttp2_context ctx,
-                          const nghttp2_frame_data *fr) {
+                          const nghttp2_frame_data *fr, nghttp2_tstamp ts) {
   nghttp2_stream *stream;
+  int rv;
 
   stream = nghttp2_conn_find_stream(conn, fr->hd.stream_id);
   if (!stream || (stream->flags & NGHTTP2_STREAM_FLAG_RST_STREAM)) {
@@ -777,6 +778,14 @@ static int conn_recv_data(nghttp2_conn *conn, nghttp2_context ctx,
 
     if (nghttp2_stream_require_strmq(stream)) {
       nghttp2_conn_strmq_push(conn, stream);
+    }
+  }
+
+  /* Charge glitch counter if no data without END_STREAM flag set */
+  if (fr->datalen == 0 && !(fr->hd.flags & NGHTTP2_DATA_FLAG_END_STREAM)) {
+    rv = conn_update_glitch_ratelim(conn, 1, ts);
+    if (rv != 0) {
+      return rv;
     }
   }
 
@@ -1894,7 +1903,7 @@ static int conn_read(nghttp2_conn *conn, nghttp2_context ctx,
               }
             }
 
-            rv = conn_recv_data(conn, ctx, &fr->data);
+            rv = conn_recv_data(conn, ctx, &fr->data, ts);
             if (rv != 0) {
               return nghttp2_conn_handle_error(conn, rv);
             }
@@ -2252,7 +2261,7 @@ static int conn_read(nghttp2_conn *conn, nghttp2_context ctx,
       }
 
       if (frrd->left == 0) {
-        rv = conn_recv_data(conn, ctx, &fr->data);
+        rv = conn_recv_data(conn, ctx, &fr->data, ts);
         if (rv != 0) {
           return nghttp2_conn_handle_error(conn, rv);
         }
@@ -2287,7 +2296,7 @@ static int conn_read(nghttp2_conn *conn, nghttp2_context ctx,
       }
 
       if (frrd->left == 0) {
-        rv = conn_recv_data(conn, ctx, &fr->data);
+        rv = conn_recv_data(conn, ctx, &fr->data, ts);
         if (rv != 0) {
           return nghttp2_conn_handle_error(conn, rv);
         }
@@ -2314,7 +2323,7 @@ static int conn_read(nghttp2_conn *conn, nghttp2_context ctx,
         return 0;
       }
 
-      rv = conn_recv_data(conn, ctx, &fr->data);
+      rv = conn_recv_data(conn, ctx, &fr->data, ts);
       if (rv != 0) {
         return nghttp2_conn_handle_error(conn, rv);
       }
