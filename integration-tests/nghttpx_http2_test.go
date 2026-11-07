@@ -3948,16 +3948,10 @@ func TestH2H1CONNECTMethodReject(t *testing.T) {
 	}
 }
 
-// TestH2H1CONNECTMethodContentLength verifies that CONNECT method
-// with content-length must fail.
+// TestH2H1CONNECTMethodContentLength verifies that content-length in
+// CONNECT method must be ignroed.
 func TestH2H1CONNECTMethodContentLength(t *testing.T) {
-	opts := options{
-		handler: func(w http.ResponseWriter, r *http.Request) {
-			t.Fatalf("request should not be forwarded")
-		},
-	}
-
-	st := newServerTester(t, opts)
+	st := newServerTester(t, options{})
 	defer st.Close()
 
 	res, err := st.http2(requestParam{
@@ -3972,7 +3966,7 @@ func TestH2H1CONNECTMethodContentLength(t *testing.T) {
 		t.Fatalf("Error st.http2() = %v", err)
 	}
 
-	if got, want := res.status, http.StatusBadRequest; got != want {
+	if got, want := res.status, http.StatusOK; got != want {
 		t.Errorf("status = %v; want %v", got, want)
 	}
 }
@@ -4083,12 +4077,40 @@ func TestH2H1ExtendedCONNECTMethodReject(t *testing.T) {
 	}
 }
 
-// TestH2H1ExtendedCONNECTMethodContentLength verifies that CONNECT
-// method with content-length must fail.
+// TestH2H1ExtendedCONNECTMethodContentLength verifies that
+// content-length in CONNECT method must be ignored.
 func TestH2H1ExtendedCONNECTMethodContentLength(t *testing.T) {
 	opts := options{
 		handler: func(w http.ResponseWriter, r *http.Request) {
-			t.Fatalf("request should not be forwarded")
+			hj, ok := w.(http.Hijacker)
+			if !ok {
+				http.Error(w, "Could not hijack the connection", http.StatusInternalServerError)
+				return
+			}
+			conn, bufrw, err := hj.Hijack()
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			accept := makeWebSocketAcceptToken(r.Header.Get("sec-websocket-key"))
+
+			if _, err := bufrw.WriteString("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: upgrade\r\nSec-WebSocket-Accept: " + accept + "\r\n\r\n"); err != nil {
+				t.Fatalf("Error bufrw.WriteString() = %v", err)
+			}
+
+			bufrw.Flush()
+
+			s, err := bufrw.ReadString('\n')
+			if err != nil {
+				t.Fatalf("Error bufrw.ReadString() = %v", err)
+			}
+
+			if got, want := s, "this belongs to another protocol\n"; got != want {
+				t.Errorf("data: %v; want %v", got, want)
+			}
+
+			conn.Close()
 		},
 	}
 
@@ -4108,7 +4130,7 @@ func TestH2H1ExtendedCONNECTMethodContentLength(t *testing.T) {
 		t.Fatalf("Error st.http2() = %v", err)
 	}
 
-	if got, want := res.status, http.StatusBadRequest; got != want {
+	if got, want := res.status, http.StatusOK; got != want {
 		t.Errorf("status = %v; want %v", got, want)
 	}
 }

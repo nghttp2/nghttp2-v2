@@ -400,8 +400,10 @@ static int http_request_on_header(nghttp2_http_state *http,
 
        https://datatracker.ietf.org/doc/html/rfc9110#section-6.5.1 now
        does not say that strongly, but we keep enforcing it.
+
+       Also do not emit content-length for CONNECT request.
     */
-    if (trailers) {
+    if (trailers || (http->flags & NGHTTP2_HTTP_FLAG_METH_CONNECT)) {
       return NGHTTP2_ERR_REMOVE_HTTP_HEADER;
     }
     if (http->content_length != -1) {
@@ -580,7 +582,6 @@ int nghttp2_http_on_request_headers(nghttp2_http_state *http) {
         (http->flags & NGHTTP2_HTTP_FLAG__AUTHORITY) == 0) {
       return NGHTTP2_ERR_MALFORMED_HTTP_HEADER;
     }
-    http->content_length = -1;
   } else {
     if ((http->flags & NGHTTP2_HTTP_FLAG_REQ_HEADERS) !=
           NGHTTP2_HTTP_FLAG_REQ_HEADERS ||
@@ -588,13 +589,10 @@ int nghttp2_http_on_request_headers(nghttp2_http_state *http) {
          (NGHTTP2_HTTP_FLAG__AUTHORITY | NGHTTP2_HTTP_FLAG_HOST)) == 0) {
       return NGHTTP2_ERR_MALFORMED_HTTP_HEADER;
     }
-    if (http->flags & NGHTTP2_HTTP_FLAG__PROTOCOL) {
-      if ((http->flags & NGHTTP2_HTTP_FLAG_METH_CONNECT) == 0 ||
-          (http->flags & NGHTTP2_HTTP_FLAG__AUTHORITY) == 0) {
-        return NGHTTP2_ERR_MALFORMED_HTTP_HEADER;
-      }
-
-      http->content_length = -1;
+    if ((http->flags & NGHTTP2_HTTP_FLAG__PROTOCOL) &&
+        ((http->flags & NGHTTP2_HTTP_FLAG_METH_CONNECT) == 0 ||
+         (http->flags & NGHTTP2_HTTP_FLAG__AUTHORITY) == 0)) {
+      return NGHTTP2_ERR_MALFORMED_HTTP_HEADER;
     }
     if (!check_path_flags(http)) {
       return NGHTTP2_ERR_MALFORMED_HTTP_HEADER;
