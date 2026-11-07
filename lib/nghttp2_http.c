@@ -379,7 +379,7 @@ static int http_request_on_header(nghttp2_http_state *http,
     break;
   case NGHTTP2_HPACK_TOKEN__PROTOCOL:
     if (!connect_protocol ||
-        !nghttp2_check_header_value(nv->value->base, nv->value->len) ||
+        !nghttp2_check_field_value(nv->value->base, nv->value->len) ||
         !check_pseudo_header(http, nv, NGHTTP2_HTTP_FLAG__PROTOCOL)) {
       return NGHTTP2_ERR_MALFORMED_HTTP_HEADER;
     }
@@ -428,7 +428,7 @@ static int http_request_on_header(nghttp2_http_state *http,
     }
     break;
   case NGHTTP2_HPACK_TOKEN_PRIORITY:
-    if (!nghttp2_check_header_value(nv->value->base, nv->value->len)) {
+    if (!nghttp2_check_field_value(nv->value->base, nv->value->len)) {
       http->flags &= ~NGHTTP2_HTTP_FLAG_PRIORITY;
       http->flags |= NGHTTP2_HTTP_FLAG_BAD_PRIORITY;
 
@@ -457,7 +457,7 @@ static int http_request_on_header(nghttp2_http_state *http,
       return NGHTTP2_ERR_MALFORMED_HTTP_HEADER;
     }
 
-    if (!nghttp2_check_header_value(nv->value->base, nv->value->len)) {
+    if (!nghttp2_check_field_value(nv->value->base, nv->value->len)) {
       return NGHTTP2_ERR_REMOVE_HTTP_HEADER;
     }
   }
@@ -530,7 +530,7 @@ static int http_response_on_header(nghttp2_http_state *http,
       return NGHTTP2_ERR_MALFORMED_HTTP_HEADER;
     }
 
-    if (!nghttp2_check_header_value(nv->value->base, nv->value->len)) {
+    if (!nghttp2_check_field_value(nv->value->base, nv->value->len)) {
       return NGHTTP2_ERR_REMOVE_HTTP_HEADER;
     }
   }
@@ -538,7 +538,7 @@ static int http_response_on_header(nghttp2_http_state *http,
   return 0;
 }
 
-static int http_check_nonempty_header_name(const uint8_t *name, size_t len);
+static int http_check_nonempty_field_name(const uint8_t *name, size_t len);
 
 int nghttp2_http_on_header(nghttp2_http_state *http, const nghttp2_hpack_nv *nv,
                            int request, int trailers, int connect_protocol) {
@@ -557,7 +557,7 @@ int nghttp2_http_on_header(nghttp2_http_state *http, const nghttp2_hpack_nv *nv,
   } else {
     http->flags |= NGHTTP2_HTTP_FLAG_PSEUDO_HEADER_DISALLOWED;
 
-    switch (http_check_nonempty_header_name(nv->name->base, nv->name->len)) {
+    switch (http_check_nonempty_field_name(nv->name->base, nv->name->len)) {
     case 0:
       return NGHTTP2_ERR_REMOVE_HTTP_HEADER;
     case -1:
@@ -671,7 +671,7 @@ void nghttp2_http_record_request_method(nghttp2_stream *stream,
   }
 }
 
-static const int8_t VALID_HD_NAME_CHARS[256] = {
+static const int8_t VALID_FIELD_NAME_CHARS[256] = {
   ['!'] = 1,  ['#'] = 1,  ['$'] = 1,  ['%'] = 1,  ['&'] = 1,  ['\''] = 1,
   ['*'] = 1,  ['+'] = 1,  ['-'] = 1,  ['.'] = 1,  ['0'] = 1,  ['1'] = 1,
   ['2'] = 1,  ['3'] = 1,  ['4'] = 1,  ['5'] = 1,  ['6'] = 1,  ['7'] = 1,
@@ -687,7 +687,7 @@ static const int8_t VALID_HD_NAME_CHARS[256] = {
   ['x'] = 1,  ['y'] = 1,  ['z'] = 1,  ['|'] = 1,  ['~'] = 1,
 };
 
-int nghttp2_check_header_name(const uint8_t *name, size_t len) {
+int nghttp2_check_field_name(const uint8_t *name, size_t len) {
   const uint8_t *last;
   if (len == 0) {
     return 0;
@@ -700,23 +700,23 @@ int nghttp2_check_header_name(const uint8_t *name, size_t len) {
     --len;
   }
   for (last = name + len; name != last; ++name) {
-    if (VALID_HD_NAME_CHARS[*name] != 1) {
+    if (VALID_FIELD_NAME_CHARS[*name] != 1) {
       return 0;
     }
   }
   return 1;
 }
 
-/* http_check_nonempty_header_name validates regular header name
+/* http_check_nonempty_field_name validates regular header name
    pointed by |name| of length |len|.  |len| must be greater than
    zero.  This function returns 1 if it succeeds, or -1 if the name
    contains a character in [A-Z], otherwise 0. */
-static int http_check_nonempty_header_name(const uint8_t *name, size_t len) {
+static int http_check_nonempty_field_name(const uint8_t *name, size_t len) {
   const uint8_t *last;
   int rv = 1;
 
   for (last = name + len; name != last; ++name) {
-    switch (VALID_HD_NAME_CHARS[*name]) {
+    switch (VALID_FIELD_NAME_CHARS[*name]) {
     case -1:
       return -1;
     case 0:
@@ -728,7 +728,7 @@ static int http_check_nonempty_header_name(const uint8_t *name, size_t len) {
   return rv;
 }
 
-static const int8_t VALID_HD_VALUE_CHARS[256] = {
+static const int8_t VALID_FIELD_VALUE_CHARS[256] = {
   [0x09] = 1, [' '] = 1,  ['!'] = 1,  ['"'] = 1,  ['#'] = 1,  ['$'] = 1,
   ['%'] = 1,  ['&'] = 1,  ['\''] = 1, ['('] = 1,  [')'] = 1,  ['*'] = 1,
   ['+'] = 1,  [','] = 1,  ['-'] = 1,  ['.'] = 1,  ['/'] = 1,  ['0'] = 1,
@@ -770,8 +770,8 @@ static const int8_t VALID_HD_VALUE_CHARS[256] = {
 };
 
 #ifdef __AVX2__
-static int contains_bad_header_value_char_avx2(const uint8_t *first,
-                                               const uint8_t *last) {
+static int contains_bad_field_value_char_avx2(const uint8_t *first,
+                                              const uint8_t *last) {
   const __m256i ctll = _mm256_set1_epi8(0x00 - 1);
   const __m256i ctlr = _mm256_set1_epi8(0x1F + 1);
   const __m256i ht = _mm256_set1_epi8('\t');
@@ -797,7 +797,7 @@ static int contains_bad_header_value_char_avx2(const uint8_t *first,
 }
 #endif /* __AVX2__ */
 
-int nghttp2_check_header_value(const uint8_t *value, size_t len) {
+int nghttp2_check_field_value(const uint8_t *value, size_t len) {
   const uint8_t *last;
 #ifdef __AVX2__
   const uint8_t *last32;
@@ -823,7 +823,7 @@ int nghttp2_check_header_value(const uint8_t *value, size_t len) {
 #ifdef __AVX2__
   if (len >= 32) {
     last32 = value + (len & ~(size_t)0x1FU);
-    if (contains_bad_header_value_char_avx2(value, last32)) {
+    if (contains_bad_field_value_char_avx2(value, last32)) {
       return 0;
     }
 
@@ -832,7 +832,7 @@ int nghttp2_check_header_value(const uint8_t *value, size_t len) {
 #endif /* __AVX2__ */
 
   for (; value != last; ++value) {
-    if (!VALID_HD_VALUE_CHARS[*value]) {
+    if (!VALID_FIELD_VALUE_CHARS[*value]) {
       return 0;
     }
   }

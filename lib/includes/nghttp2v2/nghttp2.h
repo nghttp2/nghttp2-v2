@@ -2360,23 +2360,22 @@ NGHTTP2_EXTERN int nghttp2_conn_set_server_stream_priority_versioned(
 /**
  * @function
  *
- * `nghttp2_check_header_name` returns nonzero if HTTP field name
- * |name| of length |len| is valid according to
- * :rfc:`9110#section-5`.
+ * `nghttp2_check_field_name` returns nonzero if HTTP field name
+ * |name| of length |len| is valid according to :rfc:`9110#section-5`.
  *
  * Because this is an HTTP field name in HTTP/2, the upper cased
  * alphabet is treated as error.
  */
-NGHTTP2_EXTERN int nghttp2_check_header_name(const uint8_t *name, size_t len);
+NGHTTP2_EXTERN int nghttp2_check_field_name(const uint8_t *name, size_t len);
 
 /**
  * @function
  *
- * `nghttp2_check_header_value` returns nonzero if HTTP field value
+ * `nghttp2_check_field_value` returns nonzero if HTTP field value
  * |value| of length |len| is valid according to
  * :rfc:`9110#section-5`.
  */
-NGHTTP2_EXTERN int nghttp2_check_header_value(const uint8_t *value, size_t len);
+NGHTTP2_EXTERN int nghttp2_check_field_value(const uint8_t *value, size_t len);
 
 /**
  * @function
