@@ -976,7 +976,7 @@ static int hpack_encoder_write_string(nghttp2_hpack_encoder *encoder,
 
   if (huffman) {
     p = nghttp2_hpack_huffman_encode(p, str, len);
-  } else {
+  } else if (len) {
     assert(enclen == len);
 
     p = nghttp2_cpymem(p, str, len);
@@ -1681,6 +1681,7 @@ nghttp2_ssize nghttp2_hpack_decoder_read(nghttp2_hpack_decoder *decoder,
   const nghttp2_mem *mem = decoder->ctx.mem;
   nghttp2_hpack_read_state *rstate = &decoder->rstate;
   nghttp2_ssize nread;
+  size_t huff_declen;
   int rv;
 
   if (decoder->ctx.bad) {
@@ -1863,7 +1864,7 @@ nghttp2_ssize nghttp2_hpack_decoder_read(nghttp2_hpack_decoder *decoder,
     /* Fall through */
     case NGHTTP2_HPACK_STATE_NEWNAME_READ_NAMELEN:
       nread = hpack_decoder_read_len(decoder, &rfin, p, last, 7,
-                                     NGHTTP2_HPACK_MAX_NV);
+                                     NGHTTP2_HPACK_MAX_NAMELEN);
       if (nread < 0) {
         rv = (int)nread;
         goto fail;
@@ -1881,11 +1882,16 @@ nghttp2_ssize nghttp2_hpack_decoder_read(nghttp2_hpack_decoder *decoder,
       decoder->state = NGHTTP2_HPACK_STATE_NEWNAME_READ_NAME;
 
       if (rstate->huffman_encoded) {
+        huff_declen =
+          nghttp2_hpack_huffman_estimate_decode_length(rstate->left);
+        if (huff_declen > NGHTTP2_HPACK_MAX_NAMELEN) {
+          rv = NGHTTP2_ERR_HPACK_FATAL;
+          goto fail;
+        }
+
         nghttp2_hpack_huffman_decode_context_init(&rstate->huffman_ctx);
 
-        rv = nghttp2_rcbuf_new(
-          &rstate->name,
-          nghttp2_hpack_huffman_estimate_decode_length(rstate->left) + 1, mem);
+        rv = nghttp2_rcbuf_new(&rstate->name, huff_declen + 1, mem);
       } else {
         rv = nghttp2_rcbuf_new(&rstate->name, rstate->left + 1, mem);
       }
@@ -1937,7 +1943,7 @@ nghttp2_ssize nghttp2_hpack_decoder_read(nghttp2_hpack_decoder *decoder,
     /* Fall through */
     case NGHTTP2_HPACK_STATE_READ_VALUELEN:
       nread = hpack_decoder_read_len(decoder, &rfin, p, last, 7,
-                                     NGHTTP2_HPACK_MAX_NV);
+                                     NGHTTP2_HPACK_MAX_VALUELEN);
       if (nread < 0) {
         rv = (int)nread;
         goto fail;
@@ -1954,11 +1960,16 @@ nghttp2_ssize nghttp2_hpack_decoder_read(nghttp2_hpack_decoder *decoder,
       decoder->state = NGHTTP2_HPACK_STATE_READ_VALUE;
 
       if (rstate->huffman_encoded) {
+        huff_declen =
+          nghttp2_hpack_huffman_estimate_decode_length(rstate->left);
+        if (huff_declen > NGHTTP2_HPACK_MAX_VALUELEN) {
+          rv = NGHTTP2_ERR_HPACK_FATAL;
+          goto fail;
+        }
+
         nghttp2_hpack_huffman_decode_context_init(&rstate->huffman_ctx);
 
-        rv = nghttp2_rcbuf_new(
-          &rstate->value,
-          nghttp2_hpack_huffman_estimate_decode_length(rstate->left) + 1, mem);
+        rv = nghttp2_rcbuf_new(&rstate->value, huff_declen + 1, mem);
       } else {
         rv = nghttp2_rcbuf_new(&rstate->value, rstate->left + 1, mem);
       }
