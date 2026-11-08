@@ -25,6 +25,7 @@
 #include "http2.h"
 
 #include <print>
+#include <utility>
 
 #include "llhttp.h"
 
@@ -658,7 +659,8 @@ void index_header(HeaderIndex &hdidx, int32_t token, size_t idx) {
     return;
   }
   assert(static_cast<size_t>(token) < HD_MAXIDX);
-  hdidx[static_cast<size_t>(token)] = static_cast<int8_t>(idx);
+  assert(std::in_range<HeaderIndex::value_type>(idx));
+  hdidx[static_cast<size_t>(token)] = static_cast<HeaderIndex::value_type>(idx);
 }
 
 namespace {
