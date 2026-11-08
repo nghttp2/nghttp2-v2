@@ -860,15 +860,17 @@ ClientHandler::get_downstream_addr(DownstreamAddrGroup *group,
 
     if (addr->connect_blocker->blocked()) {
       size_t i;
-      for (i = 0; i < shared_addr->affinity_hash.size(); ++i) {
-        auto j = (i + aff_idx + 1) % shared_addr->affinity_hash.size();
-        addr = &shared_addr->addrs[shared_addr->affinity_hash[j].idx];
+      for (i = aff_idx + 1; i != aff_idx; ++i) {
+        if (i == shared_addr->affinity_hash.size()) {
+          i = 0;
+        }
+        addr = &shared_addr->addrs[shared_addr->affinity_hash[i].idx];
         if (addr->connect_blocker->blocked()) {
           continue;
         }
         break;
       }
-      if (i == shared_addr->affinity_hash.size()) {
+      if (i == aff_idx) {
         return std::unexpected{Error::NO_AVAIL_DOWNSTREAM};
       }
     }
