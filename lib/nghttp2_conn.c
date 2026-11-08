@@ -812,11 +812,6 @@ static int conn_recv_data_hd(nghttp2_conn *conn, nghttp2_context ctx,
        even existed.  Just ignore.  Count the stream data to the
        connection-level flow control. */
 
-    rv = conn_update_glitch_ratelim(conn, 1, ts);
-    if (rv != 0) {
-      return rv;
-    }
-
     /* Even if we could not find the stream, connection flow control
        must be validated and its data must be counted toward
        connection-level flow control limit. */
@@ -1033,7 +1028,7 @@ static int conn_recv_headers_hd(nghttp2_conn *conn, nghttp2_context ctx,
       /* The stream is gone.  We have no idea how this stream ended or
          even existed.  Just ignore.  Count the stream data to the
          connection-level flow control. */
-      return conn_update_glitch_ratelim(conn, 1, ts);
+      return 0;
     }
 
     if (!(stream->flags & NGHTTP2_STREAM_FLAG_OPENED)) {
@@ -1045,7 +1040,7 @@ static int conn_recv_headers_hd(nghttp2_conn *conn, nghttp2_context ctx,
       /* The stream is gone.  We have no idea how this stream ended or
          even existed.  Just ignore.  Count the stream data to the
          connection-level flow control. */
-      return conn_update_glitch_ratelim(conn, 1, ts);
+      return 0;
     }
   } else {
     conn->rx.last_stream_id = fr->hd.stream_id;
