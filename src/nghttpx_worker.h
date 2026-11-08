@@ -317,7 +317,10 @@ public:
   void run_async();
   void wait();
   void process_events();
-  void send(WorkerEvent event);
+  // Queues |event| to this worker.  It returns false, and |event| is
+  // dropped, if the worker thread has already exited its event loop
+  // because nobody would process it.
+  bool send(WorkerEvent event);
 
   tls::CertLookupTree *get_cert_lookup_tree() const;
 #ifdef ENABLE_HTTP3
@@ -416,6 +419,9 @@ private:
   size_t index_;
   std::mutex m_;
   std::deque<WorkerEvent> q_;
+  // true if the thread started by run_async() has left its event
+  // loop.  Guarded by m_.
+  bool stopped_{};
   std::mt19937_64 randgen_;
   ev_async w_;
   ev_timer mcpool_clear_timer_;
