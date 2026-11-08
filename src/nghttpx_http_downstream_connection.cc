@@ -1407,6 +1407,7 @@ std::expected<void, Error> HttpDownstreamConnection::tls_handshake() {
   auto &connect_blocker = addr_->connect_blocker;
 
   signal_write_ = &HttpDownstreamConnection::actual_signal_write;
+  reusable_ = true;
 
   connect_blocker->on_success();
 
@@ -1636,6 +1637,7 @@ std::expected<void, Error> HttpDownstreamConnection::connected() {
   }
 
   signal_write_ = &HttpDownstreamConnection::actual_signal_write;
+  reusable_ = true;
 
   connect_blocker->on_success();
 
