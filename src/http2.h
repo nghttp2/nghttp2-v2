@@ -286,7 +286,7 @@ inline constexpr auto HD_MAXIDX = 76UZ;
 static_assert(HD_MAXIDX < std::numeric_limits<uint8_t>::max());
 
 // HeaderIndex must store all nghttp2_hpack_token tokens.
-using HeaderIndex = std::array<int8_t, HD_MAXIDX>;
+using HeaderIndex = std::array<int32_t, HD_MAXIDX>;
 
 // Initializes |hdidx|, header index.  The |hdidx| must point to the
 // array containing at least HD_MAXIDX elements.
