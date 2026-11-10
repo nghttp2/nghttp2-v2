@@ -267,16 +267,23 @@ mrb_value request_mod_header(mrb_state *mrb, mrb_value self, bool repl) {
 
   key = mrb_funcall(mrb, key, "downcase", 0);
 
-  auto keyref = make_string_ref(
-    balloc,
-    std::string_view{RSTRING_PTR(key), static_cast<size_t>(RSTRING_LEN(key))});
-
-  mrb_gc_arena_restore(mrb, ai);
-
-  check_header_name(mrb, keyref);
+  auto keyref =
+    std::string_view{RSTRING_PTR(key), static_cast<size_t>(RSTRING_LEN(key))};
 
   auto token = nghttp2_hpack_lookup_token(
     reinterpret_cast<const uint8_t *>(keyref.data()), keyref.size());
+
+  if (token == NGHTTP2_HPACK_TOKEN_CONTENT_LENGTH ||
+      token == NGHTTP2_HPACK_TOKEN_TRANSFER_ENCODING) {
+    mrb_raise(mrb, E_RUNTIME_ERROR,
+              "setting content-length or transfer-encoding is not allowed");
+  }
+
+  check_header_name(mrb, keyref);
+
+  keyref = make_string_ref(balloc, keyref);
+
+  mrb_gc_arena_restore(mrb, ai);
 
   if (repl) {
     size_t p = 0;
@@ -348,7 +355,7 @@ mrb_value request_clear_headers(mrb_state *mrb, mrb_value self) {
 
   check_phase(mrb, data->phase, PHASE_REQUEST);
 
-  req.fs.clear_headers();
+  clear_headers(req.fs);
 
   return mrb_nil_value();
 }
