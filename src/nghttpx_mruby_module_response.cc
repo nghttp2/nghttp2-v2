@@ -127,6 +127,8 @@ mrb_value response_mod_header(mrb_state *mrb, mrb_value self, bool repl) {
 
   mrb_gc_arena_restore(mrb, ai);
 
+  check_header_name(mrb, keyref);
+
   auto token = nghttp2_hpack_lookup_token(
     reinterpret_cast<const uint8_t *>(keyref.data()), keyref.size());
 
@@ -154,6 +156,8 @@ mrb_value response_mod_header(mrb_state *mrb, mrb_value self, bool repl) {
         mrb_raise(mrb, E_RUNTIME_ERROR, "value must be string");
       }
 
+      check_header_value(mrb, value);
+
       resp.fs.add_header_token(
         keyref,
         make_string_ref(
@@ -162,6 +166,8 @@ mrb_value response_mod_header(mrb_state *mrb, mrb_value self, bool repl) {
         false, token);
     }
   } else if (mrb_string_p(values)) {
+    check_header_value(mrb, values);
+
     resp.fs.add_header_token(
       keyref,
       make_string_ref(
@@ -316,6 +322,8 @@ mrb_value response_send_info(mrb_state *mrb, mrb_value self) {
 
     mrb_gc_arena_restore(mrb, ai);
 
+    check_header_name(mrb, keyref);
+
     auto token = nghttp2_hpack_lookup_token(
       reinterpret_cast<const uint8_t *>(keyref.data()), keyref.size());
 
@@ -327,6 +335,8 @@ mrb_value response_send_info(mrb_state *mrb, mrb_value self) {
           mrb_raise(mrb, E_RUNTIME_ERROR, "value must be string");
         }
 
+        check_header_value(mrb, value);
+
         resp.fs.add_header_token(
           keyref,
           make_string_ref(
@@ -335,6 +345,8 @@ mrb_value response_send_info(mrb_state *mrb, mrb_value self) {
           false, token);
       }
     } else if (mrb_string_p(values)) {
+      check_header_value(mrb, values);
+
       resp.fs.add_header_token(
         keyref,
         make_string_ref(
