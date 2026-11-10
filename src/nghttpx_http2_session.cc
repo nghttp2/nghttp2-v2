@@ -1639,7 +1639,7 @@ std::expected<void, Error> Http2Session::read_clear() {
 
     auto data = *maybe_data;
     if (data.empty()) {
-      return write_clear();
+      return do_write();
     }
 
     if (auto rv = on_read(data); !rv) {
@@ -1746,7 +1746,7 @@ std::expected<void, Error> Http2Session::read_tls() {
 
     auto data = *maybe_data;
     if (data.empty()) {
-      return write_tls();
+      return do_write();
     }
 
     if (auto rv = on_read(data); !rv) {
