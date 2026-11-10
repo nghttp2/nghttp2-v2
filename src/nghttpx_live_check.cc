@@ -471,7 +471,7 @@ std::expected<void, Error> LiveCheck::read_tls() {
 
   ERR_clear_error();
 
-  for (;;) {
+  for (auto i = 0UZ; i < MAX_READ_PER_EVENT; ++i) {
     auto maybe_data = conn_.read_tls(buf);
     if (!maybe_data) {
       return std::unexpected{maybe_data.error()};
@@ -486,6 +486,12 @@ std::expected<void, Error> LiveCheck::read_tls() {
       return rv;
     }
   }
+
+  // The socket might not become readable again if the rest of the
+  // data has already been read into SSL object.
+  conn_.handle_tls_pending_read();
+
+  return {};
 }
 
 std::expected<void, Error> LiveCheck::write_tls() {
@@ -536,7 +542,7 @@ std::expected<void, Error> LiveCheck::read_clear() {
   std::array<uint8_t, 4_k> rawbuf;
   auto buf = std::span{rawbuf};
 
-  for (;;) {
+  for (auto i = 0UZ; i < MAX_READ_PER_EVENT; ++i) {
     auto maybe_data = conn_.read_clear(buf);
     if (!maybe_data) {
       return std::unexpected{maybe_data.error()};
@@ -551,6 +557,8 @@ std::expected<void, Error> LiveCheck::read_clear() {
       return rv;
     }
   }
+
+  return {};
 }
 
 std::expected<void, Error> LiveCheck::write_clear() {

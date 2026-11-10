@@ -210,8 +210,6 @@ struct Request {
   // Returns true if the request is HTTP upgrade (HTTP Upgrade or
   // CONNECT method).  Upgrade to HTTP/2 is excluded.
   bool upgrade_request{};
-  // true if h2c is seen in Upgrade header field.
-  bool http2_upgrade_seen{};
   bool connection_close{};
   // true if this is HTTP/2, and request body is expected.  Note that
   // we don't take into account HTTP method here.

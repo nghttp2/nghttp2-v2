@@ -1044,6 +1044,7 @@ std::string_view path_join(BlockAllocator &balloc, std::string_view base_path,
           p = eat_file(std::ranges::begin(res), p);
         }
         first += 2;
+        first = std::find_if(first, last, [](auto c) { return c != '/'; });
         continue;
       }
       if (*(first + 1) == '.') {
@@ -1054,6 +1055,7 @@ std::string_view path_join(BlockAllocator &balloc, std::string_view base_path,
         if (*(first + 2) == '/') {
           p = eat_dir(std::ranges::begin(res), p);
           first += 3;
+          first = std::find_if(first, last, [](auto c) { return c != '/'; });
           continue;
         }
       }
@@ -1107,14 +1109,15 @@ std::string_view normalize_path(BlockAllocator &balloc, std::string_view path,
 
           continue;
         }
-        *p++ = '%';
-        *p++ = as_unsigned(util::upcase(*(it + 1)));
-        *p++ = as_unsigned(util::upcase(*(it + 2)));
-
-        it += 3;
-
-        continue;
       }
+
+      *p++ = '%';
+      *p++ = as_unsigned(util::upcase(*(it + 1)));
+      *p++ = as_unsigned(util::upcase(*(it + 2)));
+
+      it += 3;
+
+      continue;
     }
     *p++ = as_unsigned(*it++);
   }
@@ -1155,14 +1158,15 @@ std::string_view normalize_path_colon(BlockAllocator &balloc,
 
           continue;
         }
-        *p++ = '%';
-        *p++ = as_unsigned(util::upcase(*(it + 1)));
-        *p++ = as_unsigned(util::upcase(*(it + 2)));
-
-        it += 3;
-
-        continue;
       }
+
+      *p++ = '%';
+      *p++ = as_unsigned(util::upcase(*(it + 1)));
+      *p++ = as_unsigned(util::upcase(*(it + 2)));
+
+      it += 3;
+
+      continue;
     }
     *p++ = as_unsigned(*it++);
   }

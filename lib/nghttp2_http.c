@@ -305,7 +305,7 @@ static const int8_t VALID_PATH_CHARS[256] = {
   [0xFA] = 1, [0xFB] = 1, [0xFC] = 1, [0xFD] = 1, [0xFE] = 1, [0xFF] = 1,
 };
 
-static int check_path(const uint8_t *value, size_t len) {
+int nghttp2_check_path(const uint8_t *value, size_t len) {
   const uint8_t *last;
   for (last = value + len; value != last; ++value) {
     if (!VALID_PATH_CHARS[*value]) {
@@ -355,7 +355,7 @@ static int http_request_on_header(nghttp2_http_state *http,
     }
     break;
   case NGHTTP2_HPACK_TOKEN__PATH:
-    if (!check_path(nv->value->base, nv->value->len) ||
+    if (!nghttp2_check_path(nv->value->base, nv->value->len) ||
         !check_pseudo_header(http, nv, NGHTTP2_HTTP_FLAG__PATH)) {
       return NGHTTP2_ERR_MALFORMED_HTTP_HEADER;
     }

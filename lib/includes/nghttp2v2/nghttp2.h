@@ -2393,6 +2393,20 @@ NGHTTP2_EXTERN int nghttp2_check_authority(const uint8_t *value, size_t len);
 /**
  * @function
  *
+ * Returns nonzero if the |value| which is supposed to be the value of
+ * the :path header field is valid according to
+ * https://datatracker.ietf.org/doc/html/rfc9113#section-8.3.1
+ *
+ * |value| is valid if it merely consists of the allowed characters.
+ * In particular, it does not check whether |value| follows the syntax
+ * of path.  The allowed characters are all characters valid by
+ * `nghttp2_check_header_value` minus SPC and HT.
+ */
+NGHTTP2_EXTERN int nghttp2_check_path(const uint8_t *value, size_t len);
+
+/**
+ * @function
+ *
  * `nghttp2_http2_strerror` returns the textual representation of
  * HTTP/2 error code |error_code|.
  */
