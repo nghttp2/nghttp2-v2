@@ -2296,3 +2296,45 @@ func TestH1H2BadHost(t *testing.T) {
 		t.Fatalf("Error io.ReadAll() = %v", err)
 	}
 }
+
+// TestH1H1NonFinalResponse tests that non-final response works.
+func TestH1H1NonFinalResponse(t *testing.T) {
+	opts := options{
+		handler: func(w http.ResponseWriter, r *http.Request) {
+			hj, ok := w.(http.Hijacker)
+			if !ok {
+				http.Error(w, "Could not hijack the connection", http.StatusInternalServerError)
+				return
+			}
+			_, bufrw, err := hj.Hijack()
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			if _, err := bufrw.WriteString("HTTP/1.1 103\r\n\r\n"); err != nil {
+				t.Fatalf("Error bufrw.WriteString() = %v", err)
+			}
+
+			if _, err := bufrw.WriteString("HTTP/1.1 200\r\n\r\n"); err != nil {
+				t.Fatalf("Error bufrw.WriteString() = %v", err)
+			}
+
+			bufrw.Flush()
+		},
+	}
+
+	st := newServerTester(t, opts)
+	defer st.Close()
+
+	res, err := st.http1(requestParam{
+		name: "TestH1H1NonFinalResponse",
+	})
+	if err != nil {
+		t.Fatalf("Error st.http1() = %v", err)
+	}
+
+	if got, want := res.status, http.StatusEarlyHints; got != want {
+		t.Errorf("status = %v; want %v", got, want)
+	}
+}
