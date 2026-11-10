@@ -1109,14 +1109,15 @@ std::string_view normalize_path(BlockAllocator &balloc, std::string_view path,
 
           continue;
         }
-        *p++ = '%';
-        *p++ = as_unsigned(util::upcase(*(it + 1)));
-        *p++ = as_unsigned(util::upcase(*(it + 2)));
-
-        it += 3;
-
-        continue;
       }
+
+      *p++ = '%';
+      *p++ = as_unsigned(util::upcase(*(it + 1)));
+      *p++ = as_unsigned(util::upcase(*(it + 2)));
+
+      it += 3;
+
+      continue;
     }
     *p++ = as_unsigned(*it++);
   }
@@ -1157,14 +1158,15 @@ std::string_view normalize_path_colon(BlockAllocator &balloc,
 
           continue;
         }
-        *p++ = '%';
-        *p++ = as_unsigned(util::upcase(*(it + 1)));
-        *p++ = as_unsigned(util::upcase(*(it + 2)));
-
-        it += 3;
-
-        continue;
       }
+
+      *p++ = '%';
+      *p++ = as_unsigned(util::upcase(*(it + 1)));
+      *p++ = as_unsigned(util::upcase(*(it + 2)));
+
+      it += 3;
+
+      continue;
     }
     *p++ = as_unsigned(*it++);
   }
