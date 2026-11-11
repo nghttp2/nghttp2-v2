@@ -943,6 +943,7 @@ std::expected<void, Error> on_response_headers(Http2Session *http2session,
 
   auto config = get_config();
   auto &loggingconf = config->logging;
+  auto &httpconf = config->http;
 
   downstream->set_expect_final_response(false);
 
@@ -978,6 +979,23 @@ std::expected<void, Error> on_response_headers(Http2Session *http2session,
     if (log_enabled(INFO)) {
       Log{INFO, http2session, downstream} << "This is non-final response.";
     }
+
+    // For non-final response, charge the overhead to the field buffer
+    // because the :status header is very small.
+    if (resp.fs.buffer_size() + NGHTTPX_NON_FINAL_RESPONSE_OVERHEAD >
+        httpconf.response_header_field_buffer) {
+      Log{INFO, downstream}
+        << "Too large header field size="
+        << resp.fs.buffer_size() + NGHTTPX_NON_FINAL_RESPONSE_OVERHEAD;
+
+      http2session->shutdown_stream(stream_id, NGHTTP2_PROTOCOL_ERROR);
+
+      downstream->set_response_state(DownstreamState::MSG_RESET);
+
+      return {};
+    }
+
+    resp.fs.add_extra_buffer_size(NGHTTPX_NON_FINAL_RESPONSE_OVERHEAD);
 
     downstream->set_expect_final_response(true);
     // After Upstream::on_downstream_header_complete, Dowstream's
@@ -1712,7 +1730,7 @@ std::expected<void, Error> Http2Session::tls_handshake() {
   }
 
   if (!get_config()->tls.insecure) {
-    if (auto rv = tls::check_cert(conn_.tls.ssl, addr_, raddr_); !rv) {
+    if (auto rv = tls::check_cert(conn_.tls.ssl, addr_); !rv) {
       downstream_failure(addr_, raddr_);
 
       return rv;
