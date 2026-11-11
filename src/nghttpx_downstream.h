@@ -318,7 +318,7 @@ public:
   void inspect_http2_request();
   // Inspects HTTP/1 request.  This checks whether the request is
   // upgrade request and tranfer-encoding etc.
-  void inspect_http1_request();
+  std::expected<void, Error> inspect_http1_request();
 
   // downstream request API
   const Request &request() const { return req_; }

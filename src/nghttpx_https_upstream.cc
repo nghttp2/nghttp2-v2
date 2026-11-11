@@ -426,7 +426,9 @@ int htp_hdrs_completecb(llhttp_t *htp) {
     }
   }
 
-  downstream->inspect_http1_request();
+  if (!downstream->inspect_http1_request()) {
+    return -1;
+  }
 
   if ((req.upgrade_request || llhttp_get_upgrade(htp)) &&
       (req.fs.header(NGHTTP2_HPACK_TOKEN_TRANSFER_ENCODING) ||
