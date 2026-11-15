@@ -1325,6 +1325,10 @@ bool check_transfer_encoding(std::string_view s) {
 
       ++it;
 
+      if (it == std::ranges::end(s)) {
+        return false;
+      }
+
       if (util::in_token(*it)) {
         // token
         ++it;
