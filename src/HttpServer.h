@@ -114,7 +114,6 @@ struct FileEntry {
   std::expected<void, Error> map_file();
   void unmap_file();
   std::string path;
-  std::unordered_multimap<std::string, std::unique_ptr<FileEntry>>::iterator it;
   void *map{};
   int64_t length;
   int64_t mtime;
