@@ -1049,12 +1049,14 @@ typedef struct nghttp2_settings {
   size_t max_concurrent_streams_remote;
   /**
    * :member:`initial_max_stream_data` is the window size for
-   * stream-level flow control.
+   * stream-level flow control.  It must be less than or equal to
+   * ``INT32_MAX``.
    */
   size_t initial_max_stream_data;
   /**
    * :member:`initial_max_data` is the window size for
-   * connection-level flow control.
+   * connection-level flow control.  It must be less than or equal to
+   * ``INT32_MAX``.
    */
   size_t initial_max_data;
   /**
