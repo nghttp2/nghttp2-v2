@@ -33,6 +33,7 @@
 #include "nghttpx_downstream_test.h"
 #include "nghttpx_config_test.h"
 #include "nghttpx_worker_test.h"
+#include "nghttpx_connection_handler_test.h"
 #include "http2_test.h"
 #include "util_test.h"
 #include "nghttp2_gzip_test.h"
@@ -59,6 +60,7 @@ int main(int argc, char *argv[]) {
     nghttpx::downstream_suite,
     nghttpx::config_suite,
     nghttpx::worker_suite,
+    nghttpx::connection_handler_suite,
     nghttpx::http_suite,
     nghttpx::router_suite,
     nghttpx::http2_suite,

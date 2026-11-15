@@ -185,6 +185,7 @@ if(ENABLE_APP)
       nghttpx_downstream_test.cc
       nghttpx_config_test.cc
       nghttpx_worker_test.cc
+      nghttpx_connection_handler_test.cc
       nghttpx_http_test.cc
       nghttpx_router_test.cc
       http2_test.cc

@@ -228,6 +228,7 @@ nghttpx_unittest_SOURCES = nghttpx-unittest.cc \
 	nghttpx_downstream_test.cc nghttpx_downstream_test.h \
 	nghttpx_config_test.cc nghttpx_config_test.h \
 	nghttpx_worker_test.cc nghttpx_worker_test.h \
+	nghttpx_connection_handler_test.cc nghttpx_connection_handler_test.h \
 	nghttpx_http_test.cc nghttpx_http_test.h \
 	nghttpx_router_test.cc nghttpx_router_test.h \
 	http2_test.cc http2_test.h \
