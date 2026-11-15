@@ -634,6 +634,10 @@ int write_stream_data_offset(nghttp2_conn *conn, int64_t stream_id,
   // data transferred.
   downstream->response_sent_body_length += len;
 
+  auto upstream = static_cast<Http2Upstream *>(conn_user_data);
+  auto handler = upstream->get_client_handler();
+  handler->extend_write_rate_timer(len);
+
   if (!downstream->resume_read(NGHTTPX_NO_BUFFER, len)) {
     return NGHTTP2_ERR_CALLBACK_FAILURE;
   }
