@@ -420,8 +420,7 @@ int htp_hdrs_completecb(llhttp_t *htp) {
     const auto &value = host->value;
 
     if (!nghttp2_check_authority(
-          reinterpret_cast<const uint8_t *>(value.data()), value.size()) ||
-        util::contains(value, '@')) {
+          reinterpret_cast<const uint8_t *>(value.data()), value.size())) {
       return -1;
     }
   }
@@ -487,8 +486,7 @@ int htp_hdrs_completecb(llhttp_t *htp) {
     }
   } else if (!nghttp2_check_authority(
                reinterpret_cast<const uint8_t *>(req.authority.data()),
-               req.authority.size()) ||
-             util::contains(req.authority, '@')) {
+               req.authority.size())) {
     // The request-target of CONNECT is authority-form, and it is used
     // as authority as is.  Apply the same check as :authority in
     // HTTP/2, which does not allow '@'.
