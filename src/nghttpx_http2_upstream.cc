@@ -1168,6 +1168,7 @@ nghttp2_ssize downstream_read_data(nghttp2_conn *conn, int64_t stream_id,
     }
   } else if (body->rleft() == 0) {
     downstream->disable_upstream_wtimer();
+    downstream->unregister_upstream_write_rate_timer();
     return NGHTTP2_ERR_WOULDBLOCK;
   }
 
