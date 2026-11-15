@@ -575,10 +575,8 @@ int nghttp2_conn_handle_error(nghttp2_conn *conn, int liberr) {
  */
 static int conn_should_send_stream_window_update(const nghttp2_conn *conn,
                                                  const nghttp2_stream *stream) {
-  return stream->rx.unsent_max_offset - stream->rx.max_offset <=
-           NGHTTP2_MAX_WINDOW_SIZE &&
-         conn->rx.stream_window <
-           4 * (stream->rx.unsent_max_offset - stream->rx.max_offset);
+  return conn->rx.stream_window <
+         4 * (stream->rx.unsent_max_offset - stream->rx.max_offset);
 }
 
 /*
@@ -629,7 +627,6 @@ int nghttp2_conn_create_stream(nghttp2_conn *conn, nghttp2_stream **pstream,
       .write_stream_data_offset = conn->callbacks.write_stream_data_offset,
     },
     NGHTTP2_STREAM_FLAG_NONE, conn->rx.stream_window,
-    nghttp2_min(conn->rx.stream_window, conn->settings.initial_max_stream_data),
     conn->remote.settings.initial_max_stream_data, stream_user_data, conn->mem);
 
   if (conn->server) {
@@ -1379,17 +1376,23 @@ typedef struct nghttp2_apply_max_stream_data {
 static int stream_apply_rx_initial_max_stream_data(void *data, void *ptr) {
   nghttp2_stream *stream = data;
   const nghttp2_apply_max_stream_data *arg = ptr;
-  uint64_t max_offset;
+  uint64_t unsent_max_offset;
 
-  max_offset = stream->rx.max_offset + arg->delta;
+  unsent_max_offset = stream->rx.unsent_max_offset + arg->delta;
 
-  if (max_offset > stream->rx.offset &&
-      max_offset - stream->rx.offset > NGHTTP2_MAX_WINDOW_SIZE) {
+  if (unsent_max_offset > stream->rx.offset &&
+      unsent_max_offset - stream->rx.offset > NGHTTP2_MAX_WINDOW_SIZE) {
     return NGHTTP2_ERR_FLOW_CONTROL;
   }
 
-  stream->rx.unsent_max_offset += arg->delta;
-  stream->rx.max_offset = max_offset;
+  stream->rx.unsent_max_offset = unsent_max_offset;
+  stream->rx.max_offset += arg->delta;
+
+  if (!(stream->flags & NGHTTP2_STREAM_FLAG_SHUT_RD) &&
+      conn_should_send_stream_window_update(arg->conn, stream)) {
+    stream->flags |= NGHTTP2_STREAM_FLAG_SEND_WINDOW_UPDATE;
+    nghttp2_conn_strmq_push(arg->conn, stream);
+  }
 
   return 0;
 }
@@ -3020,6 +3023,7 @@ int nghttp2_conn_write_stream(nghttp2_conn *conn, nghttp2_context ctx,
                               nghttp2_buf *dest, nghttp2_stream *stream,
                               nghttp2_tstamp ts) {
   nghttp2_frame fr;
+  uint32_t delta;
   int rv;
 
   if ((stream->flags & NGHTTP2_STREAM_FLAG_OPENED) &&
@@ -3061,6 +3065,10 @@ int nghttp2_conn_write_stream(nghttp2_conn *conn, nghttp2_context ctx,
 
     if (stream->flags & NGHTTP2_STREAM_FLAG_SEND_WINDOW_UPDATE) {
       if (conn_should_send_stream_window_update(conn, stream)) {
+        delta = (uint32_t)nghttp2_min(stream->rx.unsent_max_offset -
+                                        stream->rx.max_offset,
+                                      NGHTTP2_MAX_WINDOW_SIZE);
+
         fr.window_update = (nghttp2_frame_window_update){
           .hd =
             {
@@ -3068,8 +3076,7 @@ int nghttp2_conn_write_stream(nghttp2_conn *conn, nghttp2_context ctx,
               .type = NGHTTP2_FRAME_WINDOW_UPDATE,
               .stream_id = stream->stream_id,
             },
-          .window_size_inc =
-            (uint32_t)(stream->rx.unsent_max_offset - stream->rx.max_offset),
+          .window_size_inc = delta,
         };
 
         rv = nghttp2_frame_encode_window_update(dest, &fr.window_update);
@@ -3079,10 +3086,12 @@ int nghttp2_conn_write_stream(nghttp2_conn *conn, nghttp2_context ctx,
 
         nghttp2_log_tx_window_update(&conn->log, &fr.window_update);
 
-        stream->rx.max_offset = stream->rx.unsent_max_offset;
+        stream->rx.max_offset += delta;
       }
 
-      stream->flags &= ~NGHTTP2_STREAM_FLAG_SEND_WINDOW_UPDATE;
+      if (!conn_should_send_stream_window_update(conn, stream)) {
+        stream->flags &= ~NGHTTP2_STREAM_FLAG_SEND_WINDOW_UPDATE;
+      }
     }
 
     if (stream->flags & NGHTTP2_STREAM_FLAG_SEND_PRIORITY_UPDATE) {
@@ -3725,7 +3734,7 @@ int nghttp2_conn_submit_trailers(nghttp2_conn *conn, int64_t stream_id,
 int nghttp2_conn_extend_max_stream_offset(nghttp2_conn *conn, int64_t stream_id,
                                           size_t datalen) {
   nghttp2_stream *stream;
-  uint64_t max_offset;
+  uint64_t unsent_max_offset;
 
   assert(client_stream_id(stream_id));
   assert(stream_id <= INT32_MAX);
@@ -3735,11 +3744,14 @@ int nghttp2_conn_extend_max_stream_offset(nghttp2_conn *conn, int64_t stream_id,
     return 0;
   }
 
-  max_offset = stream->rx.unsent_max_offset + datalen;
+  if (datalen > NGHTTP2_MAX_INT - stream->rx.unsent_max_offset) {
+    unsent_max_offset = NGHTTP2_MAX_INT;
+  } else {
+    unsent_max_offset = stream->rx.unsent_max_offset + datalen;
+  }
 
-  if (stream->rx.unsent_max_offset - stream->rx.offset <=
-        NGHTTP2_MAX_WINDOW_SIZE &&
-      max_offset - stream->rx.offset +
+  if (unsent_max_offset > stream->rx.offset &&
+      unsent_max_offset - stream->rx.offset +
           (conn->settings.initial_max_stream_data > conn->rx.stream_window
              ? conn->settings.initial_max_stream_data - conn->rx.stream_window
              : 0) >
@@ -3747,14 +3759,7 @@ int nghttp2_conn_extend_max_stream_offset(nghttp2_conn *conn, int64_t stream_id,
     return NGHTTP2_ERR_FLOW_CONTROL;
   }
 
-  if (max_offset - stream->rx.max_offset > NGHTTP2_MAX_WINDOW_SIZE) {
-    /* unsent_max_offset is still smaller than max_offset.  */
-    stream->rx.unsent_max_offset = max_offset;
-
-    return 0;
-  }
-
-  stream->rx.unsent_max_offset = nghttp2_min(max_offset, NGHTTP2_MAX_INT);
+  stream->rx.unsent_max_offset = unsent_max_offset;
 
   if (!(stream->flags & NGHTTP2_STREAM_FLAG_SHUT_RD) &&
       conn_should_send_stream_window_update(conn, stream)) {
@@ -3766,16 +3771,20 @@ int nghttp2_conn_extend_max_stream_offset(nghttp2_conn *conn, int64_t stream_id,
 }
 
 int nghttp2_conn_extend_max_offset(nghttp2_conn *conn, size_t datalen) {
-  uint64_t max_offset;
+  uint64_t unsent_max_offset;
 
-  max_offset = conn->rx.unsent_max_offset + datalen;
+  if (datalen > NGHTTP2_MAX_INT - conn->rx.unsent_max_offset) {
+    unsent_max_offset = NGHTTP2_MAX_INT;
+  } else {
+    unsent_max_offset = conn->rx.unsent_max_offset + datalen;
+  }
 
-  if (max_offset > conn->rx.max_offset &&
-      max_offset - conn->rx.max_offset > NGHTTP2_MAX_WINDOW_SIZE) {
+  if (unsent_max_offset > conn->rx.offset &&
+      unsent_max_offset - conn->rx.offset > NGHTTP2_MAX_WINDOW_SIZE) {
     return NGHTTP2_ERR_FLOW_CONTROL;
   }
 
-  conn->rx.unsent_max_offset = nghttp2_min(max_offset, NGHTTP2_MAX_INT);
+  conn->rx.unsent_max_offset = unsent_max_offset;
 
   return 0;
 }
