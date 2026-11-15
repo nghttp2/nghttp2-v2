@@ -17,6 +17,65 @@ import (
 	"golang.org/x/net/websocket"
 )
 
+// TestH1H1FragmentedMethod tests that a method sharing a prefix with
+// the HTTP/2 client preface is preserved across reads.
+func TestH1H1FragmentedMethod(t *testing.T) {
+	for _, tt := range []struct {
+		method string
+		split  int
+	}{
+		{method: "POST", split: 1},
+		{method: "PROPFIND", split: 2},
+	} {
+		t.Run(tt.method, func(t *testing.T) {
+			st := newServerTester(t, options{
+				handler: func(w http.ResponseWriter, r *http.Request) {
+					if got, want := r.Method, tt.method; got != want {
+						t.Errorf("method = %q; want %q", got, want)
+					}
+					body, err := io.ReadAll(r.Body)
+					if err != nil {
+						t.Errorf("Error io.ReadAll() = %v", err)
+						return
+					}
+					if got, want := string(body), "foo"; got != want {
+						t.Errorf("body = %q; want %q", got, want)
+					}
+				},
+			})
+
+			defer st.Close()
+
+			if err := st.conn.SetDeadline(time.Now().Add(5 * time.Second)); err != nil {
+				t.Fatal(err)
+			}
+
+			req := tt.method + " / HTTP/1.1\r\nHost: example.org\r\nContent-Length: 3\r\n\r\nfoo"
+			if _, err := io.WriteString(st.conn, req[:tt.split]); err != nil {
+				t.Fatal(err)
+			}
+
+			// Let nghttpx read the matching preface prefix before sending
+			// the rest of the HTTP/1 request.
+			time.Sleep(150 * time.Millisecond)
+			if _, err := io.WriteString(st.conn, req[tt.split:]); err != nil {
+				t.Fatal(err)
+			}
+
+			resp, err := http.ReadResponse(bufio.NewReader(st.conn), nil)
+			if err != nil {
+				t.Fatalf("Error http.ReadResponse() = %v", err)
+			}
+
+			defer resp.Body.Close()
+
+			if got, want := resp.StatusCode, http.StatusOK; got != want {
+				t.Errorf("status = %v; want %v", got, want)
+			}
+		})
+	}
+}
+
 // TestH1H1PlainGET tests whether simple HTTP/1 GET request works.
 func TestH1H1PlainGET(t *testing.T) {
 	st := newServerTester(t, options{})

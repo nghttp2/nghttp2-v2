@@ -18,6 +18,48 @@ import (
 	"golang.org/x/net/http2/hpack"
 )
 
+// TestH2H1FragmentedPreface tests that an HTTP/2 client preface split
+// across reads still upgrades the connection and serves a request.
+func TestH2H1FragmentedPreface(t *testing.T) {
+	for _, split := range []int{1, 3, 16, len(http2.ClientPreface) - 1} {
+		t.Run(fmt.Sprint(split), func(t *testing.T) {
+			st := newServerTester(t, options{})
+			defer st.Close()
+
+			if err := st.conn.SetDeadline(time.Now().Add(5 * time.Second)); err != nil {
+				t.Fatal(err)
+			}
+
+			if _, err := io.WriteString(st.conn, http2.ClientPreface[:split]); err != nil {
+				t.Fatal(err)
+			}
+
+			// Let nghttpx inspect the incomplete preface first.
+			time.Sleep(150 * time.Millisecond)
+			if _, err := io.WriteString(st.conn, http2.ClientPreface[split:]); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := st.fr.WriteSettings(); err != nil {
+				t.Fatal(err)
+			}
+
+			st.h2PrefaceSent = true
+
+			res, err := st.http2(requestParam{
+				name: "TestH2H1FragmentedPreface",
+			})
+			if err != nil {
+				t.Fatalf("Error st.http2() = %v", err)
+			}
+
+			if got, want := res.status, http.StatusOK; got != want {
+				t.Errorf("status = %v; want %v", got, want)
+			}
+		})
+	}
+}
+
 // TestH2H1PlainGET tests whether simple HTTP/2 GET request works.
 func TestH2H1PlainGET(t *testing.T) {
 	st := newServerTester(t, options{})
