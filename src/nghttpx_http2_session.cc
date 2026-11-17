@@ -1098,6 +1098,22 @@ int end_headers(nghttp2_conn *conn, int64_t stream_id, int fin,
 } // namespace
 
 namespace {
+int end_stream_local(nghttp2_conn *conn, int64_t stream_id,
+                     void *conn_user_data, void *stream_user_data) {
+  auto sd = static_cast<StreamData *>(stream_user_data);
+  if (!sd || !sd->dconn) {
+    return 0;
+  }
+  auto downstream = sd->dconn->get_downstream();
+
+  // For request without request body.
+  downstream->set_request_header_sent(true);
+
+  return 0;
+}
+} // namespace
+
+namespace {
 int end_stream_remote(nghttp2_conn *conn, int64_t stream_id,
                       void *conn_user_data, void *stream_user_data) {
   auto sd = static_cast<StreamData *>(stream_user_data);
@@ -1295,6 +1311,7 @@ std::expected<void, Error> Http2Session::connection_made() {
     .end_headers = end_headers,
     .recv_trailer = recv_trailer,
     .recv_data = recv_data,
+    .end_stream_local = end_stream_local,
     .end_stream_remote = end_stream_remote,
     .recv_ping_ack = recv_ping_ack,
     .shutdown = http2_shutdown,

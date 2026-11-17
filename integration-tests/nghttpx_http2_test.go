@@ -2772,8 +2772,8 @@ func TestH2H2MultipleResponseCL(t *testing.T) {
 		t.Fatalf("Error st.http2() = %v", err)
 	}
 
-	if got, want := res.status, http.StatusBadGateway; got != want {
-		t.Errorf("status: %v; want %v", got, want)
+	if got, want := res.errCode, http2.ErrCodeInternal; got != want {
+		t.Errorf("res.errCode: %v; want %v", got, want)
 	}
 }
 
@@ -2798,8 +2798,8 @@ func TestH2H2InvalidResponseCL(t *testing.T) {
 		t.Fatalf("Error st.http2() = %v", err)
 	}
 
-	if got, want := res.status, http.StatusBadGateway; got != want {
-		t.Errorf("status: %v; want %v", got, want)
+	if got, want := res.errCode, http2.ErrCodeInternal; got != want {
+		t.Errorf("res.errCode: %v; want %v", got, want)
 	}
 }
 
