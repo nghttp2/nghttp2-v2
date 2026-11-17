@@ -143,6 +143,7 @@ private:
   size_t max_buffer_size_{NGHTTPX_HTTP2_MAX_BUFFER_SIZE};
   // The number of requests seen so far.
   size_t num_requests_{};
+  bool graceful_shutdown_started_{};
 };
 
 } // namespace nghttpx

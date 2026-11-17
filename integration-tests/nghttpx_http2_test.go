@@ -1370,7 +1370,7 @@ func TestH2H1ProxyProtocolV1ForwardedForObfuscated(t *testing.T) {
 	st := newServerTester(t, opts)
 	defer st.Close()
 
-	if _, err := st.conn.Write([]byte("PROXY TCP4 192.168.0.2 192.168.0.100 12345 8080\r\n")); err != nil {
+	if _, err := st.conn.Write([]byte("PROXY TCP4 1.168.0.2 192.168.0.100 12345 8080\r\n")); err != nil {
 		t.Fatalf("Error st.conn.Write() = %v", err)
 	}
 
@@ -2772,8 +2772,8 @@ func TestH2H2MultipleResponseCL(t *testing.T) {
 		t.Fatalf("Error st.http2() = %v", err)
 	}
 
-	if got, want := res.status, http.StatusBadGateway; got != want {
-		t.Errorf("status: %v; want %v", got, want)
+	if got, want := res.errCode, http2.ErrCodeInternal; got != want {
+		t.Errorf("res.errCode: %v; want %v", got, want)
 	}
 }
 
@@ -2798,8 +2798,8 @@ func TestH2H2InvalidResponseCL(t *testing.T) {
 		t.Fatalf("Error st.http2() = %v", err)
 	}
 
-	if got, want := res.status, http.StatusBadGateway; got != want {
-		t.Errorf("status: %v; want %v", got, want)
+	if got, want := res.errCode, http2.ErrCodeInternal; got != want {
+		t.Errorf("res.errCode: %v; want %v", got, want)
 	}
 }
 
