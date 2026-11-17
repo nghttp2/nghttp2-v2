@@ -691,9 +691,11 @@ void Http2Upstream::check_shutdown() {
 }
 
 void Http2Upstream::start_graceful_shutdown() {
-  if (ev_is_active(&shutdown_timer_)) {
+  if (graceful_shutdown_started_) {
     return;
   }
+
+  graceful_shutdown_started_ = true;
 
   nghttp2_conn_submit_shutdown_notice(conn_);
 
