@@ -966,9 +966,11 @@ static int conn_on_end_headers(nghttp2_conn *conn, nghttp2_context ctx,
 
   stream->flags |= NGHTTP2_STREAM_FLAG_SHUT_RD;
 
-  rv = conn_call_end_stream_remote(conn, stream);
-  if (rv != 0) {
-    return rv;
+  if (!(stream->flags & NGHTTP2_STREAM_FLAG_RST_STREAM)) {
+    rv = conn_call_end_stream_remote(conn, stream);
+    if (rv != 0) {
+      return rv;
+    }
   }
 
   return nghttp2_conn_close_stream_if_shut_rdwr(conn, ctx, stream);
@@ -1139,7 +1141,8 @@ static int conn_recv_headers_hd(nghttp2_conn *conn, nghttp2_context ctx,
     nghttp2_unreachable();
   }
 
-  if (fr->hd.len || !(fr->hd.flags & NGHTTP2_HEADERS_FLAG_END_HEADERS)) {
+  if (fr->hd.len || !(fr->hd.flags & NGHTTP2_HEADERS_FLAG_END_HEADERS) ||
+      (stream->flags & NGHTTP2_STREAM_FLAG_RST_STREAM)) {
     return 0;
   }
 
