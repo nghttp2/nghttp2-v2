@@ -563,14 +563,20 @@ void test_nghttp2_hpack_decoder_expect_table_size_update(void) {
   nghttp2_ssize nread;
   nghttp2_hpack_nv nv;
   uint8_t flags;
+  int rv;
 
   nghttp2_hpack_encoder_init(&enc, NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY, mem);
 
   /* This will make encoder require table size update in the next
      inflation. */
   nghttp2_hpack_decoder_init(&dec, mem);
-  nghttp2_hpack_decoder_set_max_dtable_capacity(&dec, 4095);
-  nghttp2_hpack_decoder_set_max_dtable_capacity(&dec, 4096);
+  rv = nghttp2_hpack_decoder_set_max_dtable_capacity(&dec, 4095);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_hpack_decoder_set_max_dtable_capacity(&dec, 4096);
+
+  assert_int(0, ==, rv);
 
   nread = nghttp2_hpack_decoder_read(&dec, &nv, &flags, data, sizeof(data),
                                      /* fin = */ 1);
@@ -582,7 +588,9 @@ void test_nghttp2_hpack_decoder_expect_table_size_update(void) {
   /* This does not require for encoder to emit table size update since
    * size is not changed. */
   nghttp2_hpack_decoder_init(&dec, mem);
-  nghttp2_hpack_decoder_set_max_dtable_capacity(&dec, 4096);
+  rv = nghttp2_hpack_decoder_set_max_dtable_capacity(&dec, 4096);
+
+  assert_int(0, ==, rv);
 
   nghttp2_buf_wrap_init(&buf, (uint8_t *)data, sizeof(data));
   buf.last += sizeof(data);
@@ -594,7 +602,9 @@ void test_nghttp2_hpack_decoder_expect_table_size_update(void) {
   /* This does not require for encoder to emit table size update since
      new size is larger than current size. */
   nghttp2_hpack_decoder_init(&dec, mem);
-  nghttp2_hpack_decoder_set_max_dtable_capacity(&dec, 4097);
+  rv = nghttp2_hpack_decoder_set_max_dtable_capacity(&dec, 4097);
+
+  assert_int(0, ==, rv);
 
   nghttp2_buf_wrap_init(&buf, (uint8_t *)data, sizeof(data));
   buf.last += sizeof(data);
@@ -605,11 +615,18 @@ void test_nghttp2_hpack_decoder_expect_table_size_update(void) {
 
   /* Received table size is strictly larger than minimum table size */
   nghttp2_hpack_decoder_init(&dec, mem);
-  nghttp2_hpack_decoder_set_max_dtable_capacity(&dec, 111);
-  nghttp2_hpack_decoder_set_max_dtable_capacity(&dec, 4096);
+  rv = nghttp2_hpack_decoder_set_max_dtable_capacity(&dec, 111);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_hpack_decoder_set_max_dtable_capacity(&dec, 4096);
+
+  assert_int(0, ==, rv);
 
   nghttp2_buf_init(&buf);
-  nghttp2_hpack_encoder_write_table_size(&enc, &buf, 112);
+  rv = nghttp2_hpack_encoder_write_table_size(&enc, &buf, 112);
+
+  assert_int(0, ==, rv);
 
   nread = nghttp2_hpack_decoder_read(&dec, &nv, &flags, buf.pos,
                                      nghttp2_buf_len(&buf),
@@ -622,12 +639,22 @@ void test_nghttp2_hpack_decoder_expect_table_size_update(void) {
 
   /* Receiving 2 table size updates, min and last value */
   nghttp2_hpack_decoder_init(&dec, mem);
-  nghttp2_hpack_decoder_set_max_dtable_capacity(&dec, 111);
-  nghttp2_hpack_decoder_set_max_dtable_capacity(&dec, 4096);
+  rv = nghttp2_hpack_decoder_set_max_dtable_capacity(&dec, 111);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_hpack_decoder_set_max_dtable_capacity(&dec, 4096);
+
+  assert_int(0, ==, rv);
 
   nghttp2_buf_init(&buf);
-  nghttp2_hpack_encoder_write_table_size(&enc, &buf, 111);
-  nghttp2_hpack_encoder_write_table_size(&enc, &buf, 4096);
+  rv = nghttp2_hpack_encoder_write_table_size(&enc, &buf, 111);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_hpack_encoder_write_table_size(&enc, &buf, 4096);
+
+  assert_int(0, ==, rv);
 
   check_decode_header(&dec, &buf, NULL, 0);
 
@@ -636,12 +663,22 @@ void test_nghttp2_hpack_decoder_expect_table_size_update(void) {
 
   /* 2nd update is larger than last value */
   nghttp2_hpack_decoder_init(&dec, mem);
-  nghttp2_hpack_decoder_set_max_dtable_capacity(&dec, 111);
-  nghttp2_hpack_decoder_set_max_dtable_capacity(&dec, 4095);
+  rv = nghttp2_hpack_decoder_set_max_dtable_capacity(&dec, 111);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_hpack_decoder_set_max_dtable_capacity(&dec, 4095);
+
+  assert_int(0, ==, rv);
 
   nghttp2_buf_init(&buf);
-  nghttp2_hpack_encoder_write_table_size(&enc, &buf, 111);
-  nghttp2_hpack_encoder_write_table_size(&enc, &buf, 4096);
+  rv = nghttp2_hpack_encoder_write_table_size(&enc, &buf, 111);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_hpack_encoder_write_table_size(&enc, &buf, 4096);
+
+  assert_int(0, ==, rv);
 
   nread = nghttp2_hpack_decoder_read(&dec, &nv, &flags, buf.pos,
                                      nghttp2_buf_len(&buf),
@@ -711,7 +748,10 @@ void test_nghttp2_hpack_ringbuf_reserve(void) {
   nghttp2_hpack_encoder_init(&enc, 8000, mem);
   nghttp2_hpack_decoder_init(&dec, mem);
 
-  nghttp2_hpack_decoder_set_max_dtable_capacity(&dec, 8000);
+  rv = nghttp2_hpack_decoder_set_max_dtable_capacity(&dec, 8000);
+
+  assert_int(0, ==, rv);
+
   nghttp2_hpack_encoder_set_max_dtable_capacity(&enc, 8000);
 
   for (i = 0; i < 150; ++i) {

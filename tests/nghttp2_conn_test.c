@@ -452,7 +452,10 @@ static int recv_data_extend_max_stream_offset(
   userdata *ud = conn_user_data;
   int rv;
 
-  recv_data(conn, stream_id, data, datalen, conn_user_data, stream_user_data);
+  rv =
+    recv_data(conn, stream_id, data, datalen, conn_user_data, stream_user_data);
+
+  assert_int(0, ==, rv);
 
   rv = nghttp2_conn_extend_max_stream_offset(
     conn, stream_id, ud->extend_max_stream_offset.datalen);
@@ -469,7 +472,10 @@ static int recv_data_extend_max_offset(nghttp2_conn *conn, int64_t stream_id,
   userdata *ud = conn_user_data;
   int rv;
 
-  recv_data(conn, stream_id, data, datalen, conn_user_data, stream_user_data);
+  rv =
+    recv_data(conn, stream_id, data, datalen, conn_user_data, stream_user_data);
+
+  assert_int(0, ==, rv);
 
   rv = nghttp2_conn_extend_max_offset(conn, ud->extend_max_offset.datalen);
 
@@ -6657,6 +6663,8 @@ void test_nghttp2_conn_recv_window_update(void) {
   rv =
     nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
 
+  assert_int(0, ==, rv);
+
   fr.headers = (nghttp2_frame_headers){
     .hd =
       {
@@ -6735,6 +6743,8 @@ void test_nghttp2_conn_recv_window_update(void) {
   nghttp2_buf_reset(&hbuf);
   rv =
     nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
+
+  assert_int(0, ==, rv);
 
   fr.headers = (nghttp2_frame_headers){
     .hd =
@@ -6901,6 +6911,8 @@ void test_nghttp2_conn_recv_window_update(void) {
   rv =
     nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
 
+  assert_int(0, ==, rv);
+
   fr.headers = (nghttp2_frame_headers){
     .hd =
       {
@@ -7015,6 +7027,8 @@ void test_nghttp2_conn_recv_window_update(void) {
   rv =
     nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
 
+  assert_int(0, ==, rv);
+
   fr.headers = (nghttp2_frame_headers){
     .hd =
       {
@@ -7114,6 +7128,8 @@ void test_nghttp2_conn_recv_priority_update(void) {
   nghttp2_buf_reset(&hbuf);
   rv =
     nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
+
+  assert_int(0, ==, rv);
 
   fr.headers = (nghttp2_frame_headers){
     .hd =
@@ -7294,6 +7310,8 @@ void test_nghttp2_conn_recv_priority_update(void) {
   rv =
     nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
 
+  assert_int(0, ==, rv);
+
   fr.headers = (nghttp2_frame_headers){
     .hd =
       {
@@ -7345,6 +7363,8 @@ void test_nghttp2_conn_recv_priority_update(void) {
   nghttp2_buf_reset(&hbuf);
   rv =
     nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
+
+  assert_int(0, ==, rv);
 
   fr.headers = (nghttp2_frame_headers){
     .hd =
@@ -7398,6 +7418,8 @@ void test_nghttp2_conn_recv_priority_update(void) {
   nghttp2_buf_reset(&hbuf);
   rv =
     nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
+
+  assert_int(0, ==, rv);
 
   fr.headers = (nghttp2_frame_headers){
     .hd =
@@ -7470,6 +7492,8 @@ void test_nghttp2_conn_recv_priority_update(void) {
   rv =
     nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
 
+  assert_int(0, ==, rv);
+
   fr.headers = (nghttp2_frame_headers){
     .hd =
       {
@@ -7528,6 +7552,8 @@ void test_nghttp2_conn_recv_priority_update(void) {
   nghttp2_buf_reset(&hbuf);
   rv =
     nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
+
+  assert_int(0, ==, rv);
 
   fr.headers = (nghttp2_frame_headers){
     .hd =
@@ -7604,6 +7630,8 @@ void test_nghttp2_conn_recv_priority_update(void) {
   nghttp2_buf_reset(&hbuf);
   rv =
     nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
+
+  assert_int(0, ==, rv);
 
   fr.headers = (nghttp2_frame_headers){
     .hd =
@@ -7821,6 +7849,8 @@ void test_nghttp2_conn_recv_settings_ack(void) {
   rv =
     nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
 
+  assert_int(0, ==, rv);
+
   fr.headers = (nghttp2_frame_headers){
     .hd =
       {
@@ -7888,6 +7918,8 @@ void test_nghttp2_conn_recv_settings_ack(void) {
   rv =
     nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
 
+  assert_int(0, ==, rv);
+
   fr.headers = (nghttp2_frame_headers){
     .hd =
       {
@@ -7938,6 +7970,8 @@ void test_nghttp2_conn_recv_settings_ack(void) {
   nghttp2_buf_reset(&hbuf);
   rv =
     nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
+
+  assert_int(0, ==, rv);
 
   fr.headers = (nghttp2_frame_headers){
     .hd =
@@ -8036,6 +8070,8 @@ void test_nghttp2_conn_recv_settings_ack(void) {
   nghttp2_buf_reset(&hbuf);
   rv =
     nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
+
+  assert_int(0, ==, rv);
 
   fr.headers = (nghttp2_frame_headers){
     .hd =
@@ -8153,6 +8189,8 @@ void test_nghttp2_conn_recv_settings_ack(void) {
   nghttp2_buf_reset(&hbuf);
   rv =
     nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
+
+  assert_int(0, ==, rv);
 
   fr.headers = (nghttp2_frame_headers){
     .hd =
@@ -8301,6 +8339,8 @@ void test_nghttp2_conn_recv_settings_ack(void) {
   nghttp2_buf_reset(&hbuf);
   rv =
     nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
+
+  assert_int(0, ==, rv);
 
   fr.headers = (nghttp2_frame_headers){
     .hd =
@@ -11826,6 +11866,8 @@ void test_nghttp2_conn_rx_flow_control(void) {
   nghttp2_buf_reset(&buf);
   rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
 
+  assert_int(0, ==, rv);
+
   for (i = 0; i < 3; ++i) {
     fr.data = (nghttp2_frame_data){
       .hd =
@@ -12014,6 +12056,8 @@ void test_nghttp2_conn_rx_flow_control(void) {
 
   nghttp2_buf_reset(&buf);
   rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
+
+  assert_int(0, ==, rv);
 
   fr.data = (nghttp2_frame_data){
     .hd =
@@ -14032,6 +14076,8 @@ void test_nghttp2_conn_http_non_final_response(void) {
   rv = nghttp2_hpack_encoder_write(&enc, &hbuf, infonva,
                                    nghttp2_arraylen(infonva));
 
+  assert_int(0, ==, rv);
+
   fr.headers = (nghttp2_frame_headers){
     .hd =
       {
@@ -14052,6 +14098,8 @@ void test_nghttp2_conn_http_non_final_response(void) {
   nghttp2_buf_reset(&hbuf);
   rv = nghttp2_hpack_encoder_write(&enc, &hbuf, respnva,
                                    nghttp2_arraylen(respnva));
+
+  assert_int(0, ==, rv);
 
   fr.headers = (nghttp2_frame_headers){
     .hd =
@@ -14122,6 +14170,8 @@ void test_nghttp2_conn_http_non_final_response(void) {
 
   nghttp2_buf_reset(&hbuf);
   rv = nghttp2_hpack_encoder_write(&enc, &hbuf, trnva, nghttp2_arraylen(trnva));
+
+  assert_int(0, ==, rv);
 
   fr.headers = (nghttp2_frame_headers){
     .hd =
@@ -14743,6 +14793,8 @@ void test_nghttp2_conn_http_trailers(void) {
   nghttp2_buf_reset(&buf);
   rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
 
+  assert_int(0, ==, rv);
+
   nghttp2_buf_reset(&hbuf);
   rv = nghttp2_hpack_encoder_write(&enc, &hbuf, trnva, nghttp2_arraylen(trnva));
 
@@ -14802,6 +14854,8 @@ void test_nghttp2_conn_http_trailers(void) {
     (uint32_t)nghttp2_frame_encode_headers_payloadlen(&fr.headers);
   nghttp2_buf_reset(&buf);
   rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
+
+  assert_int(0, ==, rv);
 
   nghttp2_buf_reset(&hbuf);
   rv =
@@ -14865,6 +14919,8 @@ void test_nghttp2_conn_http_trailers(void) {
   nghttp2_buf_reset(&buf);
   rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
 
+  assert_int(0, ==, rv);
+
   nghttp2_buf_reset(&hbuf);
   rv = nghttp2_hpack_encoder_write(&enc, &hbuf, trnva, nghttp2_arraylen(trnva));
 
@@ -14924,6 +14980,8 @@ void test_nghttp2_conn_http_trailers(void) {
     (uint32_t)nghttp2_frame_encode_headers_payloadlen(&fr.headers);
   nghttp2_buf_reset(&buf);
   rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
+
+  assert_int(0, ==, rv);
 
   nghttp2_buf_reset(&hbuf);
   rv = nghttp2_hpack_encoder_write(&enc, &hbuf, trnva, nghttp2_arraylen(trnva));
@@ -14986,6 +15044,8 @@ void test_nghttp2_conn_http_trailers(void) {
   nghttp2_buf_reset(&buf);
   rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
 
+  assert_int(0, ==, rv);
+
   fr.data = (nghttp2_frame_data){
     .hd =
       {
@@ -14998,6 +15058,8 @@ void test_nghttp2_conn_http_trailers(void) {
 
   fr.data.hd.len = (uint32_t)nghttp2_frame_encode_data_payloadlen(&fr.data);
   rv = nghttp2_frame_encode_data(&buf, &fr.data);
+
+  assert_int(0, ==, rv);
 
   nghttp2_buf_reset(&hbuf);
   rv = nghttp2_hpack_encoder_write(&enc, &hbuf, trnva, nghttp2_arraylen(trnva));
@@ -15068,6 +15130,8 @@ void test_nghttp2_conn_http_trailers(void) {
     (uint32_t)nghttp2_frame_encode_headers_payloadlen(&fr.headers);
   nghttp2_buf_reset(&buf);
   rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
+
+  assert_int(0, ==, rv);
 
   nghttp2_buf_reset(&hbuf);
   rv = nghttp2_hpack_encoder_write(&enc, &hbuf, cl_trnva,
@@ -15149,6 +15213,8 @@ void test_nghttp2_conn_http_trailers(void) {
     (uint32_t)nghttp2_frame_encode_headers_payloadlen(&fr.headers);
   nghttp2_buf_reset(&buf);
   rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
+
+  assert_int(0, ==, rv);
 
   nghttp2_buf_reset(&hbuf);
   rv = nghttp2_hpack_encoder_write(&enc, &hbuf, cl_trnva,
@@ -15479,6 +15545,8 @@ void test_nghttp2_conn_http_record_request_method(void) {
   rv = nghttp2_hpack_encoder_write(&enc, &hbuf, cl_respnva,
                                    nghttp2_arraylen(cl_respnva));
 
+  assert_int(0, ==, rv);
+
   fr.headers = (nghttp2_frame_headers){
     .hd =
       {
@@ -15530,6 +15598,8 @@ void test_nghttp2_conn_http_record_request_method(void) {
   nghttp2_buf_reset(&hbuf);
   rv = nghttp2_hpack_encoder_write(&enc, &hbuf, cl_respnva,
                                    nghttp2_arraylen(cl_respnva));
+
+  assert_int(0, ==, rv);
 
   fr.headers = (nghttp2_frame_headers){
     .hd =
