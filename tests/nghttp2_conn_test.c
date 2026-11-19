@@ -243,6 +243,12 @@ typedef struct userdata {
     size_t nseq;
     size_t seq_idx;
   } read_data;
+  struct {
+    size_t datalen;
+  } extend_max_stream_offset;
+  struct {
+    size_t datalen;
+  } extend_max_offset;
 } userdata;
 
 static void genrand(uint8_t *dest, size_t destlen) { memset(dest, 0, destlen); }
@@ -436,6 +442,38 @@ static int recv_data(nghttp2_conn *conn, int64_t stream_id, const uint8_t *data,
   ++ud->recv_data.ncalled;
   ud->recv_data.stream_id = stream_id;
   ud->recv_data.datalen += datalen;
+
+  return 0;
+}
+
+static int recv_data_extend_max_stream_offset(
+  nghttp2_conn *conn, int64_t stream_id, const uint8_t *data, size_t datalen,
+  void *conn_user_data, void *stream_user_data) {
+  userdata *ud = conn_user_data;
+  int rv;
+
+  recv_data(conn, stream_id, data, datalen, conn_user_data, stream_user_data);
+
+  rv = nghttp2_conn_extend_max_stream_offset(
+    conn, stream_id, ud->extend_max_stream_offset.datalen);
+
+  assert_int(0, ==, rv);
+
+  return 0;
+}
+
+static int recv_data_extend_max_offset(nghttp2_conn *conn, int64_t stream_id,
+                                       const uint8_t *data, size_t datalen,
+                                       void *conn_user_data,
+                                       void *stream_user_data) {
+  userdata *ud = conn_user_data;
+  int rv;
+
+  recv_data(conn, stream_id, data, datalen, conn_user_data, stream_user_data);
+
+  rv = nghttp2_conn_extend_max_offset(conn, ud->extend_max_offset.datalen);
+
+  assert_int(0, ==, rv);
 
   return 0;
 }
@@ -11726,6 +11764,7 @@ void test_nghttp2_conn_rx_flow_control(void) {
   uint8_t outbuf[16384];
   nghttp2_hpack_encoder enc;
   nghttp2_buf buf, hbuf;
+  nghttp2_callbacks callbacks;
   nghttp2_settings settings;
   nghttp2_frame fr;
   nghttp2_stream *stream;
@@ -11733,6 +11772,7 @@ void test_nghttp2_conn_rx_flow_control(void) {
   nghttp2_ssize nwrite;
   conn_options opts;
   int64_t stream_id;
+  userdata ud;
   size_t i;
   int rv;
 
@@ -12086,6 +12126,176 @@ void test_nghttp2_conn_rx_flow_control(void) {
 
   assert_int(0, ==, rv);
 
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_CLOSING, ==,
+              conn->rx.frrd.state);
+  assert_uint32(NGHTTP2_FLOW_CONTROL_ERROR, ==, conn->tx.goaway.error_code);
+
+  nghttp2_hpack_encoder_free(&enc);
+  nghttp2_conn_del(conn);
+
+  /* Padding automatic refund exceeds the stream offset limit */
+  server_default_callbacks(&callbacks);
+  callbacks.recv_data = recv_data_extend_max_stream_offset;
+
+  server_default_settings(&settings);
+
+  opts = (conn_options){
+    .callbacks = &callbacks,
+    .settings = &settings,
+    .user_data = &ud,
+  };
+
+  setup_default_server_with_options(&conn, opts);
+
+  write_preface(conn, ts);
+  read_client_preface(conn, NULL, 0, ts);
+  write_settings_ack(conn, ts);
+  read_settings_ack(conn, ts);
+
+  nghttp2_hpack_encoder_init(&enc, NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY, mem);
+  nghttp2_buf_reset(&hbuf);
+  rv =
+    nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
+
+  assert_int(0, ==, rv);
+
+  fr.headers = (nghttp2_frame_headers){
+    .hd =
+      {
+        .type = NGHTTP2_FRAME_HEADERS,
+        .flags = NGHTTP2_HEADERS_FLAG_END_HEADERS,
+        .stream_id = 0x01,
+      },
+    .field_block = hbuf.pos,
+    .field_blocklen = nghttp2_buf_len(&hbuf),
+  };
+
+  fr.headers.hd.len =
+    (uint32_t)nghttp2_frame_encode_headers_payloadlen(&fr.headers);
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
+              ==, conn->rx.frrd.state);
+
+  fr.data = (nghttp2_frame_data){
+    .hd =
+      {
+        .type = NGHTTP2_FRAME_DATA,
+        .flags = NGHTTP2_DATA_FLAG_PADDED,
+        .stream_id = 0x01,
+      },
+    .data = nulldata,
+    .datalen = 1,
+  };
+
+  fr.data.hd.len = (uint32_t)nghttp2_frame_encode_data_payloadlen(&fr.data);
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_data(&buf, &fr.data);
+
+  assert_int(0, ==, rv);
+
+  ud = (userdata){
+    .extend_max_stream_offset.datalen =
+      NGHTTP2_MAX_WINDOW_SIZE - NGHTTP2_INITIAL_WINDOW_SIZE + 2,
+  };
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_CLOSING, ==,
+              conn->rx.frrd.state);
+  assert_uint32(NGHTTP2_FLOW_CONTROL_ERROR, ==, conn->tx.goaway.error_code);
+
+  stream = nghttp2_conn_find_stream(conn, 0x01);
+
+  assert_not_null(stream);
+  assert_uint64(NGHTTP2_MAX_WINDOW_SIZE + 2, ==, stream->rx.unsent_max_offset);
+  assert_uint64(65535, ==, stream->rx.max_offset);
+  assert_uint64(2, ==, stream->rx.offset);
+
+  nghttp2_hpack_encoder_free(&enc);
+  nghttp2_conn_del(conn);
+
+  /* Padding automatic refund exceeds the connection offset limit */
+  server_default_callbacks(&callbacks);
+  callbacks.recv_data = recv_data_extend_max_offset;
+
+  server_default_settings(&settings);
+  settings.initial_max_data = NGHTTP2_MAX_WINDOW_SIZE;
+
+  opts = (conn_options){
+    .callbacks = &callbacks,
+    .settings = &settings,
+    .user_data = &ud,
+  };
+
+  setup_default_server_with_options(&conn, opts);
+
+  write_preface_with_window_update(
+    conn, NGHTTP2_MAX_WINDOW_SIZE - NGHTTP2_INITIAL_WINDOW_SIZE, ts);
+  read_client_preface(conn, NULL, 0, ts);
+  write_settings_ack(conn, ts);
+  read_settings_ack(conn, ts);
+
+  nghttp2_hpack_encoder_init(&enc, NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY, mem);
+  nghttp2_buf_reset(&hbuf);
+  rv =
+    nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
+
+  assert_int(0, ==, rv);
+
+  fr.headers = (nghttp2_frame_headers){
+    .hd =
+      {
+        .type = NGHTTP2_FRAME_HEADERS,
+        .flags = NGHTTP2_HEADERS_FLAG_END_HEADERS,
+        .stream_id = 0x01,
+      },
+    .field_block = hbuf.pos,
+    .field_blocklen = nghttp2_buf_len(&hbuf),
+  };
+
+  fr.headers.hd.len =
+    (uint32_t)nghttp2_frame_encode_headers_payloadlen(&fr.headers);
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
+              ==, conn->rx.frrd.state);
+
+  fr.data = (nghttp2_frame_data){
+    .hd =
+      {
+        .type = NGHTTP2_FRAME_DATA,
+        .flags = NGHTTP2_DATA_FLAG_PADDED,
+        .stream_id = 0x01,
+      },
+    .data = nulldata,
+    .datalen = 1,
+  };
+
+  fr.data.hd.len = (uint32_t)nghttp2_frame_encode_data_payloadlen(&fr.data);
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_data(&buf, &fr.data);
+
+  assert_int(0, ==, rv);
+
+  ud = (userdata){
+    .extend_max_offset.datalen = 2,
+  };
   rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
 
   assert_int(0, ==, rv);

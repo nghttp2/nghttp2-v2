@@ -759,6 +759,10 @@ static int conn_on_data(nghttp2_conn *conn, const nghttp2_frame_data *fr,
   return conn_call_recv_data(conn, stream, data, datalen);
 }
 
+static int conn_extend_max_stream_offset(nghttp2_conn *conn,
+                                         nghttp2_stream *stream,
+                                         size_t datalen);
+
 static int conn_recv_data(nghttp2_conn *conn, nghttp2_context ctx,
                           const nghttp2_frame_data *fr, nghttp2_tstamp ts) {
   nghttp2_stream *stream;
@@ -770,11 +774,14 @@ static int conn_recv_data(nghttp2_conn *conn, nghttp2_context ctx,
   }
 
   if (fr->hd.flags & NGHTTP2_DATA_FLAG_PADDED) {
-    stream->rx.unsent_max_offset += fr->padlen + 1;
-    conn->rx.unsent_max_offset += fr->padlen + 1;
+    rv = conn_extend_max_stream_offset(conn, stream, fr->padlen + 1);
+    if (rv != 0) {
+      return rv;
+    }
 
-    if (nghttp2_stream_require_strmq(stream)) {
-      nghttp2_conn_strmq_push(conn, stream);
+    rv = nghttp2_conn_extend_max_offset(conn, fr->padlen + 1);
+    if (rv != 0) {
+      return rv;
     }
   }
 
@@ -3734,18 +3741,10 @@ int nghttp2_conn_submit_trailers(nghttp2_conn *conn, int64_t stream_id,
   return conn_submit_headers_data(conn, stream, nva, nvlen, NULL);
 }
 
-int nghttp2_conn_extend_max_stream_offset(nghttp2_conn *conn, int64_t stream_id,
-                                          size_t datalen) {
-  nghttp2_stream *stream;
+static int conn_extend_max_stream_offset(nghttp2_conn *conn,
+                                         nghttp2_stream *stream,
+                                         size_t datalen) {
   uint64_t unsent_max_offset;
-
-  assert(client_stream_id(stream_id));
-  assert(stream_id <= INT32_MAX);
-
-  stream = nghttp2_conn_find_stream(conn, stream_id);
-  if (!stream) {
-    return 0;
-  }
 
   if (datalen > NGHTTP2_MAX_INT - stream->rx.unsent_max_offset) {
     unsent_max_offset = NGHTTP2_MAX_INT;
@@ -3771,6 +3770,21 @@ int nghttp2_conn_extend_max_stream_offset(nghttp2_conn *conn, int64_t stream_id,
   }
 
   return 0;
+}
+
+int nghttp2_conn_extend_max_stream_offset(nghttp2_conn *conn, int64_t stream_id,
+                                          size_t datalen) {
+  nghttp2_stream *stream;
+
+  assert(client_stream_id(stream_id));
+  assert(stream_id <= INT32_MAX);
+
+  stream = nghttp2_conn_find_stream(conn, stream_id);
+  if (!stream) {
+    return 0;
+  }
+
+  return conn_extend_max_stream_offset(conn, stream, datalen);
 }
 
 int nghttp2_conn_extend_max_offset(nghttp2_conn *conn, size_t datalen) {
