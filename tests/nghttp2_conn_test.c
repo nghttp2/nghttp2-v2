@@ -12306,6 +12306,74 @@ void test_nghttp2_conn_rx_flow_control(void) {
   nghttp2_hpack_encoder_free(&enc);
   nghttp2_conn_del(conn);
 
+  /* Data for RST_STREAM-ed stream are automatically reclaimed to
+     connection window */
+  setup_default_server(&conn);
+  write_preface(conn, ts);
+  read_client_preface(conn, NULL, 0, ts);
+  write_settings_ack(conn, ts);
+  read_settings_ack(conn, ts);
+
+  nghttp2_hpack_encoder_init(&enc, NGHTTP2_HPACK_DEFAULT_DTABLE_CAPACITY, mem);
+  nghttp2_buf_reset(&hbuf);
+  rv =
+    nghttp2_hpack_encoder_write(&enc, &hbuf, reqnva, nghttp2_arraylen(reqnva));
+
+  assert_int(0, ==, rv);
+
+  fr.headers = (nghttp2_frame_headers){
+    .hd =
+      {
+        .type = NGHTTP2_FRAME_HEADERS,
+        .flags = NGHTTP2_HEADERS_FLAG_END_HEADERS,
+        .stream_id = 0x01,
+      },
+    .field_block = hbuf.pos,
+    .field_blocklen = nghttp2_buf_len(&hbuf),
+  };
+
+  fr.headers.hd.len =
+    (uint32_t)nghttp2_frame_encode_headers_payloadlen(&fr.headers);
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_headers(&buf, &fr.headers);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+  assert_enum(nghttp2_frame_read_state, NGHTTP2_FRAME_READ_STATE_FRAME_LENGTH,
+              ==, conn->rx.frrd.state);
+
+  nghttp2_conn_shutdown_stream(conn, 0x00, 0x01, NGHTTP2_INTERNAL_ERROR);
+
+  fr.data = (nghttp2_frame_data){
+    .hd =
+      {
+        .type = NGHTTP2_FRAME_DATA,
+        .flags = NGHTTP2_DATA_FLAG_PADDED,
+        .stream_id = 0x01,
+      },
+    .data = nulldata,
+    .datalen = 99,
+  };
+
+  fr.data.hd.len = (uint32_t)nghttp2_frame_encode_data_payloadlen(&fr.data);
+  nghttp2_buf_reset(&buf);
+  rv = nghttp2_frame_encode_data(&buf, &fr.data);
+
+  assert_int(0, ==, rv);
+
+  rv = nghttp2_conn_read(conn, buf.pos, nghttp2_buf_len(&buf), ++ts);
+
+  assert_int(0, ==, rv);
+  assert_uint64(NGHTTP2_INITIAL_WINDOW_SIZE + 100, ==,
+                conn->rx.unsent_max_offset);
+  assert_uint64(100, ==, conn->rx.offset);
+
+  nghttp2_hpack_encoder_free(&enc);
+  nghttp2_conn_del(conn);
+
   nghttp2_buf_free(&hbuf, mem);
 }
 
