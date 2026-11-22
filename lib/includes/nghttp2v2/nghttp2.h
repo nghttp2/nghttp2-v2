@@ -2458,10 +2458,17 @@ NGHTTP2_EXTERN void nghttp2_hpack_encoder_del(nghttp2_hpack_encoder *enc);
  *
  * This function expands |buf| as necessary to store the result.
  * :member:`buf->last <nghttp2_buf.last>` will be adjusted when data
- * is written.  |buf| can be empty buffer, that is initialized by
- * `nghttp2_buf_init`.  If :member:`buf->begin <nghttp2_buf.begin>` is
- * not ``NULL``, it must be allocated by the same memory allocator
- * passed to `nghttp2_hpack_encoder_new`.
+ * is written.
+ *
+ * The buffer pointed by |buf| must be initialized by
+ * `nghttp2_buf_init`.  Avoid initializing it with zero values.  Any
+ * caller-supplied backing storage must come from the allocator passed
+ * to `nghttp2_hpack_encoder_new`.  This function allocates memory for
+ * these buffers as necessary if it needs more space in the buffer.
+ * In particular, it frees and expands buffer if the current capacity
+ * of buffer is not enough.  Any dynamically allocated memory pointed
+ * by :member:`nghttp2_buf.begin` must be allocated by the same memory
+ * allocator passed to `nghttp2_hpack_encoder_new`.
  *
  * After this function returns, it is safe to delete the |nva|.
  *

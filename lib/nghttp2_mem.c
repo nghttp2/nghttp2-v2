@@ -114,8 +114,8 @@ void *nghttp2_mem_realloc_debug(const nghttp2_mem *mem, void *ptr, size_t size,
                                 size_t line) {
   void *nptr = mem->realloc(ptr, size, mem->user_data);
 
-  fprintf(stderr, "realloc %p ptr=%p size=%zu in %s at %s:%zu\n", nptr, ptr,
-          size, func, file, line);
+  fprintf(stderr, "realloc %p size=%zu in %s at %s:%zu\n", nptr, size, func,
+          file, line);
 
   return nptr;
 }

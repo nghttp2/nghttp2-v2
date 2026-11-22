@@ -24,9 +24,22 @@
  */
 #include "nghttp2_buf.h"
 
-void nghttp2_buf_init(nghttp2_buf *buf) { *buf = (nghttp2_buf){0}; }
+static const uint8_t inibuf;
+
+void nghttp2_buf_init(nghttp2_buf *buf) {
+  *buf = (nghttp2_buf){
+    .begin = (uint8_t *)&inibuf,
+    .end = (uint8_t *)&inibuf,
+    .pos = (uint8_t *)&inibuf,
+    .last = (uint8_t *)&inibuf,
+  };
+}
 
 void nghttp2_buf_wrap_init(nghttp2_buf *buf, uint8_t *src, size_t len) {
+  if (len == 0) {
+    src = (uint8_t *)&inibuf;
+  }
+
   *buf = (nghttp2_buf){
     .begin = src,
     .end = src + len,
@@ -36,6 +49,10 @@ void nghttp2_buf_wrap_init(nghttp2_buf *buf, uint8_t *src, size_t len) {
 }
 
 void nghttp2_buf_free(nghttp2_buf *buf, const nghttp2_mem *mem) {
+  if (buf->begin == &inibuf) {
+    return;
+  }
+
   nghttp2_mem_free(mem, buf->begin);
 }
 
@@ -60,7 +77,7 @@ int nghttp2_buf_reserve(nghttp2_buf *buf, size_t size, const nghttp2_mem *mem) {
   pos_offset = buf->pos - buf->begin;
   last_offset = buf->last - buf->begin;
 
-  p = nghttp2_mem_realloc(mem, buf->begin, size);
+  p = nghttp2_mem_realloc(mem, buf->begin == &inibuf ? NULL : buf->begin, size);
   if (!p) {
     return NGHTTP2_ERR_NOMEM;
   }
