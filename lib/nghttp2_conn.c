@@ -3622,6 +3622,9 @@ int64_t nghttp2_conn_get_next_stream_id(const nghttp2_conn *conn) {
 int64_t nghttp2_conn_submit_request(nghttp2_conn *conn, const nghttp2_nv *nva,
                                     size_t nvlen, const nghttp2_data_reader *dr,
                                     void *stream_user_data) {
+  static const nghttp2_context ctx = {
+    .phase = NGHTTP2_PHASE_WRITE,
+  };
   int64_t stream_id;
   nghttp2_stream *stream;
   int rv;
@@ -3639,7 +3642,6 @@ int64_t nghttp2_conn_submit_request(nghttp2_conn *conn, const nghttp2_nv *nva,
   }
 
   stream_id = conn->tx.next_stream_id;
-  conn->tx.next_stream_id += 2;
 
   rv = nghttp2_conn_create_stream(conn, &stream, stream_id, stream_user_data);
   if (rv != 0) {
@@ -3658,8 +3660,14 @@ int64_t nghttp2_conn_submit_request(nghttp2_conn *conn, const nghttp2_nv *nva,
 
   rv = conn_submit_headers_data(conn, stream, nva, nvlen, dr);
   if (rv != 0) {
+    /* Set the flag so that we do not call stream_close callback */
+    stream->flags |= NGHTTP2_STREAM_FLAG_REFUSED;
+    (void)nghttp2_conn_close_stream(conn, ctx, stream);
+
     return rv;
   }
+
+  conn->tx.next_stream_id += 2;
 
   return stream_id;
 }
