@@ -1675,7 +1675,7 @@ nghttp2_ssize nghttp2_hpack_decoder_read(nghttp2_hpack_decoder *decoder,
                                          nghttp2_hpack_nv *dest,
                                          uint8_t *pflags, const uint8_t *src,
                                          size_t srclen, int fin) {
-  const uint8_t *p = src, *last = src ? src + srclen : src;
+  const uint8_t *p, *last;
   int rfin;
   int busy = 0;
   const nghttp2_mem *mem = decoder->ctx.mem;
@@ -1686,6 +1686,15 @@ nghttp2_ssize nghttp2_hpack_decoder_read(nghttp2_hpack_decoder *decoder,
 
   if (decoder->ctx.bad) {
     return NGHTTP2_ERR_HPACK_FATAL;
+  }
+
+  if (srclen) {
+    p = src;
+    last = src + srclen;
+  } else {
+    src = (const uint8_t *)"";
+    p = src;
+    last = src;
   }
 
   DEBUGF("decoder: start state=%d\n", decoder->state);
